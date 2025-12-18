@@ -47,6 +47,45 @@ Fin/
 
 ## Installation
 
+### Option 1: CLI Installation (Recommended)
+
+1. **Clone the repository**:
+   ```bash
+   cd Fin
+   ```
+
+2. **Create virtual environment**:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   ```
+
+3. **Install the package**:
+   ```bash
+   pip install -e .
+   ```
+
+   This installs the CLI tool as `fin-cli` command.
+
+4. **Initialize database**:
+   ```bash
+   fin-cli init
+   ```
+
+5. **Configure credentials**:
+   ```bash
+   fin-cli config setup
+   ```
+
+   Or set individual credentials:
+   ```bash
+   fin-cli config set cal.username "myuser"
+   fin-cli config set cal.password "mypass"
+   fin-cli config set email.address "user@gmail.com"
+   ```
+
+### Option 2: Manual Installation (for development)
+
 1. **Clone the repository**:
    ```bash
    cd Fin
@@ -87,7 +126,57 @@ Fin/
 
 ## Usage
 
-### CAL Credit Card Scraper
+### CLI Usage (Recommended)
+
+The CLI provides a unified interface for all scrapers:
+
+#### Initialize and Configure
+```bash
+# Initialize database
+fin-cli init
+
+# Configure credentials interactively
+fin-cli config setup
+
+# View current configuration (masked)
+fin-cli config show
+
+# Set specific credentials
+fin-cli config set cal.username "myuser"
+fin-cli config set cal.password "mypass"
+```
+
+#### Sync Data (Coming in Phase 2)
+```bash
+# Sync all sources
+fin-cli sync --all
+
+# Sync specific institution
+fin-cli sync --credit-card cal
+fin-cli sync --broker excellence
+fin-cli sync --pension migdal
+```
+
+#### Query Data (Coming in Phase 3)
+```bash
+# List accounts
+fin-cli accounts list
+
+# List transactions
+fin-cli transactions list --from 2024-01-01 --to 2024-12-31
+
+# View statistics
+fin-cli stats
+
+# Export to CSV
+fin-cli export transactions --output transactions.csv
+```
+
+### Programmatic Usage
+
+You can also use the scrapers directly in Python code:
+
+#### CAL Credit Card Scraper
 
 ```python
 from scrapers.credit_cards import CALCreditCardScraper, CALCredentials
