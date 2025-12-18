@@ -1,0 +1,100 @@
+---
+description: Pytest unit test generator - creates parametrized tests with mocker, covers happy paths/edge cases/exceptions, no test classes, 2-3 tests per category
+globs: 
+    - "test_*.py"
+alwaysApply: false
+---
+# Unit Test Generation Rules
+
+## Test Generation Guidelines
+When generating unit tests, follow these rules:
+
+## Structure Requirements
+- Use pytest as the testing framework
+- Use `pytest.mark.parametrize` with `pytest.param` and descriptive `id` values
+- Mock all external dependencies using `mocker` fixture (pytest-mock)
+- Limit to 2-3 tests per test category
+
+## Test Categories (Generate all applicable)
+1. **Happy Flow Tests**: Normal execution paths with valid inputs
+2. **Edge Cases**: Boundary conditions, empty inputs, null values
+3. **Exception Testing**: Invalid inputs that should raise exceptions
+4. **Additional Tests** (when relevant):
+   - Boundary values (min/max, thresholds)
+   - State transitions (state changes, workflows)
+   - Interaction verification (method calls, side effects)
+
+## Code Style
+- Use descriptive test names that explain the scenario
+- Write function-based tests (no test classes)
+- Include docstrings for complex scenarios
+- Use fixtures for common test data setup
+- Follow naming convention: `test_<function_name>_<scenario>`
+
+## Test File Structure
+```python
+import pytest
+
+# Create fixtures for recurring mocks
+@pytest.fixture
+def mock_database(mocker):
+    """Fixture for database mock used across multiple tests."""
+    return mocker.MagicMock()
+
+@pytest.fixture
+def mock_api_client(mocker):
+    """Fixture for API client mock used across multiple tests."""
+    mock_client = mocker.MagicMock()
+    mock_client.get.return_value = {"status": "success"}
+    return mock_client
+
+@pytest.mark.parametrize("input_val,expected", [
+    pytest.param(valid_input, expected_output, id="descriptive_case_name"),
+])
+def test_function_name_happy_flow(mock_database, input_val, expected):
+    # Use existing fixture instead of creating new mock
+    # Happy flow test implementation
+    pass
+    
+@pytest.mark.parametrize("edge_input,expected", [
+    pytest.param(None, expected_result, id="none_input"),
+    pytest.param([], expected_result, id="empty_list"),
+])
+def test_function_name_edge_cases(mock_api_client, edge_input, expected):
+    # Use existing fixture instead of creating new mock
+    # Edge case test implementation
+    pass
+    
+@pytest.mark.parametrize("invalid_input,exception_type", [
+    pytest.param("invalid", ValueError, id="invalid_string"),
+    pytest.param(-1, ValueError, id="negative_number"),
+])
+def test_function_name_exceptions(mocker, invalid_input, exception_type):
+    # Use mocker only for one-off mocks
+    mocked_obj = mocker.MagicMock()
+    with pytest.raises(exception_type):
+        # Exception test implementation
+        pass
+```
+
+## Mocking Rules
+- Use `mocker` fixture (pytest-mock) for all mocking needs
+- Use `mocker.MagicMock()` for complex objects with methods/attributes
+- Use `mocker.Mock()` for simple mocks
+- Use `mocker.patch()` for patching modules/functions
+- **Naming convention**: 
+  - Use `mock_` prefix for fixture names (e.g., `mock_database`, `mock_service`)
+  - Use `mocked_` prefix for mock variables created with mocker (e.g., `mocked_database`, `mocked_service`)
+- Mock external APIs, databases, file systems
+- Mock time-dependent operations
+- Verify mock calls when testing interactions
+
+## Test Data and Fixtures
+- Use fixtures for reusable test data
+- Keep test data minimal and focused
+- Use factory patterns for complex objects
+- Avoid hardcoded values in assertions when possible
+- **Check for existing fixtures**: Always look for relevant existing fixtures in the current test file or conftest.py and reuse them
+- **Create fixtures for recurring mocks**: If the same mock is used across multiple tests, create a fixture for it instead of repeating the mock setup
+
+When asked to generate tests, create comprehensive test coverage following these rules.

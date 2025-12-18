@@ -1,0 +1,135 @@
+# Sensitive Files - NEVER COMMIT
+.env
+.env.local
+.env.*.local
+credentials.json
+**/credentials.json
+
+# Python
+*.py[cod]
+*$py.class
+*.so
+.Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+.virtualenv/
+
+# Distribution / Packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Chrome WebDriver (large binary)
+chrome-linux64/
+chromedriver*
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Database files (for future CLI)
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Exported data
+*.csv
+*.json
+*.xlsx
+exports/
+backups/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+
+# Screenshot/debugging artifacts
+screenshots/
+*.png
+*.jpg
+*.jpeg
+!docs/*.png
+!docs/*.jpg
+
+# MCP (if using Model Context Protocol servers)
+.mcp/
+
+# Pyright / mypy
+.pyright/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff
+.ruff_cache/
