@@ -128,7 +128,7 @@ class SyncHistory(Base):
     records_added = Column(Integer, default=0)
     records_updated = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
-    metadata = Column(Text, nullable=True)  # JSON with additional info
+    sync_metadata = Column(Text, nullable=True)  # JSON with additional info
 
     __table_args__ = (
         Index('idx_sync_history_date', 'started_at'),
