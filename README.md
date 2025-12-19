@@ -248,13 +248,39 @@ fin-cli reports history --institution cal
 fin-cli reports history --status success
 ```
 
-#### Export Data (Coming in Phase 4)
+#### Export Data
 ```bash
-# Export to CSV
+# Export transactions to CSV
 fin-cli export transactions --output transactions.csv
 
-# Export to JSON
+# Export transactions to JSON
 fin-cli export transactions --format json --output data.json
+
+# Export balances
+fin-cli export balances --output balances.csv
+fin-cli export balances --format json --output balances.json
+
+# Export accounts
+fin-cli export accounts --output accounts.csv
+
+# Export with filters
+fin-cli export transactions --from 2024-01-01 --to 2024-12-31 --output txns_2024.csv
+fin-cli export transactions --account 1 --status pending --output pending.json
+```
+
+#### Maintenance Commands
+```bash
+# Create database backup
+fin-cli maintenance backup
+fin-cli maintenance backup --output /path/to/backup.db
+
+# Clean old data
+fin-cli maintenance cleanup --older-than 365
+fin-cli maintenance cleanup --older-than 180 --dry-run  # Preview what will be deleted
+fin-cli maintenance cleanup --older-than 90 --yes       # Skip confirmation
+
+# Verify database integrity
+fin-cli maintenance verify
 ```
 
 ### Programmatic Usage
@@ -340,12 +366,12 @@ See the `examples/` folder for complete, runnable examples:
 
 ## CLI Implementation Status
 
-The unified CLI interface is mostly complete:
+The unified CLI interface is feature-complete:
 - ✅ **Phase 1**: Database initialization and credential management
 - ✅ **Phase 2**: Data synchronization for all institutions
 - ✅ **Phase 3**: Querying, reporting, and analytics
-- 🚧 **Phase 4**: Data export (CSV/JSON) and maintenance commands
-- 📋 **Phase 5**: Testing and polish
+- ✅ **Phase 4**: Data export (CSV/JSON) and maintenance commands
+- 📋 **Phase 5**: Testing and polish (in progress)
 
 See `CLI_PLAN.md` for detailed implementation status and future enhancements.
 

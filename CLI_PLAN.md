@@ -368,19 +368,33 @@ Fin/
 - `fin-cli reports balances` - Show balance report
 - `fin-cli reports history` - Show sync history
 
-### Phase 4: Export & Maintenance
+### Phase 4: Export & Maintenance ✓ COMPLETED
 **Goal**: Data export and system maintenance
 
 **Tasks**:
-1. Implement `export` command (CSV, JSON)
-2. Implement `history` command
-3. Implement `cleanup` command
-4. Implement `backup` command
-5. Add verification/integrity checks
+1. ✅ Implement `export` command (CSV, JSON)
+2. ⏭️  Implement `history` command (already exists in reports.py)
+3. ✅ Implement `cleanup` command
+4. ✅ Implement `backup` command
+5. ✅ Add verification/integrity checks
 
-**Files to create**:
-- `cli/commands/export.py`
-- `cli/commands/maintenance.py`
+**Files created**:
+- ✅ `cli/commands/export.py`
+- ✅ `cli/commands/maintenance.py`
+- ✅ Updated `cli/main.py` to include export and maintenance commands
+- ✅ Updated `cli/commands/__init__.py`
+- ✅ Updated `services/analytics_service.py` with `get_all_balances` method
+- ✅ Updated `db/database.py` with `get_db_path` function
+
+**Status**: Phase 4 is complete and ready for use
+
+**Available commands**:
+- `fin-cli export transactions` - Export transactions to CSV or JSON
+- `fin-cli export balances` - Export balances to CSV or JSON
+- `fin-cli export accounts` - Export accounts to CSV or JSON
+- `fin-cli maintenance cleanup` - Remove old data from database
+- `fin-cli maintenance backup` - Create database backup
+- `fin-cli maintenance verify` - Verify data integrity
 
 ### Phase 5: Polish & Testing
 **Goal**: Production-ready CLI
@@ -411,7 +425,6 @@ USER_EMAIL_APP_PASSWORD=xxx
 
 **Option 2: Encrypted Config File (Recommended)**
 ```json
-// config/credentials.json (encrypted)
 {
   "excellence": {
     "username": "encrypted_value",
@@ -505,10 +518,11 @@ Use OS-native credential storage (macOS Keychain, Windows Credential Manager, Li
 - [x] Can view account balances
 - [x] Reports generate correctly
 
-### Phase 4
-- [ ] Can export to CSV and JSON
-- [ ] Cleanup removes old data
-- [ ] Backup creates valid database copy
+### Phase 4 ✓ COMPLETED
+- [x] Can export to CSV and JSON
+- [x] Cleanup removes old data
+- [x] Backup creates valid database copy
+- [x] Verify command checks data integrity
 
 ## Timeline Estimate
 

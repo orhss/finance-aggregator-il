@@ -155,3 +155,13 @@ def check_database_exists(db_path: Path = DEFAULT_DB_PATH) -> bool:
         True if database file exists, False otherwise
     """
     return db_path.exists()
+
+
+def get_db_path() -> Path:
+    """
+    Get the database file path
+
+    Returns:
+        Path to the database file
+    """
+    return DEFAULT_DB_PATH

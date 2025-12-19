@@ -284,6 +284,31 @@ class AnalyticsService:
 
         return query.order_by(Balance.balance_date).all()
 
+    def get_all_balances(
+        self,
+        from_date: Optional[date] = None,
+        to_date: Optional[date] = None
+    ) -> List[Balance]:
+        """
+        Get all balance records across all accounts
+
+        Args:
+            from_date: Start date
+            to_date: End date
+
+        Returns:
+            List of Balance objects
+        """
+        query = self.session.query(Balance)
+
+        if from_date:
+            query = query.filter(Balance.balance_date >= from_date)
+
+        if to_date:
+            query = query.filter(Balance.balance_date <= to_date)
+
+        return query.order_by(Balance.balance_date.desc()).all()
+
     # ==================== Statistics Methods ====================
 
     def get_overall_stats(self) -> Dict[str, Any]:
