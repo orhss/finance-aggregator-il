@@ -10,6 +10,31 @@ Python automation framework for extracting financial data from Israeli instituti
 - **API integration**: Direct API calls where available (CAL credit cards, Excellence broker)
 - **Standardized data models**: Unified transaction and balance models across all sources
 
+## Quick Start
+
+```bash
+# 1. Install the CLI
+pip install -e .
+
+# 2. Initialize database
+fin-cli init
+
+# 3. Configure credentials
+fin-cli config setup
+
+# 4. Sync your data
+fin-cli sync all
+
+# 5. View your accounts
+fin-cli accounts list
+
+# 6. Check your transactions
+fin-cli transactions list
+
+# 7. View statistics
+fin-cli reports stats
+```
+
 ## Supported Institutions
 
 ### Brokers
@@ -146,30 +171,90 @@ fin-cli config set cal.username "myuser"
 fin-cli config set cal.password "mypass"
 ```
 
-#### Sync Data (Coming in Phase 2)
+#### Sync Data
 ```bash
 # Sync all sources
-fin-cli sync --all
+fin-cli sync all
 
 # Sync specific institution
-fin-cli sync --credit-card cal
-fin-cli sync --broker excellence
-fin-cli sync --pension migdal
+fin-cli sync cal          # CAL credit card
+fin-cli sync excellence   # Excellence broker
+fin-cli sync migdal      # Migdal pension
+fin-cli sync phoenix     # Phoenix pension
 ```
 
-#### Query Data (Coming in Phase 3)
+#### Query Accounts
 ```bash
-# List accounts
+# List all accounts
 fin-cli accounts list
 
-# List transactions
+# Filter by type or institution
+fin-cli accounts list --type broker
+fin-cli accounts list --institution cal
+
+# Show detailed account info
+fin-cli accounts show 1
+
+# Show accounts summary
+fin-cli accounts summary
+```
+
+#### Query Transactions
+```bash
+# List recent transactions (default: 50)
+fin-cli transactions list
+
+# Filter by date range
 fin-cli transactions list --from 2024-01-01 --to 2024-12-31
 
-# View statistics
-fin-cli stats
+# Filter by account
+fin-cli transactions list --account 1
 
+# Filter by status
+fin-cli transactions list --status pending
+
+# Filter by institution
+fin-cli transactions list --institution cal
+
+# Pagination
+fin-cli transactions list --limit 100 --offset 50
+
+# Show detailed transaction info
+fin-cli transactions show 123
+```
+
+#### Reports and Analytics
+```bash
+# Overall statistics
+fin-cli reports stats
+
+# Monthly spending report
+fin-cli reports monthly --year 2024 --month 12
+fin-cli reports monthly  # Current month
+
+# Category breakdown
+fin-cli reports categories
+fin-cli reports categories --from 2024-01-01 --to 2024-12-31
+
+# Balance report for all accounts
+fin-cli reports balances
+
+# Balance history for specific account
+fin-cli reports balances --account 1 --from 2024-01-01
+
+# Sync history
+fin-cli reports history --limit 20
+fin-cli reports history --institution cal
+fin-cli reports history --status success
+```
+
+#### Export Data (Coming in Phase 4)
+```bash
 # Export to CSV
 fin-cli export transactions --output transactions.csv
+
+# Export to JSON
+fin-cli export transactions --format json --output data.json
 ```
 
 ### Programmatic Usage
@@ -253,13 +338,16 @@ automator.cleanup()
 See the `examples/` folder for complete, runnable examples:
 - `example_cal_usage.py` - CAL credit card transaction extraction with CSV export
 
-## Future Development
+## CLI Implementation Status
 
-See `CLI_PLAN.md` for the planned unified CLI interface that will:
-- Store all data in SQLite database
-- Provide commands for syncing, querying, and exporting data
-- Generate analytics and reports
-- Support scheduled synchronization
+The unified CLI interface is mostly complete:
+- ✅ **Phase 1**: Database initialization and credential management
+- ✅ **Phase 2**: Data synchronization for all institutions
+- ✅ **Phase 3**: Querying, reporting, and analytics
+- 🚧 **Phase 4**: Data export (CSV/JSON) and maintenance commands
+- 📋 **Phase 5**: Testing and polish
+
+See `CLI_PLAN.md` for detailed implementation status and future enhancements.
 
 ## Architecture
 
@@ -281,10 +369,11 @@ See `CLI_PLAN.md` for the planned unified CLI interface that will:
    - MFA flow handling
    - Data extraction and normalization
 
-3. **Service Layer** (planned):
-   - Unified interface for all scrapers
-   - Database integration
-   - Transaction deduplication
+3. **Service Layer**:
+   - `BrokerService`, `PensionService`, `CreditCardService` - Data sync services
+   - `AnalyticsService` - Querying and reporting
+   - Database integration with SQLAlchemy
+   - Transaction deduplication logic
 
 ## Security Notes
 
