@@ -15,7 +15,7 @@ from rich.console import Console
 from rich import print as rprint
 
 # Import command modules
-from cli.commands import init, config, sync
+from cli.commands import init, config, sync, accounts, transactions, reports
 
 # Create main Typer app
 app = typer.Typer(
@@ -31,6 +31,9 @@ console = Console()
 app.add_typer(init.app, name="init", help="Initialize database")
 app.add_typer(config.app, name="config", help="Manage configuration and credentials")
 app.add_typer(sync.app, name="sync", help="Synchronize financial data")
+app.add_typer(accounts.app, name="accounts", help="Manage accounts")
+app.add_typer(transactions.app, name="transactions", help="Manage transactions")
+app.add_typer(reports.app, name="reports", help="Generate reports and analytics")
 
 
 @app.command()

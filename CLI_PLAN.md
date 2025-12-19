@@ -338,21 +338,35 @@ Fin/
 - `fin-cli sync phoenix` - Sync Phoenix pension
 - `fin-cli sync cal` - Sync CAL credit card
 
-### Phase 3: Querying & Reporting (User Interface)
+### Phase 3: Querying & Reporting (User Interface) ✓ COMPLETED
 **Goal**: Enable users to query and analyze data
 
 **Tasks**:
-1. Implement `accounts` commands (list, show)
-2. Implement `transactions` commands (list, show)
-3. Implement `stats` command
-4. Implement `report` commands (monthly, categories, balances)
-5. Add rich formatting (tables, colors)
+1. ✅ Implement `accounts` commands (list, show, summary)
+2. ✅ Implement `transactions` commands (list, show)
+3. ✅ Implement `stats` command
+4. ✅ Implement `report` commands (monthly, categories, balances, history)
+5. ✅ Add rich formatting (tables, colors)
 
-**Files to create**:
-- `cli/commands/accounts.py`
-- `cli/commands/transactions.py`
-- `cli/commands/reports.py`
-- `services/analytics_service.py`
+**Files created**:
+- ✅ `cli/commands/accounts.py`
+- ✅ `cli/commands/transactions.py`
+- ✅ `cli/commands/reports.py`
+- ✅ `services/analytics_service.py`
+
+**Status**: Phase 3 is complete and ready for use
+
+**Available commands**:
+- `fin-cli accounts list` - List all accounts
+- `fin-cli accounts show <id>` - Show account details
+- `fin-cli accounts summary` - Show accounts summary
+- `fin-cli transactions list` - List transactions with filters
+- `fin-cli transactions show <id>` - Show transaction details
+- `fin-cli reports stats` - Show overall statistics
+- `fin-cli reports monthly` - Generate monthly report
+- `fin-cli reports categories` - Show category breakdown
+- `fin-cli reports balances` - Show balance report
+- `fin-cli reports history` - Show sync history
 
 ### Phase 4: Export & Maintenance
 **Goal**: Data export and system maintenance
@@ -486,10 +500,10 @@ Use OS-native credential storage (macOS Keychain, Windows Credential Manager, Li
 - [x] No duplicate transactions (deduplication logic implemented in services)
 - [x] Sync history tracked correctly (SyncHistory table updated on each sync)
 
-### Phase 3
-- [ ] Can query transactions by date range
-- [ ] Can view account balances
-- [ ] Reports generate correctly
+### Phase 3 ✓ COMPLETED
+- [x] Can query transactions by date range
+- [x] Can view account balances
+- [x] Reports generate correctly
 
 ### Phase 4
 - [ ] Can export to CSV and JSON
