@@ -1,4 +1,4 @@
-# Financial Data Aggregator
+# finance-aggregator-il
 
 Python automation framework for extracting financial data from Israeli institutions (brokers, pension funds, and credit cards).
 
