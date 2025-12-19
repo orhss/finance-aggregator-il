@@ -310,21 +310,33 @@ Fin/
 
 **Status**: Phase 1 is complete and ready for testing
 
-### Phase 2: Data Integration (Sync Services)
+### Phase 2: Data Integration (Sync Services) ✓ COMPLETED
 **Goal**: Connect scrapers to database
 
 **Tasks**:
-1. Implement `BrokerService` (Excellence integration)
-2. Implement `PensionService` (Migdal + Phoenix integration)
-3. Implement `CreditCardService` (CAL integration)
-4. Create unified `sync` command
-5. Add transaction deduplication logic
+1. ✅ Implement `BrokerService` (Excellence integration)
+2. ✅ Implement `PensionService` (Migdal + Phoenix integration)
+3. ✅ Implement `CreditCardService` (CAL integration)
+4. ✅ Create unified `sync` command
+5. ✅ Add transaction deduplication logic (built into services)
 
-**Files to create**:
-- `services/broker_service.py`
-- `services/pension_service.py`
-- `services/credit_card_service.py`
-- `cli/commands/sync.py`
+**Files created**:
+- ✅ `services/__init__.py`
+- ✅ `services/broker_service.py`
+- ✅ `services/pension_service.py`
+- ✅ `services/credit_card_service.py`
+- ✅ `cli/commands/sync.py`
+- ✅ Updated `cli/main.py` to include sync command
+- ✅ Updated `cli/commands/__init__.py`
+
+**Status**: Phase 2 is complete and ready for use
+
+**Available sync commands**:
+- `fin-cli sync all` - Sync all data sources
+- `fin-cli sync excellence` - Sync Excellence broker
+- `fin-cli sync migdal` - Sync Migdal pension
+- `fin-cli sync phoenix` - Sync Phoenix pension
+- `fin-cli sync cal` - Sync CAL credit card
 
 ### Phase 3: Querying & Reporting (User Interface)
 **Goal**: Enable users to query and analyze data
@@ -469,10 +481,10 @@ Use OS-native credential storage (macOS Keychain, Windows Credential Manager, Li
 - [x] Credentials can be stored and retrieved
 - [x] `fin-cli init` and `fin-cli config` work
 
-### Phase 2
-- [ ] Can sync all three data sources (broker, pension, credit card)
-- [ ] No duplicate transactions
-- [ ] Sync history tracked correctly
+### Phase 2 ✓ COMPLETED
+- [x] Can sync all three data sources (broker, pension, credit card)
+- [x] No duplicate transactions (deduplication logic implemented in services)
+- [x] Sync history tracked correctly (SyncHistory table updated on each sync)
 
 ### Phase 3
 - [ ] Can query transactions by date range
