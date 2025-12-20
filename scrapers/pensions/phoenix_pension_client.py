@@ -2,6 +2,7 @@ import os
 import re
 from datetime import datetime
 from typing import Optional, Dict, Any
+import logging
 
 import dotenv
 from selenium.webdriver.common.by import By
@@ -9,16 +10,21 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
 
-from scrapers.base.pension_base import (
-    EmailMFARetrieverBase,
-    SeleniumMFAAutomatorBase,
+# New modular imports
+from scrapers.base.email_retriever import (
+    EmailMFARetriever,
     EmailConfig,
     MFAConfig
 )
+from scrapers.base.pension_base import (
+    SeleniumMFAAutomatorBase,
+)
 
+logger = logging.getLogger(__name__)
 dotenv.load_dotenv()
 
-class PhoenixEmailMFARetriever(EmailMFARetrieverBase):
+
+class PhoenixEmailMFARetriever(EmailMFARetriever):
     """Handles retrieving MFA codes from email for Phoenix pension site"""
 
     def __init__(self, email_config: EmailConfig, mfa_config: MFAConfig):
@@ -48,7 +54,7 @@ class PhoenixEmailMFARetriever(EmailMFARetrieverBase):
                 # Pattern 1: Look for 6-digit codes in HTML
                 html_matches = re.findall(self.mfa_config.code_pattern, html_content)
                 if html_matches:
-                    print(f"Found MFA code in HTML content: {html_matches[0]}")
+                    logger.info(f"Found MFA code in HTML content: {html_matches[0]}")
                     return html_matches[0]
 
                 # Pattern 2: Look for codes in specific Phoenix elements
@@ -59,11 +65,11 @@ class PhoenixEmailMFARetriever(EmailMFARetrieverBase):
                     r'<p[^>]*>(\d{6})</p>',
                     r'<td[^>]*>(\d{6})</td>'
                 ]
-                
+
                 for pattern in phoenix_patterns:
                     matches = re.findall(pattern, html_content, re.DOTALL | re.IGNORECASE)
                     if matches:
-                        print(f"Found MFA code with Phoenix pattern {pattern}: {matches[0]}")
+                        logger.info(f"Found MFA code with Phoenix pattern {pattern}: {matches[0]}")
                         return matches[0]
 
             # Fallback to plain text content - Phoenix might send simple text emails
@@ -71,9 +77,9 @@ class PhoenixEmailMFARetriever(EmailMFARetrieverBase):
                 # Look for 6-digit codes in plain text
                 plain_matches = re.findall(self.mfa_config.code_pattern, plain_content)
                 if plain_matches:
-                    print(f"Found MFA code in plain text: {plain_matches[0]}")
+                    logger.info(f"Found MFA code in plain text: {plain_matches[0]}")
                     return plain_matches[0]
-                
+
                 # Look for codes with context (e.g., "קוד האימות שלך לאתר הפניקס הוא: 387367")
                 context_patterns = [
                     r'קוד האימות שלך לאתר הפניקס הוא:\s*(\d{6})',  # Exact Phoenix format
@@ -82,18 +88,18 @@ class PhoenixEmailMFARetriever(EmailMFARetrieverBase):
                     r'code[^:]*:\s*(\d{6})',
                     r'הקוד[^:]*:\s*(\d{6})'
                 ]
-                
+
                 for pattern in context_patterns:
                     matches = re.findall(pattern, plain_content, re.IGNORECASE)
                     if matches:
-                        print(f"Found MFA code with context pattern: {matches[0]}")
+                        logger.info(f"Found MFA code with context pattern: {matches[0]}")
                         return matches[0]
 
-            print("No MFA code found in Phoenix email content")
+            logger.warning("No MFA code found in Phoenix email content")
             return None
 
         except Exception as e:
-            print(f"Error extracting MFA code: {e}")
+            logger.error(f"Error extracting MFA code: {e}", exc_info=True)
             return None
 
 
@@ -116,13 +122,13 @@ class PhoenixSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
         """
         id_number = credentials.get('id')
         email = credentials.get('email')
-        
+
         if not id_number:
-            print("ID number not provided in credentials")
+            logger.error("ID number not provided in credentials")
             return False
-            
+
         if not email:
-            print("Email not provided in credentials")
+            logger.error("Email not provided in credentials")
             return False
             
         return self.login_with_id_email_and_mfa(
@@ -211,7 +217,7 @@ class PhoenixSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
             )
 
         except Exception as e:
-            print(f"Error during Phoenix login: {e}")
+            logger.error(f"Error during Phoenix login: {e}", exc_info=True)
             return False
 
     def extract_financial_data(self) -> Dict[str, Any]:
@@ -219,7 +225,7 @@ class PhoenixSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
         data = {}
 
         try:
-            print("Extracting financial data from Phoenix site...")
+            logger.info("Extracting financial data from Phoenix site...")
 
             # Wait for the financial data to load
             # Phoenix uses specific div structure for financial data
@@ -255,68 +261,66 @@ class PhoenixSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
                             cleaned_text = text.replace('₪', '').replace(',', '').strip()
                             if cleaned_text.isdigit():
                                 total_investments = cleaned_text
-                                print(f"Total investments and savings found: ₪{total_investments}")
+                                logger.info(f"Total investments and savings found: ₪{total_investments}")
                                 break
                             else:
                                 total_investments = text
-                                print(f"Total investments and savings found: {total_investments}")
+                                logger.info(f"Total investments and savings found: {total_investments}")
                                 break
 
                     except NoSuchElementException:
                         continue
                     except Exception as e:
-                        print(f"Error with selector {selector}: {e}")
+                        logger.debug(f"Error with selector {selector}: {e}")
                         continue
 
                 data['total_investments_savings'] = total_investments
 
             except Exception as e:
-                print(f"Error extracting total investments: {e}")
+                logger.warning(f"Error extracting total investments: {e}")
                 data['total_investments_savings'] = None
 
             return data
 
         except Exception as e:
-            print(f"Error extracting financial data: {e}")
+            logger.error(f"Error extracting financial data: {e}", exc_info=True)
             return {}
 
     def execute(self, site_url: str, credentials: Dict[str, str], selectors: Dict[str, str]) -> Dict[str, Any]:
         """Execute the complete Phoenix automation flow (login + data extraction)
-        
+
         Args:
             site_url: URL of the login page
             credentials: Dictionary containing login credentials (e.g., {'id': '123456789', 'email': 'user@example.com'})
             selectors: Dictionary containing CSS selectors for form elements
-            
+
         Returns:
             Dictionary containing extracted Phoenix financial data, or empty dict if failed
         """
         try:
-            print("=== Starting Phoenix Pension Automation ===")
-            print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            
+            logger.info("=== Starting Phoenix Pension Automation ===")
+            logger.info(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
             # Perform login
-            print("1. Attempting login...")
+            logger.info("1. Attempting login...")
             login_success = self.login(site_url, credentials, selectors)
-            
+
             if not login_success:
-                print("Login failed, cannot extract data")
+                logger.error("Login failed, cannot extract data")
                 return {}
-            
-            print("2. Login successful! Extracting financial data...")
-            
+
+            logger.info("2. Login successful! Extracting financial data...")
+
             # Extract financial data
             financial_data = self.extract_financial_data()
-            
-            print("3. Data extraction completed")
-            print("=== Phoenix Automation Completed Successfully ===")
-            
+
+            logger.info("3. Data extraction completed")
+            logger.info("=== Phoenix Automation Completed Successfully ===")
+
             return financial_data
-            
+
         except Exception as e:
-            print(f"Error during Phoenix automation execution: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Error during Phoenix automation execution: {e}", exc_info=True)
             return {}
 
 

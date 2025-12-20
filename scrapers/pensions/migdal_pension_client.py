@@ -3,6 +3,7 @@ import re
 import time
 from datetime import datetime
 from typing import Optional, Dict, Any
+import logging
 
 import dotenv
 from selenium.webdriver.common.by import By
@@ -10,17 +11,21 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-from scrapers.base.pension_base import (
-    EmailMFARetrieverBase,
-    SeleniumMFAAutomatorBase,
+# New modular imports
+from scrapers.base.email_retriever import (
+    EmailMFARetriever,
     EmailConfig,
     MFAConfig
 )
+from scrapers.base.pension_base import (
+    SeleniumMFAAutomatorBase,
+)
 
-
+logger = logging.getLogger(__name__)
 dotenv.load_dotenv()
 
-class MigdalEmailMFARetriever(EmailMFARetrieverBase):
+
+class MigdalEmailMFARetriever(EmailMFARetriever):
     """Handles retrieving MFA codes from email for Migdal pension site"""
 
     def __init__(self, email_config: EmailConfig, mfa_config: MFAConfig):
@@ -52,27 +57,27 @@ class MigdalEmailMFARetriever(EmailMFARetrieverBase):
                 h2_matches = re.findall(h2_pattern, html_content, re.DOTALL | re.IGNORECASE)
 
                 if h2_matches:
-                    print(f"Found MFA code in h2 element: {h2_matches[0]}")
+                    logger.info(f"Found MFA code in h2 element: {h2_matches[0]}")
                     return h2_matches[0]
 
                 # If no h2 match, try general HTML content
                 html_matches = re.findall(self.mfa_config.code_pattern, html_content)
                 if html_matches:
-                    print(f"Found MFA code in HTML content: {html_matches[0]}")
+                    logger.info(f"Found MFA code in HTML content: {html_matches[0]}")
                     return html_matches[0]
 
             # Fallback to plain text content
             if plain_content:
                 plain_matches = re.findall(self.mfa_config.code_pattern, plain_content)
                 if plain_matches:
-                    print(f"Found MFA code in plain text: {plain_matches[0]}")
+                    logger.info(f"Found MFA code in plain text: {plain_matches[0]}")
                     return plain_matches[0]
 
-            print("No MFA code found in email content")
+            logger.warning("No MFA code found in email content")
             return None
 
         except Exception as e:
-            print(f"Error extracting MFA code: {e}")
+            logger.error(f"Error extracting MFA code: {e}", exc_info=True)
             return None
 
 
@@ -95,7 +100,7 @@ class MigdalSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
         """
         id_number = credentials.get('id')
         if not id_number:
-            print("ID number not provided in credentials")
+            logger.error("ID number not provided in credentials")
             return False
             
         return self.login_with_id_and_mfa(
@@ -168,7 +173,7 @@ class MigdalSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
             )
 
         except Exception as e:
-            print(f"Error during Migdal login: {e}")
+            logger.error(f"Error during Migdal login: {e}", exc_info=True)
             return False
 
     def extract_financial_data(self) -> Dict[str, Any]:
@@ -176,7 +181,7 @@ class MigdalSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
         data = {}
 
         try:
-            print("Extracting financial data from Migdal site...")
+            logger.info("Extracting financial data from Migdal site...")
 
             # Wait for the financial data to load
             WebDriverWait(self.driver, 15).until(
@@ -189,12 +194,12 @@ class MigdalSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
                                                         "//div[contains(@class, 'carusel-cube')]//label[contains(text(), 'קרנות פנסיה')]/..//span[contains(@class, 'value')]")
                 pension_balance = pension_cube.text.strip()
                 data['pension_balance'] = pension_balance
-                print(f"Pension balance: {pension_balance}")
+                logger.info(f"Pension balance: {pension_balance}")
             except NoSuchElementException:
-                print("Pension balance not found")
+                logger.debug("Pension balance not found")
                 data['pension_balance'] = None
             except Exception as e:
-                print(f"Error extracting pension balance: {e}")
+                logger.warning(f"Error extracting pension balance: {e}")
                 data['pension_balance'] = None
 
             # Extract keren histalmut balance (קרנות השתלמות) - this might not exist for all users
@@ -203,17 +208,17 @@ class MigdalSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
                                                       "//div[contains(@class, 'carusel-cube')]//label[contains(text(), 'קרנות השתלמות')]/..//span[contains(@class, 'value')]")
                 keren_balance = keren_cube.text.strip()
                 data['keren_histalmut_balance'] = keren_balance
-                print(f"Keren Histalmut balance: {keren_balance}")
+                logger.info(f"Keren Histalmut balance: {keren_balance}")
             except NoSuchElementException:
-                print("Keren Histalmut balance not found (may not exist for this user)")
+                logger.debug("Keren Histalmut balance not found (may not exist for this user)")
                 data['keren_histalmut_balance'] = None
             except Exception as e:
-                print(f"Error extracting keren histalmut balance: {e}")
+                logger.warning(f"Error extracting keren histalmut balance: {e}")
                 data['keren_histalmut_balance'] = None
 
             # Alternative method: try to find all value spans in carusel-cube divs
             if not data.get('pension_balance') or not data.get('keren_histalmut_balance'):
-                print("Trying alternative extraction method...")
+                logger.debug("Trying alternative extraction method...")
                 try:
                     value_spans = self.driver.find_elements(By.CSS_SELECTOR, "div.carusel-cube span.value")
                     cube_titles = self.driver.find_elements(By.CSS_SELECTOR, "div.carusel-cube label.cube-title")
@@ -221,7 +226,7 @@ class MigdalSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
                     for i, (title, value) in enumerate(zip(cube_titles, value_spans)):
                         title_text = title.text.strip()
                         value_text = value.text.strip()
-                        print(f"Found cube {i + 1}: {title_text} = {value_text}")
+                        logger.debug(f"Found cube {i + 1}: {title_text} = {value_text}")
 
                         if 'קרנות פנסיה' in title_text and not data.get('pension_balance'):
                             data['pension_balance'] = value_text
@@ -229,51 +234,49 @@ class MigdalSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
                             data['keren_histalmut_balance'] = value_text
 
                 except Exception as e:
-                    print(f"Error in alternative extraction method: {e}")
+                    logger.warning(f"Error in alternative extraction method: {e}")
 
             return data
 
         except Exception as e:
-            print(f"Error extracting financial data: {e}")
+            logger.error(f"Error extracting financial data: {e}", exc_info=True)
             return {}
 
     def execute(self, site_url: str, credentials: Dict[str, str], selectors: Dict[str, str]) -> Dict[str, Any]:
         """Execute the complete Migdal automation flow (login + data extraction)
-        
+
         Args:
             site_url: URL of the login page
             credentials: Dictionary containing login credentials (e.g., {'id': '123456789'})
             selectors: Dictionary containing CSS selectors for form elements
-            
+
         Returns:
             Dictionary containing extracted Migdal financial data, or empty dict if failed
         """
         try:
-            print("=== Starting Migdal Pension Automation ===")
-            print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            
+            logger.info("=== Starting Migdal Pension Automation ===")
+            logger.info(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
             # Perform login
-            print("1. Attempting login...")
+            logger.info("1. Attempting login...")
             login_success = self.login(site_url, credentials, selectors)
-            
+
             if not login_success:
-                print("Login failed, cannot extract data")
+                logger.error("Login failed, cannot extract data")
                 return {}
-            
-            print("2. Login successful! Extracting financial data...")
-            
+
+            logger.info("2. Login successful! Extracting financial data...")
+
             # Extract financial data
             financial_data = self.extract_financial_data()
-            
-            print("3. Data extraction completed")
-            print("=== Migdal Automation Completed Successfully ===")
-            
+
+            logger.info("3. Data extraction completed")
+            logger.info("=== Migdal Automation Completed Successfully ===")
+
             return financial_data
-            
+
         except Exception as e:
-            print(f"Error during Migdal automation execution: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Error during Migdal automation execution: {e}", exc_info=True)
             return {}
 
 
