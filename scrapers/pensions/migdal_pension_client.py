@@ -106,7 +106,7 @@ class MigdalSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
         return self.login_with_id_and_mfa(
             site_url=site_url,
             id_number=id_number,
-            id_selector=selectors.get('id_selector', '#username'),
+            id_selector=selectors.get('id_selector', "input#username[type='number']"),
             login_button_selector=selectors.get('login_button_selector', 'button[type="submit"]'),
             email_label_selector=selectors.get('email_label_selector', 'label[for="otpToEmail"]'),
             continue_button_selector=selectors.get('continue_button_selector', 'button.form-btn'),

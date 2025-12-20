@@ -101,7 +101,7 @@ class PensionService:
             automator = MigdalSeleniumMFAAutomator(email_retriever, headless=headless)
 
             # Login
-            site_url = "https://www.migdal.co.il/he/myArea"
+            site_url = "https://my.migdal.co.il/mymigdal/process/login"
             credentials = {'id': user_id}
             selectors = {
                 'id_field': 'input[name="idNumber"]',
