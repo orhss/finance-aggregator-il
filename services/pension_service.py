@@ -138,7 +138,7 @@ class PensionService:
                 if keren_amount is not None:
                     # Get or create keren account
                     keren_account = self._get_or_create_account(
-                        account_type="pension",
+                        account_type="savings",
                         institution="migdal",
                         account_number=f"{user_id}_keren",
                         account_name="Migdal Keren Hishtalmut"
