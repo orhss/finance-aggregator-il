@@ -164,8 +164,8 @@ def setup():
 
         # Email (for MFA)
         rprint("\n[bold cyan]Email (for MFA)[/bold cyan]")
-        email = typer.prompt("Email address", default=credentials.email.address or "")
-        password = typer.prompt("App password (Gmail)", default=credentials.email.password or "", hide_input=True)
+        email = typer.prompt("Email address", default="")
+        password = typer.prompt("App password (Gmail)", default="", hide_input=True)
         credentials.email.address = email if email else None
         credentials.email.password = password if password else None
 
