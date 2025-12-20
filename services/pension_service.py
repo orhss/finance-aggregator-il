@@ -225,7 +225,7 @@ class PensionService:
             automator = PhoenixSeleniumMFAAutomator(email_retriever, headless=headless)
 
             # Login
-            site_url = "https://www.fnx.co.il/"
+            site_url = "https://my.fnx.co.il/"
             credentials = {
                 'id': user_id,
                 'email': email_address

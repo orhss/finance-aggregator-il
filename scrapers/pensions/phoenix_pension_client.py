@@ -174,14 +174,19 @@ class PhoenixSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
             ]
             
             # Define fallback selectors for various elements
+            # IMPORTANT: Text-based selectors first to handle multiple buttons correctly
             fallback_selectors = {
                 'login_button': [
+                    # Text-based selectors (most reliable for distinguishing between buttons)
+                    "//button[contains(text(), 'שלחו לי קוד כניסה')]",  # "Send me login code"
+                    "//button[contains(text(), 'שלחו לי קוד')]",          # Partial match
+                    "//button[contains(text(), 'קוד כניסה')]",            # "Login code"
+                    "//button[contains(., 'שלחו לי קוד כניסה')]",        # Any descendant text
+                    # Class-based fallbacks (less specific)
                     "button.bg-\\[\\#FF4E31\\]",
                     "button.text-white.w-\\[340px\\]",
                     "button[type='button'].bg-\\[\\#FF4E31\\]",
                     "button[type='button'].text-white",
-                    "button.bg-\\[\\#FF4E31\\].text-white.w-\\[340px\\]",
-                    "//button[contains(text(), 'שלחו לי קוד כניסה')]",
                     "//button[contains(@class, 'bg-[#FF4E31]')]",
                     "//button[contains(@class, 'text-white')]",
                     "button[type='button']"
