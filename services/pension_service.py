@@ -91,7 +91,7 @@ class PensionService:
             )
 
             mfa_config = MFAConfig(
-                sender_email="no-reply@migdal.co.il",
+                sender_email="noreply@migdal.co.il",
                 sender_name="Migdal",
                 code_pattern=r'\b\d{6}\b'
             )

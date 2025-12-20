@@ -133,14 +133,16 @@ class EmailMFARetriever(ABC):
             status, messages = self.connection.search(None, search_criteria)
 
             if status != 'OK' or not messages[0]:
-                logger.debug(f"No emails found from {self.mfa_config.sender_email}")
+                logger.warning(f"No emails found from {self.mfa_config.sender_email}")
+                logger.info("TIP: Check if the sender email address is correct in your MFA config")
                 return None
 
             message_ids = messages[0].split()
             if not message_ids:
+                logger.warning("No message IDs found")
                 return None
 
-            logger.info(f"Found {len(message_ids)} emails, checking recent ones")
+            logger.info(f"Found {len(message_ids)} emails from {self.mfa_config.sender_email}, checking {min(5, len(message_ids))} most recent")
 
             # Check last 5 messages (newest first)
             for msg_id in reversed(message_ids[-5:]):
@@ -161,10 +163,13 @@ class EmailMFARetriever(ABC):
                 # Extract MFA code (institution-specific)
                 mfa_code = self.extract_mfa_code(email_message)
                 if mfa_code:
-                    logger.info(f"MFA code extracted: {mfa_code}")
+                    logger.info(f"✓ MFA code extracted: {mfa_code}")
                     return mfa_code
+                else:
+                    logger.warning(f"✗ No MFA code found in this email")
 
             logger.warning("No valid MFA codes found in recent emails")
+            logger.info(f"Checked {min(5, len(message_ids))} emails from {self.mfa_config.sender_email}")
             return None
 
         except Exception as e:
@@ -225,6 +230,22 @@ class EmailMFARetriever(ABC):
 
         logger.error(f"Timeout waiting for MFA code after {self.mfa_config.max_wait_time}s")
         return None
+
+    def wait_for_mfa_code_with_delay(self, since_time: Optional[datetime] = None) -> Optional[str]:
+        """
+        Wait for MFA code with initial delay (backward compatibility wrapper)
+
+        This method exists for backward compatibility with old SeleniumMFAAutomatorBase.
+        It's just a wrapper around wait_for_mfa_code() with email_delay.
+
+        Args:
+            since_time: Only look at emails after this time
+
+        Returns:
+            MFA code if found, None otherwise
+        """
+        logger.debug("Using backward compatibility wrapper: wait_for_mfa_code_with_delay()")
+        return self.wait_for_mfa_code(since_time=since_time, initial_delay=None)
 
     @abstractmethod
     def extract_mfa_code(self, email_message) -> Optional[str]:

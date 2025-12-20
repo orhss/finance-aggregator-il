@@ -284,6 +284,12 @@ class MigdalSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
 def main():
     """Example usage of the MFA automation system for Israeli pension site"""
 
+    # IMPORTANT: Configure logging FIRST!
+    logging.basicConfig(
+        level=logging.INFO,  # Change to DEBUG for more details
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
     print("=== Starting Migdal Pension Automation ===")
     print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
