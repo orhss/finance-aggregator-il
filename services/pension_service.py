@@ -215,7 +215,7 @@ class PensionService:
             )
 
             mfa_config = MFAConfig(
-                sender_email="noreply@fnx.co.il",
+                sender_email="fnxnoreplay@fnx.co.il",
                 sender_name="Phoenix",
                 code_pattern=r'\b\d{6}\b'
             )
@@ -233,7 +233,7 @@ class PensionService:
             selectors = {
                 'id_field': 'input[name="identityNumber"]',
                 'email_field': 'input[name="email"]',
-                'login_button': 'button[type="submit"]',
+                # 'login_button': 'button[type="submit"]',
                 'mfa_field': 'input[name="otpCode"]',
                 'mfa_submit_button': 'button[type="submit"]'
             }
@@ -247,8 +247,8 @@ class PensionService:
             result.financial_data = financial_data
 
             # Parse and save balance
-            if financial_data.get('total_investments'):
-                total_amount = self._parse_amount(financial_data['total_investments'])
+            if financial_data.get('total_investments_savings'):
+                total_amount = self._parse_amount(financial_data['total_investments_savings'])
                 if total_amount is not None:
                     # Get or create account
                     account = self._get_or_create_account(

@@ -803,15 +803,16 @@ class SeleniumMFAAutomatorBase(ABC):
             
             # Try primary selector first
             try:
-                login_button = self.driver.find_element(By.CSS_SELECTOR, login_button_selector)
-                if login_button.is_enabled():
-                    print("Found enabled login button, clicking...")
-                    login_button.click()
-                    print("Successfully clicked initial login button")
-                    return True
-                else:
-                    print("Login button found but disabled")
-                    
+                if login_button_selector:
+                    login_button = self.driver.find_element(By.CSS_SELECTOR, login_button_selector)
+                    if login_button.is_enabled():
+                        print("Found enabled login button, clicking...")
+                        login_button.click()
+                        print("Successfully clicked initial login button")
+                        return True
+                    else:
+                        print("Login button found but disabled")
+
             except NoSuchElementException:
                 print("Primary login button not found, trying fallback selectors...")
             

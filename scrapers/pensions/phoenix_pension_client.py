@@ -137,7 +137,7 @@ class PhoenixSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
             email=email,
             id_selector=selectors.get('id_selector', '#fnx-id'),
             email_selector=selectors.get('email_selector', 'input[inputmode="email"]'),
-            login_button_selector=selectors.get('login_button_selector', 'button[type="button"]'),
+            login_button_selector=selectors.get('login_button_selector', ''),
             success_indicator=selectors.get('success_indicator', '.dashboard')
         )
 
