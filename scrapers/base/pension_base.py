@@ -882,11 +882,19 @@ class SeleniumMFAAutomatorBase(ABC):
                 print("Failed to enter ID number")
                 return False
 
+            # Small delay to allow page to update after ID entry
+            time.sleep(2)
+            print("Waiting for MFA options to appear...")
+
             # Select email MFA option if provided
             if email_label_selector:
                 email_fallbacks = fallback_selectors.get('email_label', []) if fallback_selectors else []
                 if not self.select_email_mfa_option(email_label_selector, email_fallbacks):
                     print("Could not select email MFA option, proceeding anyway...")
+
+                # Small delay after selecting email option before clicking login
+                time.sleep(1)
+                print("Email option selected, proceeding to login...")
 
             # Click initial login button
             login_fallbacks = fallback_selectors.get('login_button', []) if fallback_selectors else []
