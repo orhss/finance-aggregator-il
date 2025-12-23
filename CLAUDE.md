@@ -44,14 +44,23 @@ pip install -r requirements.txt
 - DTOs: `Transaction`, `CardAccount`, `Installments`
 - Handles installment payments across multiple months
 
-**Pension Automation Pattern** (`pension_base.py`):
-- Two-component architecture for MFA automation:
-  1. `EmailMFARetrieverBase` (ABC): IMAP email retrieval and MFA code extraction
-  2. `SeleniumMFAAutomatorBase` (ABC): Selenium-based web automation
+**Pension Automation Pattern** (NEW modular architecture):
+- **New Base Classes** (recommended):
+  - `scrapers/base/email_retriever.py`: `EmailMFARetriever` - Email/IMAP operations with context manager support
+  - `scrapers/base/mfa_handler.py`: `MFAHandler` - MFA code entry with single/individual field patterns
+  - `scrapers/utils/wait_conditions.py`: `SmartWait` - Condition-based waits replacing time.sleep()
+  - `scrapers/utils/retry.py`: `retry_with_backoff` - Exponential backoff decorator
+  - `scrapers/exceptions.py`: Structured exception hierarchy
+  - `scrapers/config/logging_config.py`: Centralized logging configuration
+- **Legacy Base Classes** (`pension_base.py` - DEPRECATED):
+  - `EmailMFARetrieverBase` (ABC): DEPRECATED - use `EmailMFARetriever` instead
+  - `SeleniumMFAAutomatorBase` (ABC): DEPRECATED - use modular components instead
 - Configuration DTOs: `EmailConfig`, `MFAConfig`
-- Concrete implementations:
+- Concrete implementations (refactored to use new modules):
   - Migdal: `MigdalEmailMFARetriever` + `MigdalSeleniumAutomator`
   - Phoenix: `PhoenixEmailMFARetriever` + `PhoenixSeleniumAutomator`
+
+**Refactoring Status**: See `scraper_refactoring_plan.md` for detailed progress and migration guide.
 
 ### Key Design Patterns
 
@@ -72,19 +81,26 @@ pip install -r requirements.txt
 
 ### MFA Flow Architecture
 
-1. **Email Retrieval** (`EmailMFARetrieverBase`):
-   - Connects to Gmail via IMAP
+1. **Email Retrieval** (`EmailMFARetriever` in `scrapers/base/email_retriever.py`):
+   - Connects to Gmail via IMAP with context manager support
    - Searches for MFA emails from specific senders
    - Extracts codes using regex patterns (overridden per institution)
    - Timing: `email_delay` before checking, `max_wait_time` for polling
+   - Proper logging instead of print statements
 
-2. **Web Automation** (`SeleniumMFAAutomatorBase`):
+2. **MFA Code Entry** (`MFAHandler` in `scrapers/base/mfa_handler.py`):
+   - Supports both single-field and individual-field (6 digit) patterns
+   - Human-like typing with configurable delays
+   - Fallback selector support for robustness
+   - Proper error handling with `MFAEntryError`
+
+3. **Web Automation** (Legacy `SeleniumMFAAutomatorBase` - DEPRECATED):
    - Chrome headless browser automation
    - Human-like typing with delays (`enter_id_number_human_like`, `enter_mfa_code_human_like`)
    - Flexible selectors with fallback support
    - Handles loader overlays with configurable delays (`post_login_delay`, `mfa_submission_delay`)
 
-3. **Institution-Specific Flows**:
+4. **Institution-Specific Flows**:
    - **Migdal**: ID → Email option → Continue → MFA (6 fields) → No submit button
    - **Phoenix**: ID + Email → Login → MFA (single field) → Submit button
 

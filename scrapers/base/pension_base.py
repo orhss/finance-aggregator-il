@@ -1,7 +1,21 @@
+"""
+DEPRECATED: This module is deprecated and will be removed in a future version.
+
+Use the new modular components instead:
+    - scrapers.base.email_retriever.EmailMFARetriever (replaces EmailMFARetrieverBase)
+    - scrapers.base.mfa_handler.MFAHandler (replaces MFA handling in SeleniumMFAAutomatorBase)
+    - scrapers.utils.wait_conditions.SmartWait (replaces time.sleep patterns)
+    - scrapers.utils.retry.retry_with_backoff (for retry logic)
+    - scrapers.exceptions (for structured error handling)
+
+See scraper_refactoring_plan.md for migration details.
+"""
+
 import imaplib
 import email
 import re
 import time
+import warnings
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
@@ -12,6 +26,16 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+
+
+def _deprecation_warning(class_name: str, replacement: str):
+    """Issue a deprecation warning for legacy classes."""
+    warnings.warn(
+        f"{class_name} is deprecated and will be removed in a future version. "
+        f"Use {replacement} instead. See scraper_refactoring_plan.md for migration details.",
+        DeprecationWarning,
+        stacklevel=3
+    )
 
 
 @dataclass
@@ -38,8 +62,18 @@ class MFAConfig:
 
 
 class EmailMFARetrieverBase(ABC):
+    """
+    DEPRECATED: Use scrapers.base.email_retriever.EmailMFARetriever instead.
+
+    This class is maintained for backwards compatibility only and will be
+    removed in a future version.
+    """
 
     def __init__(self, email_config: EmailConfig, mfa_config: MFAConfig):
+        _deprecation_warning(
+            "EmailMFARetrieverBase",
+            "scrapers.base.email_retriever.EmailMFARetriever"
+        )
         self.email_config = email_config
         self.mfa_config = mfa_config
         self.mail_connection = None
@@ -199,8 +233,22 @@ class EmailMFARetrieverBase(ABC):
 
 
 class SeleniumMFAAutomatorBase(ABC):
+    """
+    DEPRECATED: This class is deprecated and will be removed in a future version.
+
+    Use the new modular components instead:
+        - scrapers.base.mfa_handler.MFAHandler for MFA code entry
+        - scrapers.utils.wait_conditions.SmartWait for intelligent waiting
+        - scrapers.utils.retry.retry_selenium_action for retry logic
+
+    This class is maintained for backwards compatibility only.
+    """
 
     def __init__(self, email_retriever: EmailMFARetrieverBase, headless: bool = True):
+        _deprecation_warning(
+            "SeleniumMFAAutomatorBase",
+            "scrapers.base.mfa_handler.MFAHandler and modular components"
+        )
         self.email_retriever = email_retriever
         self.headless = headless
         self.driver = None
