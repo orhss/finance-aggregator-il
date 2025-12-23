@@ -10,8 +10,10 @@ Usage:
 """
 
 import typer
+import logging
 from typing import Optional
 from rich.console import Console
+from rich.logging import RichHandler
 from rich import print as rprint
 
 # Import command modules
@@ -26,6 +28,39 @@ app = typer.Typer(
 
 # Create console for rich output
 console = Console()
+
+
+def setup_logging(verbose: bool = False, debug: bool = False):
+    """Configure logging for the CLI
+
+    Args:
+        verbose: Enable INFO level logging
+        debug: Enable DEBUG level logging (more detailed)
+    """
+    if debug:
+        level = logging.DEBUG
+    elif verbose:
+        level = logging.INFO
+    else:
+        # Default: only show warnings and errors
+        level = logging.WARNING
+
+    # Configure root logger with RichHandler for nice formatting
+    logging.basicConfig(
+        level=level,
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(
+            console=console,
+            show_time=debug,
+            show_path=debug,
+            rich_tracebacks=True
+        )]
+    )
+
+    # Also configure specific loggers for our modules
+    for logger_name in ['scrapers', 'services']:
+        logging.getLogger(logger_name).setLevel(level)
 
 # Register command groups
 app.add_typer(init.app, name="init", help="Initialize database")
@@ -46,14 +81,17 @@ def version():
 
 
 @app.callback()
-def callback():
+def callback(
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output (INFO level)"),
+    debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug output (DEBUG level)"),
+):
     """
     Financial Data Aggregator CLI
 
     Extracts financial data from Israeli brokers, pension funds, and credit cards.
     Stores data in SQLite for unified access and analysis.
     """
-    pass
+    setup_logging(verbose=verbose, debug=debug)
 
 
 def main():

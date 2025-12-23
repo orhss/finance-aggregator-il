@@ -4,6 +4,7 @@ Automated transaction extraction for Israeli CAL (Visa CAL) credit cards
 """
 
 import json
+import logging
 import time
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
@@ -17,6 +18,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+
+logger = logging.getLogger(__name__)
 
 
 # Configuration
@@ -127,13 +130,13 @@ class CALCreditCardScraper:
 
     def setup_driver(self):
         """Setup Chrome WebDriver with request interception"""
-        print("Setting up Chrome WebDriver...")
+        logger.info("Setting up Chrome WebDriver...")
         options = Options()
         if self.headless:
-            print("Running in headless mode")
+            logger.debug("Running in headless mode")
             options.add_argument('--headless')
         else:
-            print("Running in visible mode")
+            logger.debug("Running in visible mode")
 
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
@@ -144,25 +147,25 @@ class CALCreditCardScraper:
         # Enable performance logging to capture network requests
         options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
 
-        print("Initializing Chrome driver...")
+        logger.debug("Initializing Chrome driver...")
         self.driver = webdriver.Chrome(options=options)
         self.driver.implicitly_wait(10)
-        print("Chrome driver initialized successfully")
+        logger.info("Chrome driver initialized successfully")
 
     def cleanup(self):
         """Clean up resources"""
-        print("Starting cleanup process...")
+        logger.debug("Starting cleanup process...")
         if self.driver:
-            print("Closing Chrome driver...")
+            logger.debug("Closing Chrome driver...")
             self.driver.quit()
-            print("Chrome driver closed successfully")
+            logger.info("Chrome driver closed successfully")
         else:
-            print("No Chrome driver to close")
-        print("Cleanup completed")
+            logger.debug("No Chrome driver to close")
+        logger.debug("Cleanup completed")
 
     def wait_for_iframe(self, timeout: int = 10) -> Any:
         """Wait for and switch to login iframe"""
-        print("Waiting for login iframe...")
+        logger.debug("Waiting for login iframe...")
         start_time = time.time()
 
         while time.time() - start_time < timeout:
@@ -170,7 +173,7 @@ class CALCreditCardScraper:
             for iframe in iframes:
                 src = iframe.get_attribute("src")
                 if src and "connect" in src:
-                    print(f"Found login iframe: {src}")
+                    logger.debug(f"Found login iframe: {src}")
                     self.driver.switch_to.frame(iframe)
                     return iframe
             time.sleep(0.5)
@@ -191,22 +194,22 @@ class CALCreditCardScraper:
             if not self.driver:
                 self.setup_driver()
 
-            print(f"Navigating to {self.BASE_URL}...")
+            logger.info(f"Step 1/4: Navigating to {self.BASE_URL}...")
             self.driver.get(self.BASE_URL)
 
             # Click login button
-            print("Waiting for login button...")
+            logger.debug("Waiting for login button...")
             login_btn = WebDriverWait(self.driver, 15).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "#ccLoginDesktopBtn"))
             )
-            print("Clicking login button...")
+            logger.debug("Clicking login button...")
             login_btn.click()
 
             # Wait for and switch to iframe
             self.wait_for_iframe()
 
             # Click on regular login tab
-            print("Switching to password login tab...")
+            logger.debug("Switching to password login tab...")
             regular_login_tab = WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "#regular-login"))
             )
@@ -214,7 +217,7 @@ class CALCreditCardScraper:
             time.sleep(1)
 
             # Enter username
-            print("Entering username...")
+            logger.info("Step 2/4: Entering credentials...")
             username_field = WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "[formcontrolname='userName']"))
             )
@@ -222,13 +225,13 @@ class CALCreditCardScraper:
             username_field.send_keys(self.credentials.username)
 
             # Enter password
-            print("Entering password...")
+            logger.debug("Entering password...")
             password_field = self.driver.find_element(By.CSS_SELECTOR, "[formcontrolname='password']")
             password_field.clear()
             password_field.send_keys(self.credentials.password)
 
             # Submit login
-            print("Submitting login form...")
+            logger.info("Step 3/4: Submitting login form...")
             submit_btn = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
             submit_btn.click()
 
@@ -236,11 +239,11 @@ class CALCreditCardScraper:
             self.driver.switch_to.default_content()
 
             # Wait for dashboard or check for errors
-            print("Waiting for login to complete...")
+            logger.debug("Waiting for login to complete...")
             time.sleep(5)
 
             current_url = self.driver.current_url
-            print(f"Current URL: {current_url}")
+            logger.debug(f"Current URL: {current_url}")
 
             # Check for invalid password error
             if "connect" in current_url:
@@ -257,7 +260,7 @@ class CALCreditCardScraper:
 
             # Close tutorial popup if present
             if "site-tutorial" in current_url:
-                print("Closing tutorial popup...")
+                logger.debug("Closing tutorial popup...")
                 try:
                     close_btn = self.driver.find_element(By.CSS_SELECTOR, "button.btn-close")
                     close_btn.click()
@@ -266,14 +269,14 @@ class CALCreditCardScraper:
                     pass
 
             # Extract authorization token
-            print("Extracting authorization token...")
+            logger.info("Step 4/4: Extracting session data...")
             self.extract_authorization_token()
 
             # Extract card information
-            print("Extracting card information...")
+            logger.debug("Extracting card information...")
             self.extract_card_info()
 
-            print(f"Login successful! Found {len(self.cards)} card(s)")
+            logger.info(f"Login successful! Found {len(self.cards)} card(s)")
             return True
 
         except TimeoutException as e:
@@ -293,7 +296,7 @@ class CALCreditCardScraper:
                 token = auth_module['auth']['calConnectToken']
                 if token and token.strip():
                     self.authorization_token = f"CALAuthScheme {token}"
-                    print(f"Authorization token extracted from session storage")
+                    logger.debug("Authorization token extracted from session storage")
                     return
 
             # Fallback: Parse performance logs
@@ -314,7 +317,7 @@ class CALCreditCardScraper:
                             auth_header = headers.get('Authorization') or headers.get('authorization')
                             if auth_header:
                                 self.authorization_token = auth_header
-                                print("Authorization token extracted from network logs")
+                                logger.debug("Authorization token extracted from network logs")
                                 return
                 except:
                     continue
@@ -343,7 +346,7 @@ class CALCreditCardScraper:
                 for card in cards
             ]
 
-            print(f"Extracted {len(self.cards)} card(s): {[c['last4Digits'] for c in self.cards]}")
+            logger.debug(f"Extracted {len(self.cards)} card(s): {[c['last4Digits'] for c in self.cards]}")
 
         except Exception as e:
             raise CALScraperError(f"Error extracting card info: {e}")
@@ -433,14 +436,14 @@ class CALCreditCardScraper:
             if data.get('statusCode') == 1:
                 return data
             elif data.get('statusCode') == 96:
-                print("No pending transactions found")
+                logger.debug("No pending transactions found")
                 return None
             else:
-                print(f"Warning: Unexpected status code for pending transactions: {data.get('statusCode')}")
+                logger.warning(f"Unexpected status code for pending transactions: {data.get('statusCode')}")
                 return None
 
         except requests.RequestException as e:
-            print(f"Warning: Failed to fetch pending transactions: {e}")
+            logger.warning(f"Failed to fetch pending transactions: {e}")
             return None
 
     def convert_transactions(
@@ -613,7 +616,7 @@ class CALCreditCardScraper:
 
         end_date = datetime.now() + timedelta(days=months_forward * 30)
 
-        print(f"Fetching transactions from {start_date.date()} to {end_date.date()}")
+        logger.info(f"Fetching transactions from {start_date.date()} to {end_date.date()}")
 
         accounts = []
 
@@ -621,14 +624,14 @@ class CALCreditCardScraper:
             card_id = card['cardUniqueId']
             last_4 = card['last4Digits']
 
-            print(f"\nProcessing card ending in {last_4}...")
+            logger.info(f"Processing card ending in {last_4}...")
 
             # Fetch pending transactions
-            print(f"Fetching pending transactions for card {last_4}...")
+            logger.debug(f"Fetching pending transactions for card {last_4}...")
             pending_data = self.fetch_pending_transactions([card_id])
 
             # Fetch completed transactions by month
-            print(f"Fetching completed transactions for card {last_4}...")
+            logger.debug(f"Fetching completed transactions for card {last_4}...")
             completed_data_list = []
 
             current_date = end_date
@@ -636,7 +639,7 @@ class CALCreditCardScraper:
                 month = current_date.month
                 year = current_date.year
 
-                print(f"  Fetching month {month}/{year}...")
+                logger.debug(f"  Fetching month {month}/{year}...")
                 month_data = self.fetch_completed_transactions(card_id, month, year)
                 completed_data_list.append(month_data)
 
@@ -655,7 +658,7 @@ class CALCreditCardScraper:
                 if start_date <= datetime.fromisoformat(t.date) <= end_date
             ]
 
-            print(f"Found {len(transactions)} transactions for card {last_4}")
+            logger.info(f"Found {len(transactions)} transactions for card {last_4}")
 
             accounts.append(CardAccount(
                 account_number=last_4,
@@ -683,7 +686,7 @@ class CALCreditCardScraper:
             List of CardAccount objects with transactions
         """
         try:
-            print("Starting CAL credit card scraper...")
+            logger.info("Starting CAL credit card scraper...")
 
             # Login
             self.login()

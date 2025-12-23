@@ -163,10 +163,11 @@ class PensionAutomatorBase(ABC):
                 self.setup_driver()
 
             # Navigate to login page
-            logger.info(f"Navigating to login page: {site_url}")
+            logger.info(f"Step 1/6: Navigating to login page: {site_url}")
             self.driver.get(site_url)
 
             # Enter ID number
+            logger.info("Step 2/6: Entering ID number...")
             if not self._web_actions.enter_text_human_like(id_selector, id_number):
                 logger.error("Failed to enter ID number")
                 return False
@@ -175,7 +176,7 @@ class PensionAutomatorBase(ABC):
             time.sleep(2)
 
             # Select email MFA option
-            logger.info("Selecting email MFA option...")
+            logger.info("Step 3/6: Selecting email MFA option...")
             email_fallbacks = fallback_selectors.get('email_label', [])
             if not self._web_actions.select_option(email_label_selector, email_fallbacks):
                 logger.warning("Could not select email MFA option, proceeding anyway...")
@@ -306,10 +307,11 @@ class PensionAutomatorBase(ABC):
                 self.setup_driver()
 
             # Navigate to login page
-            logger.info(f"Navigating to login page: {site_url}")
+            logger.info(f"Step 1/5: Navigating to login page: {site_url}")
             self.driver.get(site_url)
 
             # Enter ID number
+            logger.info("Step 2/5: Entering credentials...")
             if not self._web_actions.enter_text_human_like(id_selector, id_number):
                 logger.error("Failed to enter ID number")
                 return False
@@ -320,6 +322,7 @@ class PensionAutomatorBase(ABC):
                 return False
 
             # Click login button
+            logger.info("Step 3/5: Clicking login button...")
             login_time = datetime.now()
             login_fallbacks = fallback_selectors.get('login_button', [])
             if not self._web_actions.click_button(login_button_selector, login_fallbacks):
