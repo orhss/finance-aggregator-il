@@ -1,16 +1,12 @@
 """
 Base classes for financial institution scrapers
 
-New modular architecture (recommended):
+Modular architecture:
 - PensionAutomatorBase: Base class for pension site automation
 - EmailMFARetriever: Email-based MFA code retrieval
 - MFAHandler: MFA code entry into web forms
 - SeleniumDriver: WebDriver lifecycle management
 - WebActions: Common web interaction utilities
-
-Legacy classes (deprecated):
-- EmailMFARetrieverBase: Use EmailMFARetriever instead
-- SeleniumMFAAutomatorBase: Use PensionAutomatorBase instead
 """
 
 from .broker_base import (
@@ -25,7 +21,6 @@ from .broker_base import (
     BalanceError,
 )
 
-# New modular components (recommended)
 from .email_retriever import (
     EmailMFARetriever,
     EmailRetrievalError,
@@ -53,12 +48,6 @@ from .pension_automator import (
     PensionAutomatorBase,
 )
 
-# Legacy classes (deprecated - kept for backwards compatibility)
-from .pension_base import (
-    EmailMFARetrieverBase,
-    SeleniumMFAAutomatorBase,
-)
-
 __all__ = [
     # Broker base
     "BrokerAPIClient",
@@ -70,7 +59,7 @@ __all__ = [
     "AuthenticationError",
     "AccountError",
     "BalanceError",
-    # New modular components (recommended)
+    # Modular components
     "PensionAutomatorBase",
     "EmailMFARetriever",
     "EmailRetrievalError",
@@ -83,7 +72,4 @@ __all__ = [
     "WebActions",
     "WebActionError",
     "ElementNotFoundError",
-    # Legacy classes (deprecated)
-    "EmailMFARetrieverBase",
-    "SeleniumMFAAutomatorBase",
 ]
