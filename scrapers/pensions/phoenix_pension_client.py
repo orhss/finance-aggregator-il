@@ -191,7 +191,7 @@ class PhoenixSeleniumMFAAutomator(PensionAutomatorBase):
             email_address=email,
             id_selector=selectors.get('id_selector', '#fnx-id'),
             email_selector=selectors.get('email_selector', 'input[inputmode="email"]'),
-            login_button_selector=selectors.get('login_button_selector', 'button[type="button"]'),
+            login_button_selector=selectors.get('login_button_selector', "//button[contains(text(), 'שלחו לי קוד כניסה')]"),
             otp_selector=self.OTP_SELECTOR,
             submit_button_selector="#login-btn",
             fallback_selectors=self.FALLBACK_SELECTORS
@@ -248,22 +248,9 @@ class PhoenixSeleniumMFAAutomator(PensionAutomatorBase):
                         continue
 
             except NoSuchElementException:
-                logger.warning("Pie chart legend not found, trying alternative extraction")
+                logger.warning("Pie chart legend not found")
             except Exception as e:
                 logger.warning(f"Error extracting from pie chart legend: {e}")
-
-            # Also extract total investments and savings (סה"כ השקעות וחסכונות) as fallback/reference
-            try:
-                total_selector = "//span[contains(@class, 'h2-medium')]"
-                total_elem = self.driver.find_element(By.XPATH, total_selector)
-                total_value = total_elem.text.strip()
-                if total_value and any(char.isdigit() for char in total_value):
-                    data['total_investments_savings'] = total_value
-                    logger.info(f"Total investments and savings: ₪{total_value}")
-            except NoSuchElementException:
-                logger.debug("Total investments element not found")
-            except Exception as e:
-                logger.debug(f"Error extracting total: {e}")
 
             return data
 
