@@ -248,21 +248,57 @@ class PensionService:
             financial_data = automator.extract_financial_data()
             result.financial_data = financial_data
 
-            # Parse and save balance
-            if financial_data.get('total_investments_savings'):
-                total_amount = self._parse_amount(financial_data['total_investments_savings'])
-                if total_amount is not None:
-                    # Get or create account
-                    account = self._get_or_create_account(
+            # Parse and save individual balances (pension, keren hishtalmut, etc.)
+            if financial_data.get('pension_balance'):
+                pension_amount = self._parse_amount(financial_data['pension_balance'])
+                if pension_amount is not None:
+                    pension_account = self._get_or_create_account(
                         account_type="pension",
                         institution="phoenix",
                         account_number=user_id,
                         account_name="Phoenix Pension"
                     )
                     result.accounts_synced += 1
+                    if self._save_balance(pension_account, pension_amount):
+                        result.balances_added += 1
 
-                    # Save balance
-                    if self._save_balance(account, total_amount):
+            if financial_data.get('keren_histalmut_balance'):
+                keren_amount = self._parse_amount(financial_data['keren_histalmut_balance'])
+                if keren_amount is not None:
+                    keren_account = self._get_or_create_account(
+                        account_type="savings",
+                        institution="phoenix",
+                        account_number=f"{user_id}_keren",
+                        account_name="Phoenix Keren Hishtalmut"
+                    )
+                    result.accounts_synced += 1
+                    if self._save_balance(keren_account, keren_amount):
+                        result.balances_added += 1
+
+            if financial_data.get('managers_insurance_balance'):
+                insurance_amount = self._parse_amount(financial_data['managers_insurance_balance'])
+                if insurance_amount is not None:
+                    insurance_account = self._get_or_create_account(
+                        account_type="pension",
+                        institution="phoenix",
+                        account_number=f"{user_id}_insurance",
+                        account_name="Phoenix Managers Insurance"
+                    )
+                    result.accounts_synced += 1
+                    if self._save_balance(insurance_account, insurance_amount):
+                        result.balances_added += 1
+
+            if financial_data.get('gemel_balance'):
+                gemel_amount = self._parse_amount(financial_data['gemel_balance'])
+                if gemel_amount is not None:
+                    gemel_account = self._get_or_create_account(
+                        account_type="savings",
+                        institution="phoenix",
+                        account_number=f"{user_id}_gemel",
+                        account_name="Phoenix Gemel"
+                    )
+                    result.accounts_synced += 1
+                    if self._save_balance(gemel_account, gemel_amount):
                         result.balances_added += 1
 
             # Update sync record

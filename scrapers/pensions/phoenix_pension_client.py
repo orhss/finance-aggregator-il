@@ -205,57 +205,65 @@ class PhoenixSeleniumMFAAutomator(PensionAutomatorBase):
             logger.info("Extracting financial data from Phoenix site...")
 
             # Wait for the financial data to load
-            # Phoenix uses specific div structure for financial data
-            WebDriverWait(self.driver, 5).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "body"))
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "app-pie-chart .legend"))
             )
 
-            # Extract total investments and savings (סה"כ השקעות וחסכונות)
+            # Extract individual account values from the pie chart legend
+            # Legend structure: .legend-item contains category name (caption-3) and value (body-2-medium)
             try:
-                # Look for the specific Phoenix div structure
-                phoenix_selectors = [
-                    "//div[contains(@class, 'flex flex-col')]//span[contains(text(), 'סה\"כ השקעות וחסכונות')]/..//span[contains(@class, 'h2-medium')]",
-                    "//div[contains(@class, 'flex flex-col')]//span[contains(text(), 'סה\"כ השקעות וחסכונות')]/..//span[contains(@class, 'subtitle-1-medium')]/following-sibling::span",
-                    ".flex.flex-col .h2-medium",
-                    "//span[contains(@class, 'h2-medium')]",
-                    "//div[contains(@class, 'flex flex-col')]//span[contains(@class, 'h2-medium')]"
-                ]
+                legend_items = self.driver.find_elements(By.CSS_SELECTOR, "app-pie-chart .legend .legend-item")
+                logger.info(f"Found {len(legend_items)} legend items in pie chart")
 
-                total_investments = None
-                for selector in phoenix_selectors:
+                for item in legend_items:
                     try:
-                        if selector.startswith("//"):
-                            # XPath selector
-                            element = self.driver.find_element(By.XPATH, selector)
-                        else:
-                            # CSS selector
-                            element = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        # Get category name (e.g., "קרן השתלמות", "קרן פנסיה")
+                        category_elem = item.find_element(By.CSS_SELECTOR, ".caption-3")
+                        category = category_elem.text.strip()
 
-                        # Get the text and clean it
-                        text = element.text.strip()
-                        if text and any(char.isdigit() for char in text):
-                            # Remove currency symbol and clean the number
-                            cleaned_text = text.replace('₪', '').replace(',', '').strip()
-                            if cleaned_text.isdigit():
-                                total_investments = cleaned_text
-                                logger.info(f"Total investments and savings found: ₪{total_investments}")
-                                break
-                            else:
-                                total_investments = text
-                                logger.info(f"Total investments and savings found: {total_investments}")
-                                break
+                        # Get value
+                        value_elem = item.find_element(By.CSS_SELECTOR, ".body-2-medium")
+                        value = value_elem.text.strip()
+
+                        logger.info(f"Found: {category} = {value}")
+
+                        # Map Hebrew category names to data keys
+                        if 'קרן השתלמות' in category:
+                            data['keren_histalmut_balance'] = value
+                        elif 'קרן פנסיה' in category or 'פנסיה' in category:
+                            data['pension_balance'] = value
+                        elif 'ביטוח מנהלים' in category:
+                            data['managers_insurance_balance'] = value
+                        elif 'גמל' in category:
+                            data['gemel_balance'] = value
+                        else:
+                            # Store any other categories with a generic key
+                            safe_key = category.replace(' ', '_').replace('"', '')
+                            data[f'phoenix_{safe_key}'] = value
 
                     except NoSuchElementException:
                         continue
                     except Exception as e:
-                        logger.debug(f"Error with selector {selector}: {e}")
+                        logger.debug(f"Error extracting legend item: {e}")
                         continue
 
-                data['total_investments_savings'] = total_investments
-
+            except NoSuchElementException:
+                logger.warning("Pie chart legend not found, trying alternative extraction")
             except Exception as e:
-                logger.warning(f"Error extracting total investments: {e}")
-                data['total_investments_savings'] = None
+                logger.warning(f"Error extracting from pie chart legend: {e}")
+
+            # Also extract total investments and savings (סה"כ השקעות וחסכונות) as fallback/reference
+            try:
+                total_selector = "//span[contains(@class, 'h2-medium')]"
+                total_elem = self.driver.find_element(By.XPATH, total_selector)
+                total_value = total_elem.text.strip()
+                if total_value and any(char.isdigit() for char in total_value):
+                    data['total_investments_savings'] = total_value
+                    logger.info(f"Total investments and savings: ₪{total_value}")
+            except NoSuchElementException:
+                logger.debug("Total investments element not found")
+            except Exception as e:
+                logger.debug(f"Error extracting total: {e}")
 
             return data
 
