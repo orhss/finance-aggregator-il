@@ -86,11 +86,49 @@
    - ✅ Marked legacy classes as DEPRECATED in documentation
    - ✅ Updated MFA Flow Architecture section with new module references
 
-### 📋 Next Steps (Phase 3 - Future)
-1. **Complete Module Transition** (FUTURE)
-   - Remove pension_base.py entirely once all clients validated
-   - Update all remaining imports across codebase
-   - Create migration guide for any external code using old base classes - NOT NEEDED
+### 📋 Next Steps (Phase 3 - Selenium Automator Migration)
+
+**Status**: BLOCKED - Requires migrating SeleniumMFAAutomatorBase dependencies
+
+**Current Blockers** (discovered 2025-12-23):
+- `MigdalSeleniumMFAAutomator` extends `SeleniumMFAAutomatorBase`
+- `PhoenixSeleniumMFAAutomator` extends `SeleniumMFAAutomatorBase`
+- `pension_service.py` imports `EmailConfig`, `MFAConfig` from `pension_base.py`
+
+**Phase 3 Tasks**:
+
+1. **Create `scrapers/base/selenium_driver.py`** (NOT STARTED)
+   - WebDriver setup and configuration
+   - Chrome options management (headless, user-agent, etc.)
+   - Context manager for guaranteed browser cleanup
+   - Replaces `setup_driver()` and `cleanup()` from SeleniumMFAAutomatorBase
+
+2. **Create `scrapers/base/web_actions.py`** (NOT STARTED)
+   - Form filling utilities (human-like typing)
+   - Button clicking with fallback selectors
+   - Element waiting and detection
+   - Replaces form/button methods from SeleniumMFAAutomatorBase
+
+3. **Refactor `MigdalSeleniumMFAAutomator`** (NOT STARTED)
+   - Remove inheritance from SeleniumMFAAutomatorBase
+   - Compose new modules: selenium_driver, web_actions, mfa_handler
+   - Use SmartWait instead of time.sleep()
+   - Test complete sync flow
+
+4. **Refactor `PhoenixSeleniumMFAAutomator`** (NOT STARTED)
+   - Remove inheritance from SeleniumMFAAutomatorBase
+   - Compose new modules: selenium_driver, web_actions, mfa_handler
+   - Use SmartWait instead of time.sleep()
+   - Test complete sync flow
+
+5. **Update imports across codebase** (NOT STARTED)
+   - Update `pension_service.py` to import from `email_retriever.py`
+   - Update `scrapers/base/__init__.py` to remove legacy exports
+   - Remove any remaining references to pension_base.py
+
+6. **Remove `pension_base.py`** (BLOCKED by tasks 1-5)
+   - Delete the file once no imports remain
+   - Verify all tests pass
 
 ### 📈 Phase 1 Impact Summary
 
