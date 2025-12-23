@@ -1,6 +1,14 @@
+"""
+Migdal Pension Client
+
+Handles login and data extraction for Migdal pension site using:
+- Email-based MFA automation
+- Selenium web automation
+- PensionAutomatorBase for reusable login flows
+"""
+
 import os
 import re
-import time
 from datetime import datetime
 from typing import Optional, Dict, Any
 import logging
@@ -9,17 +17,15 @@ import dotenv
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException
 
-# New modular imports
+# Modular imports
 from scrapers.base.email_retriever import (
     EmailMFARetriever,
     EmailConfig,
     MFAConfig
 )
-from scrapers.base.pension_base import (
-    SeleniumMFAAutomatorBase,
-)
+from scrapers.base.pension_automator import PensionAutomatorBase
 
 logger = logging.getLogger(__name__)
 dotenv.load_dotenv()
@@ -81,20 +87,55 @@ class MigdalEmailMFARetriever(EmailMFARetriever):
             return None
 
 
-class MigdalSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
-    """Handles Selenium automation with MFA for Migdal pension site"""
+class MigdalSeleniumMFAAutomator(PensionAutomatorBase):
+    """
+    Handles Selenium automation with MFA for Migdal pension site
+
+    Extends PensionAutomatorBase which provides:
+    - Browser lifecycle management via SeleniumDriver
+    - Web interactions via WebActions
+    - MFA code entry via MFAHandler
+    - Reusable login_with_id_and_mfa_flow() for Migdal's login pattern
+    """
+
+    # Migdal-specific OTP selectors (6 individual digit fields)
+    OTP_SELECTORS = [
+        "input[name='otp']",
+        "input[name='otp2']",
+        "input[name='otp3']",
+        "input[name='otp4']",
+        "input[name='otp5']",
+        "input[name='otp6']"
+    ]
+
+    # Fallback selectors for various elements
+    FALLBACK_SELECTORS = {
+        'email_label': [
+            "//label[contains(text(), 'מייל') or contains(text(), 'Email')]"
+        ],
+        'login_button': [
+            "//button[contains(text(), 'כניסה') or contains(text(), 'Login')]"
+        ],
+        'continue_button': [
+            "//button[contains(., 'המשך') or contains(., 'Continue')]"
+        ],
+        'submit_button': [
+            "//button[contains(text(), 'כניסה') or contains(text(), 'Login')]"
+        ]
+    }
 
     def __init__(self, email_retriever: MigdalEmailMFARetriever, headless: bool = True):
         super().__init__(email_retriever, headless)
 
     def login(self, site_url: str, credentials: Dict[str, str], selectors: Dict[str, str]) -> bool:
-        """Implement the abstract login method for Migdal site
-        
+        """
+        Perform login for Migdal site using ID and email MFA flow
+
         Args:
             site_url: URL of the login page
             credentials: Dictionary containing login credentials (e.g., {'id': '123456789'})
             selectors: Dictionary containing CSS selectors for form elements
-            
+
         Returns:
             True if login successful, False otherwise
         """
@@ -102,79 +143,19 @@ class MigdalSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
         if not id_number:
             logger.error("ID number not provided in credentials")
             return False
-            
-        return self.login_with_id_and_mfa(
+
+        # Use the base class login flow with Migdal-specific selectors
+        return self.login_with_id_and_mfa_flow(
             site_url=site_url,
             id_number=id_number,
-            id_selector=selectors.get('id_selector', "input#username[type='number']"),
+            id_selector=selectors.get('id_selector', '#username'),
             login_button_selector=selectors.get('login_button_selector', 'button[type="submit"]'),
             email_label_selector=selectors.get('email_label_selector', 'label[for="otpToEmail"]'),
             continue_button_selector=selectors.get('continue_button_selector', 'button.form-btn'),
-            success_indicator=selectors.get('success_indicator', '.dashboard')
+            otp_selectors=self.OTP_SELECTORS,
+            submit_button_selector=None,  # Migdal auto-submits after MFA entry
+            fallback_selectors=self.FALLBACK_SELECTORS
         )
-
-    def login_with_id_and_mfa(self,
-                              site_url: str,
-                              id_number: str,
-                              id_selector: str,
-                              login_button_selector: str,
-                              email_label_selector: str,
-                              continue_button_selector: str,
-                              success_indicator: str) -> bool:
-        """
-        Perform login with ID and MFA automation for Migdal site
-        
-        Args:
-            site_url: URL to login page
-            id_number: Israeli ID number (9 digits including check digit)
-            id_selector: CSS selector for ID input field
-            login_button_selector: CSS selector for login button
-            email_label_selector: CSS selector for email MFA option label
-            continue_button_selector: CSS selector for continue button after MFA selection
-            success_indicator: Selector to confirm successful login
-        """
-        try:
-            # Define OTP selectors for individual digit fields (Migdal pattern)
-            otp_selectors = [
-                "input[name='otp']",
-                "input[name='otp2']",
-                "input[name='otp3']",
-                "input[name='otp4']",
-                "input[name='otp5']",
-                "input[name='otp6']"
-            ]
-            
-            # Define fallback selectors for various elements
-            fallback_selectors = {
-                'email_label': [
-                    "//label[contains(text(), 'מייל') or contains(text(), 'Email')]"
-                ],
-                'login_button': [
-                    "//button[contains(text(), 'כניסה') or contains(text(), 'Login')]"
-                ],
-                'continue_button': [
-                    "//button[contains(., 'המשך') or contains(., 'Continue')]"
-                ],
-                'submit_button': [
-                    "//button[contains(text(), 'כניסה') or contains(text(), 'Login')]"
-                ]
-            }
-            
-            # Use the comprehensive base method for login flow
-            return self.login_with_id_and_mfa_flow(
-                site_url=site_url,
-                id_number=id_number,
-                id_selector=id_selector,
-                login_button_selector=login_button_selector,
-                email_label_selector=email_label_selector,
-                continue_button_selector=continue_button_selector,
-                otp_selectors=otp_selectors,
-                fallback_selectors=fallback_selectors
-            )
-
-        except Exception as e:
-            logger.error(f"Error during Migdal login: {e}", exc_info=True)
-            return False
 
     def extract_financial_data(self) -> Dict[str, Any]:
         """Extract financial data from Migdal pension site after successful login"""

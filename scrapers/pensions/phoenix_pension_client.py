@@ -1,3 +1,12 @@
+"""
+Phoenix Pension Client
+
+Handles login and data extraction for Phoenix pension site using:
+- Email-based MFA automation
+- Selenium web automation
+- PensionAutomatorBase for reusable login flows
+"""
+
 import os
 import re
 from datetime import datetime
@@ -10,15 +19,13 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
 
-# New modular imports
+# Modular imports
 from scrapers.base.email_retriever import (
     EmailMFARetriever,
     EmailConfig,
     MFAConfig
 )
-from scrapers.base.pension_base import (
-    SeleniumMFAAutomatorBase,
-)
+from scrapers.base.pension_automator import PensionAutomatorBase
 
 logger = logging.getLogger(__name__)
 dotenv.load_dotenv()
@@ -103,20 +110,66 @@ class PhoenixEmailMFARetriever(EmailMFARetriever):
             return None
 
 
-class PhoenixSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
-    """Handles Selenium automation with MFA for Phoenix pension site"""
+class PhoenixSeleniumMFAAutomator(PensionAutomatorBase):
+    """
+    Handles Selenium automation with MFA for Phoenix pension site
+
+    Extends PensionAutomatorBase which provides:
+    - Browser lifecycle management via SeleniumDriver
+    - Web interactions via WebActions
+    - MFA code entry via MFAHandler
+    - Reusable login_with_id_email_and_mfa_flow() for Phoenix's login pattern
+    """
+
+    # Phoenix-specific OTP selector (single field)
+    OTP_SELECTOR = "input[data-verify-field='otpCode']"
+
+    # Fallback selectors for various elements
+    FALLBACK_SELECTORS = {
+        'login_button': [
+            # Text-based selectors (most reliable for distinguishing between buttons)
+            "//button[contains(text(), 'שלחו לי קוד כניסה')]",  # "Send me login code"
+            "//button[contains(text(), 'שלחו לי קוד')]",          # Partial match
+            "//button[contains(text(), 'קוד כניסה')]",            # "Login code"
+            "//button[contains(., 'שלחו לי קוד כניסה')]",        # Any descendant text
+            # Class-based fallbacks (less specific)
+            "button.bg-\\[\\#FF4E31\\]",
+            "button.text-white.w-\\[340px\\]",
+            "button[type='button'].bg-\\[\\#FF4E31\\]",
+            "button[type='button'].text-white",
+            "//button[contains(@class, 'bg-[#FF4E31]')]",
+            "//button[contains(@class, 'text-white')]",
+            "button[type='button']"
+        ],
+        'otp_field': [
+            "input[type='number']",
+            "input.input-otp",
+            "#otp",
+            "input[name='otp']",
+            "input[name='otpCode']",
+            "input[inputmode='numeric']"
+        ],
+        'submit_button': [
+            "button[type='submit']",
+            "//button[contains(text(), 'כניסה')]",
+            "button[style*='background-color: rgb(255, 90, 35)']",
+            "button.bg-\\[\\#FF4E31\\]",
+            "button.text-white"
+        ]
+    }
 
     def __init__(self, email_retriever: PhoenixEmailMFARetriever, headless: bool = True):
         super().__init__(email_retriever, headless)
 
     def login(self, site_url: str, credentials: Dict[str, str], selectors: Dict[str, str]) -> bool:
-        """Implement the abstract login method for Phoenix site
-        
+        """
+        Perform login for Phoenix site using ID, email and MFA flow
+
         Args:
             site_url: URL of the login page
             credentials: Dictionary containing login credentials (e.g., {'id': '123456789', 'email': 'user@example.com'})
             selectors: Dictionary containing CSS selectors for form elements
-            
+
         Returns:
             True if login successful, False otherwise
         """
@@ -130,100 +183,19 @@ class PhoenixSeleniumMFAAutomator(SeleniumMFAAutomatorBase):
         if not email:
             logger.error("Email not provided in credentials")
             return False
-            
-        return self.login_with_id_email_and_mfa(
+
+        # Use the base class login flow with Phoenix-specific selectors
+        return self.login_with_id_email_and_mfa_flow(
             site_url=site_url,
             id_number=id_number,
-            email=email,
+            email_address=email,
             id_selector=selectors.get('id_selector', '#fnx-id'),
             email_selector=selectors.get('email_selector', 'input[inputmode="email"]'),
-            login_button_selector=selectors.get('login_button_selector', ''),
-            success_indicator=selectors.get('success_indicator', '.dashboard')
+            login_button_selector=selectors.get('login_button_selector', 'button[type="button"]'),
+            otp_selector=self.OTP_SELECTOR,
+            submit_button_selector="#login-btn",
+            fallback_selectors=self.FALLBACK_SELECTORS
         )
-
-    def login_with_id_email_and_mfa(self,
-                                   site_url: str,
-                                   id_number: str,
-                                   email: str,
-                                   id_selector: str,
-                                   email_selector: str,
-                                   login_button_selector: str,
-                                   success_indicator: str) -> bool:
-        """
-        Perform login with ID, email and MFA automation for Phoenix site
-        
-        Args:
-            site_url: URL to login page
-            id_number: Israeli ID number (9 digits including check digit)
-            email: Email address for MFA
-            id_selector: CSS selector for ID input field
-            email_selector: CSS selector for email input field
-            login_button_selector: CSS selector for login button
-            success_indicator: Selector to confirm successful login
-        """
-        try:
-            # Define OTP selectors for Phoenix
-            otp_selectors = [
-                "input[data-verify-field='otpCode']",
-                "input[type='number']",
-                "input.input-otp",
-                "#otp",
-                "input[name='otp']",
-                "input[name='otpCode']",
-                "input[inputmode='numeric']"
-            ]
-            
-            # Define fallback selectors for various elements
-            # IMPORTANT: Text-based selectors first to handle multiple buttons correctly
-            fallback_selectors = {
-                'login_button': [
-                    # Text-based selectors (most reliable for distinguishing between buttons)
-                    "//button[contains(text(), 'שלחו לי קוד כניסה')]",  # "Send me login code"
-                    "//button[contains(text(), 'שלחו לי קוד')]",          # Partial match
-                    "//button[contains(text(), 'קוד כניסה')]",            # "Login code"
-                    "//button[contains(., 'שלחו לי קוד כניסה')]",        # Any descendant text
-                    # Class-based fallbacks (less specific)
-                    "button.bg-\\[\\#FF4E31\\]",
-                    "button.text-white.w-\\[340px\\]",
-                    "button[type='button'].bg-\\[\\#FF4E31\\]",
-                    "button[type='button'].text-white",
-                    "//button[contains(@class, 'bg-[#FF4E31]')]",
-                    "//button[contains(@class, 'text-white')]",
-                    "button[type='button']"
-                ],
-                'otp_field': [
-                    "input[type='number']",
-                    "input.input-otp",
-                    "#otp",
-                    "input[name='otp']",
-                    "input[name='otpCode']",
-                    "input[inputmode='numeric']"
-                ],
-                'submit_button': [
-                    "button[type='submit']",
-                    "//button[contains(text(), 'כניסה')]",
-                    "button[style*='background-color: rgb(255, 90, 35)']",
-                    "button.bg-\\[\\#FF4E31\\]",
-                    "button.text-white"
-                ]
-            }
-            
-            # Use the comprehensive base method for login flow
-            return self.login_with_id_email_and_mfa_flow(
-                site_url=site_url,
-                id_number=id_number,
-                email=email,
-                id_selector=id_selector,
-                email_selector=email_selector,
-                login_button_selector=login_button_selector,
-                otp_selectors=otp_selectors,
-                submit_button_selector="#login-btn",
-                fallback_selectors=fallback_selectors
-            )
-
-        except Exception as e:
-            logger.error(f"Error during Phoenix login: {e}", exc_info=True)
-            return False
 
     def extract_financial_data(self) -> Dict[str, Any]:
         """Extract financial data from Phoenix pension site after successful login"""

@@ -17,7 +17,7 @@ from scrapers.pensions.phoenix_pension_client import (
     PhoenixEmailMFARetriever,
     PhoenixSeleniumMFAAutomator
 )
-from scrapers.base.pension_base import (
+from scrapers.base.email_retriever import (
     EmailConfig,
     MFAConfig
 )

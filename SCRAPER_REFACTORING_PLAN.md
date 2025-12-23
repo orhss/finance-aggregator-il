@@ -86,49 +86,74 @@
    - ✅ Marked legacy classes as DEPRECATED in documentation
    - ✅ Updated MFA Flow Architecture section with new module references
 
-### 📋 Next Steps (Phase 3 - Selenium Automator Migration)
+### 📋 Phase 3 - Selenium Automator Migration (IN PROGRESS)
 
-**Status**: BLOCKED - Requires migrating SeleniumMFAAutomatorBase dependencies
+**Status**: IN PROGRESS
+**Last Updated**: 2025-12-23
 
-**Current Blockers** (discovered 2025-12-23):
-- `MigdalSeleniumMFAAutomator` extends `SeleniumMFAAutomatorBase`
-- `PhoenixSeleniumMFAAutomator` extends `SeleniumMFAAutomatorBase`
-- `pension_service.py` imports `EmailConfig`, `MFAConfig` from `pension_base.py`
+**Architecture Decision** (discovered during implementation):
+The original plan to have each client compose modules directly would cause **code duplication**.
+`SeleniumMFAAutomatorBase` contains ~500 lines of shared login flow orchestration used by both
+Migdal and Phoenix. Instead of duplicating this in each client, we create a new base class
+that uses composition internally but provides the same reusable interface.
+
+**Correct Approach**:
+```
+OLD: SeleniumMFAAutomatorBase (monolithic, 866 lines)
+     ├── MigdalSeleniumMFAAutomator (extends)
+     └── PhoenixSeleniumMFAAutomator (extends)
+
+NEW: PensionAutomatorBase (uses composition internally)
+     ├── Composes: SeleniumDriver, WebActions, MFAHandler
+     ├── Provides: login_with_id_and_mfa_flow(), login_with_id_email_and_mfa_flow()
+     ├── MigdalSeleniumAutomator (extends) - only overrides extract_financial_data()
+     └── PhoenixSeleniumAutomator (extends) - only overrides extract_financial_data()
+```
 
 **Phase 3 Tasks**:
 
-1. **Create `scrapers/base/selenium_driver.py`** (NOT STARTED)
+1. **Create `scrapers/base/selenium_driver.py`** ✅ COMPLETED
    - WebDriver setup and configuration
    - Chrome options management (headless, user-agent, etc.)
    - Context manager for guaranteed browser cleanup
-   - Replaces `setup_driver()` and `cleanup()` from SeleniumMFAAutomatorBase
+   - DriverConfig dataclass for configuration
 
-2. **Create `scrapers/base/web_actions.py`** (NOT STARTED)
+2. **Create `scrapers/base/web_actions.py`** ✅ COMPLETED
    - Form filling utilities (human-like typing)
    - Button clicking with fallback selectors
    - Element waiting and detection
-   - Replaces form/button methods from SeleniumMFAAutomatorBase
+   - Option selection, iframe switching, etc.
 
-3. **Refactor `MigdalSeleniumMFAAutomator`** (NOT STARTED)
-   - Remove inheritance from SeleniumMFAAutomatorBase
-   - Compose new modules: selenium_driver, web_actions, mfa_handler
-   - Use SmartWait instead of time.sleep()
-   - Test complete sync flow
+3. **Create `scrapers/base/pension_automator.py`** ✅ COMPLETED
+   - New base class `PensionAutomatorBase` replacing `SeleniumMFAAutomatorBase`
+   - Uses composition: SeleniumDriver, WebActions, MFAHandler
+   - Provides reusable login flows:
+     - `login_with_id_and_mfa_flow()` (Migdal pattern: ID → email option → MFA)
+     - `login_with_id_email_and_mfa_flow()` (Phoenix pattern: ID + email → MFA)
+   - Context manager support
+   - Proper logging throughout
 
-4. **Refactor `PhoenixSeleniumMFAAutomator`** (NOT STARTED)
-   - Remove inheritance from SeleniumMFAAutomatorBase
-   - Compose new modules: selenium_driver, web_actions, mfa_handler
-   - Use SmartWait instead of time.sleep()
-   - Test complete sync flow
+4. **Refactor `MigdalSeleniumMFAAutomator`** ✅ COMPLETED
+   - Changed inheritance: `SeleniumMFAAutomatorBase` → `PensionAutomatorBase`
+   - Removed duplicated login flow code (now uses base class)
+   - Kept only institution-specific: `extract_financial_data()`, OTP selectors, fallbacks
+   - Class constants for OTP_SELECTORS and FALLBACK_SELECTORS
 
-5. **Update imports across codebase** (NOT STARTED)
-   - Update `pension_service.py` to import from `email_retriever.py`
-   - Update `scrapers/base/__init__.py` to remove legacy exports
-   - Remove any remaining references to pension_base.py
+5. **Refactor `PhoenixSeleniumMFAAutomator`** ✅ COMPLETED
+   - Changed inheritance: `SeleniumMFAAutomatorBase` → `PensionAutomatorBase`
+   - Removed duplicated login flow code (now uses base class)
+   - Kept only institution-specific: `extract_financial_data()`, OTP selectors, fallbacks
+   - Class constants for OTP_SELECTOR and FALLBACK_SELECTORS
 
-6. **Remove `pension_base.py`** (BLOCKED by tasks 1-5)
-   - Delete the file once no imports remain
-   - Verify all tests pass
+6. **Update imports across codebase** ✅ COMPLETED
+   - ✅ Updated `pension_service.py` to import EmailConfig, MFAConfig from `email_retriever.py`
+   - ✅ Updated `scrapers/base/__init__.py` to export all new modules
+   - ✅ Kept legacy exports for backwards compatibility
+
+7. **Remove `pension_base.py`** (READY - requires testing)
+   - Legacy classes still exported via `__init__.py` for backwards compatibility
+   - Can be removed once testing confirms new architecture works
+   - Recommend: Run Migdal and Phoenix sync flows to verify before removal
 
 ### 📈 Phase 1 Impact Summary
 
