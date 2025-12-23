@@ -87,9 +87,9 @@ class WebActions:
         try:
             logger.debug(f"Looking for input field: {selector}")
             field = WebDriverWait(self.driver, timeout).until(
-                EC.presence_of_element_located((by, selector))
+                EC.element_to_be_clickable((by, selector))
             )
-            logger.debug("Found input field")
+            logger.debug("Found input field (element is interactable)")
 
             if clear_first:
                 field.clear()

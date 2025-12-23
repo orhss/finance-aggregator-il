@@ -104,7 +104,7 @@ class MFAHandler:
         for i, (digit, selector) in enumerate(zip(code, selectors)):
             try:
                 field = WebDriverWait(self.driver, self.timeout).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
                 )
                 field.clear()
                 field.send_keys(digit)
@@ -182,7 +182,7 @@ class MFAHandler:
             logger.debug(f"Looking for MFA field: {selector}")
 
             field = WebDriverWait(self.driver, self.timeout).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
             )
 
             field.clear()
