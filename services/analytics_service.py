@@ -5,7 +5,7 @@ Analytics service for querying and analyzing financial data
 from datetime import date, datetime
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy import func, extract, and_, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from db.models import Account, Transaction, Balance, SyncHistory
 from db.database import get_db
 
@@ -356,9 +356,10 @@ class AnalyticsService:
         Returns:
             Dictionary with monthly summary
         """
-        # Get transactions for the month
+        # Get transactions for the month with eager-loaded accounts (fixes N+1 query)
         transactions = (
             self.session.query(Transaction)
+            .options(joinedload(Transaction.account))
             .filter(
                 extract('year', Transaction.transaction_date) == year,
                 extract('month', Transaction.transaction_date) == month
@@ -388,8 +389,8 @@ class AnalyticsService:
             txn_type = txn.transaction_type or 'unknown'
             by_type[txn_type] = by_type.get(txn_type, 0) + 1
 
-            # Group by account
-            account = self.get_account_by_id(txn.account_id)
+            # Group by account (account already loaded via joinedload)
+            account = txn.account
             if account:
                 key = f"{account.institution} ({account.account_type})"
                 by_account[key] = by_account.get(key, 0) + 1
