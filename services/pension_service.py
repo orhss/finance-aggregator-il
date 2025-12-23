@@ -104,8 +104,10 @@ class PensionService:
             site_url = "https://my.migdal.co.il/mymigdal/process/login"
             credentials = {'id': user_id}
             selectors = {
-                'id_field': 'input[name="idNumber"]',
-                'continue_button': 'button.submit-button'
+                'id_selector': "input#username[type='number']",
+                'login_button_selector': 'button[type="submit"]',
+                'email_label_selector': 'label[for="otpToEmail"]',
+                'continue_button_selector': 'button.form-btn'
             }
 
             success = automator.login(site_url, credentials, selectors)
