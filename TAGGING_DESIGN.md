@@ -537,35 +537,35 @@ class TagScreen(ModalScreen):
 
 ---
 
-### Phase 5: Reports
+### Phase 5: Reports ✅ COMPLETE
 **Goal:** Tag-based analytics
 
-| Task | File | Description |
-|------|------|-------------|
-| 5.1 | `services/analytics_service.py` | Add `get_tag_breakdown()` method |
-| 5.2 | `services/analytics_service.py` | Add `tags` param to `get_transactions()` |
-| 5.3 | `cli/commands/reports.py` | Add `reports tags` command |
-| 5.4 | `cli/commands/reports.py` | Add `--group-by tags` to `reports monthly` |
-| 5.5 | - | Test: Generate tag reports |
+| Task | File | Description | Status |
+|------|------|-------------|--------|
+| 5.1 | `services/analytics_service.py` | Add `get_tag_breakdown()` method | ✅ |
+| 5.2 | `services/analytics_service.py` | Add `get_monthly_tag_breakdown()` method | ✅ |
+| 5.3 | `cli/commands/reports.py` | Add `reports tags` command | ✅ |
+| 5.4 | `cli/commands/reports.py` | Add `--group-by tags` to `reports monthly` | ✅ |
+| 5.5 | - | Test: Generate tag reports | ✅ |
 
 **Checkpoint:** `fin-cli reports tags` shows breakdown
 
 ---
 
-### Phase 6: Interactive Browser (TUI)
+### Phase 6: Interactive Browser (TUI) ✅ COMPLETE
 **Goal:** Browse and edit transactions interactively
 
-| Task | File | Description |
-|------|------|-------------|
-| 6.1 | `requirements.txt` | Add `textual>=0.45.0` |
-| 6.2 | `cli/tui/__init__.py` | Create package |
-| 6.3 | `cli/tui/browser.py` | Create `TransactionBrowser` app shell |
-| 6.4 | `cli/tui/browser.py` | Implement transaction list with DataTable |
-| 6.5 | `cli/tui/browser.py` | Implement search/filter |
-| 6.6 | `cli/tui/browser.py` | Implement `EditScreen` modal |
-| 6.7 | `cli/tui/browser.py` | Implement `TagScreen` modal |
-| 6.8 | `cli/commands/transactions.py` | Add `transactions browse` command |
-| 6.9 | - | Test: Full interactive workflow |
+| Task | File | Description | Status |
+|------|------|-------------|--------|
+| 6.1 | `requirements.txt` | Add `textual>=0.45.0` | ✅ |
+| 6.2 | `cli/tui/__init__.py` | Create package | ✅ |
+| 6.3 | `cli/tui/browser.py` | Create `TransactionBrowser` app shell | ✅ |
+| 6.4 | `cli/tui/browser.py` | Implement transaction list with DataTable | ✅ |
+| 6.5 | `cli/tui/browser.py` | Implement search/filter | ✅ |
+| 6.6 | `cli/tui/browser.py` | Implement `EditScreen` modal | ✅ |
+| 6.7 | `cli/tui/browser.py` | Implement `TagScreen` modal | ✅ |
+| 6.8 | `cli/commands/transactions.py` | Add `transactions browse` command | ✅ |
+| 6.9 | - | Test: Full interactive workflow | ✅ |
 
 **Checkpoint:** `fin-cli transactions browse` opens TUI, can edit and tag
 
@@ -573,15 +573,15 @@ class TagScreen(ModalScreen):
 
 ### Summary
 
-| Phase | Tasks | Depends On |
-|-------|-------|------------|
-| 1. Database | 6 | - |
-| 2. Tag Service | 9 | Phase 1 |
-| 3. Basic CLI | 7 | Phase 2 |
-| 4. Transaction CLI | 9 | Phase 2, 3 |
-| 5. Reports | 5 | Phase 2 |
-| 6. TUI Browser | 9 | Phase 2, 4 |
+| Phase | Tasks | Depends On | Status |
+|-------|-------|------------|--------|
+| 1. Database | 6 | - | ✅ COMPLETE |
+| 2. Tag Service | 9 | Phase 1 | ✅ COMPLETE |
+| 3. Basic CLI | 7 | Phase 2 | ✅ COMPLETE |
+| 4. Transaction CLI | 10 | Phase 2, 3 | ✅ COMPLETE |
+| 5. Reports | 5 | Phase 2 | ✅ COMPLETE |
+| 6. TUI Browser | 9 | Phase 2, 4 | ✅ COMPLETE |
 
-**Total: 45 tasks across 6 phases**
+**Total: 46 tasks across 6 phases - ALL COMPLETE**
 
 Each phase is independently testable. Phases 4 and 5 can run in parallel after Phase 2.

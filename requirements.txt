@@ -6,6 +6,7 @@ selenium
 # CLI framework and UI
 typer[all]>=0.9.0
 rich>=13.7.0
+textual>=0.45.0
 
 # Database ORM
 sqlalchemy>=2.0.0

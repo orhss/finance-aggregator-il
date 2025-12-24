@@ -17,6 +17,57 @@ app = typer.Typer(help="Manage transactions")
 console = Console()
 
 
+@app.command("browse")
+def browse_transactions(
+    from_date: Optional[str] = typer.Option(None, "--from", help="Start date (YYYY-MM-DD)"),
+    to_date: Optional[str] = typer.Option(None, "--to", help="End date (YYYY-MM-DD)"),
+    tag: Optional[List[str]] = typer.Option(None, "--tag", "-t", help="Filter by tag"),
+    untagged: bool = typer.Option(False, "--untagged", help="Show only untagged transactions"),
+    institution: Optional[str] = typer.Option(None, "--institution", "-i", help="Filter by institution")
+):
+    """
+    Interactive transaction browser (TUI)
+
+    Navigate with arrow keys, press Enter or 'e' to edit, 't' to tag, '/' to search.
+    """
+    try:
+        from cli.tui.browser import run_browser
+
+        # Parse dates
+        from_date_obj = None
+        to_date_obj = None
+
+        if from_date:
+            try:
+                from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
+            except ValueError:
+                console.print("[red]Invalid from date format. Use YYYY-MM-DD[/red]")
+                raise typer.Exit(code=1)
+
+        if to_date:
+            try:
+                to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
+            except ValueError:
+                console.print("[red]Invalid to date format. Use YYYY-MM-DD[/red]")
+                raise typer.Exit(code=1)
+
+        run_browser(
+            from_date=from_date_obj,
+            to_date=to_date_obj,
+            tags=list(tag) if tag else None,
+            untagged_only=untagged,
+            institution=institution,
+        )
+
+    except ImportError as e:
+        console.print("[red]TUI requires 'textual' package. Install with: pip install textual[/red]")
+        console.print(f"[dim]Error: {e}[/dim]")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"[red]Error launching browser: {e}[/red]")
+        raise typer.Exit(code=1)
+
+
 @app.command("list")
 def list_transactions(
     account_id: Optional[int] = typer.Option(None, "--account", "-a", help="Filter by account ID"),
