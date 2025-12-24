@@ -142,7 +142,7 @@ def list_transactions(
             # Get tags for transaction
             txn_tags = tag_service.get_transaction_tags(txn.id)
             if txn_tags:
-                tags_str = ", ".join([f"[cyan]{t.name}[/cyan]" for t in txn_tags[:3]])
+                tags_str = ", ".join([f"[cyan]{fix_rtl(t.name)}[/cyan]" for t in txn_tags[:3]])
                 if len(txn_tags) > 3:
                     tags_str += f" [dim]+{len(txn_tags) - 3}[/dim]"
             else:
@@ -256,7 +256,7 @@ def show_transaction(
 
         # Tags
         if txn_tags:
-            tags_str = ", ".join([f"[cyan]{t.name}[/cyan]" for t in txn_tags])
+            tags_str = ", ".join([f"[cyan]{fix_rtl(t.name)}[/cyan]" for t in txn_tags])
             info_lines.append(f"[bold]Tags:[/bold] {tags_str}")
         else:
             info_lines.append(f"[bold]Tags:[/bold] [dim](none)[/dim]")

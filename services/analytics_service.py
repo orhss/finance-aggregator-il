@@ -571,6 +571,89 @@ class AnalyticsService:
 
         return self.get_tag_breakdown(from_date=first_day, to_date=last_day)
 
+    def get_spending_for_tag(
+        self,
+        tag_name: str,
+        from_date: Optional[date] = None,
+        to_date: Optional[date] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get detailed spending breakdown for a specific tag
+
+        Args:
+            tag_name: Tag name to get spending for
+            from_date: Start date filter
+            to_date: End date filter
+
+        Returns:
+            Dictionary with:
+            - total_amount: Total spending for this tag
+            - count: Number of transactions
+            - by_category: Breakdown by category {category: {count, total_amount}}
+            - transactions: List of transaction details
+        """
+        # Find the tag
+        tag = self.session.query(Tag).filter(
+            func.lower(Tag.name) == func.lower(tag_name)
+        ).first()
+
+        if not tag:
+            return {
+                'total_amount': 0,
+                'count': 0,
+                'by_category': {},
+                'transactions': []
+            }
+
+        # Get transactions for this tag
+        query = (
+            self.session.query(Transaction)
+            .join(TransactionTag, Transaction.id == TransactionTag.transaction_id)
+            .filter(TransactionTag.tag_id == tag.id)
+        )
+
+        if from_date:
+            query = query.filter(Transaction.transaction_date >= from_date)
+        if to_date:
+            query = query.filter(Transaction.transaction_date <= to_date)
+
+        query = query.order_by(Transaction.transaction_date.desc())
+        transactions = query.all()
+
+        # Calculate totals and category breakdown
+        total_amount = 0
+        by_category: Dict[str, Dict[str, Any]] = {}
+
+        for txn in transactions:
+            total_amount += txn.original_amount
+            category = txn.category or '(uncategorized)'
+
+            if category not in by_category:
+                by_category[category] = {'count': 0, 'total_amount': 0}
+
+            by_category[category]['count'] += 1
+            by_category[category]['total_amount'] += txn.original_amount
+
+        # Build transaction list
+        txn_list = [
+            {
+                'id': txn.id,
+                'date': txn.transaction_date,
+                'description': txn.description,
+                'amount': txn.original_amount,
+                'currency': txn.original_currency,
+                'category': txn.category or '(uncategorized)'
+            }
+            for txn in transactions
+        ]
+
+        return {
+            'total_amount': total_amount,
+            'count': len(transactions),
+            'by_category': by_category,
+            'transactions': txn_list
+        }
+
     # ==================== Sync History Methods ====================
 
     def get_sync_history(

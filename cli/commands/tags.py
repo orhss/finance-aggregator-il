@@ -10,6 +10,7 @@ from rich.prompt import Confirm
 from typing import Optional
 
 from services.tag_service import TagService
+from cli.utils import fix_rtl
 
 app = typer.Typer(help="Manage transaction tags")
 console = Console()
@@ -53,7 +54,7 @@ def list_tags(
                 amount_str = f"[green]{amount_str}[/green]"
 
             table.add_row(
-                stat["name"],
+                fix_rtl(stat["name"]),
                 str(stat["count"]),
                 amount_str
             )
@@ -195,7 +196,7 @@ def migrate_categories(
 
         total = 0
         for category, count in sorted(results.items(), key=lambda x: x[1], reverse=True):
-            table.add_row(category, str(count))
+            table.add_row(fix_rtl(category), str(count))
             total += count
 
         table.add_section()

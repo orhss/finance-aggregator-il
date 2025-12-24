@@ -301,7 +301,7 @@ class TransactionBrowser(App):
 
             # Get tags for this transaction
             txn_tags = tag_service.get_transaction_tags(txn.id)
-            tags_str = ", ".join([t.name for t in txn_tags[:3]]) if txn_tags else ""
+            tags_str = ", ".join([fix_rtl(t.name) for t in txn_tags[:3]]) if txn_tags else ""
             if len(txn_tags) > 3:
                 tags_str += f" +{len(txn_tags) - 3}"
 
