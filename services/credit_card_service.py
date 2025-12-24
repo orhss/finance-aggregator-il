@@ -111,6 +111,11 @@ class CreditCardService(BaseSyncService):
         """
         Save transaction to database with deduplication.
 
+        Handles three scenarios:
+        1. Completed transaction with ID: Match by transaction_id
+        2. Pending transaction (no ID): Match by date + merchant + amount
+        3. Pending → Completed transition: Match completed txn to existing pending record
+
         Does NOT commit - relies on transaction management from sync_transaction.
 
         Args:
@@ -127,21 +132,37 @@ class CreditCardService(BaseSyncService):
         # Build unique identifier
         transaction_id = transaction.identifier if transaction.identifier else None
 
-        # Check if transaction already exists
-        query = self.db.query(DBTransaction).filter(
-            DBTransaction.account_id == account.id,
-            DBTransaction.transaction_date == transaction_date,
-            DBTransaction.description == transaction.description,
-            DBTransaction.original_amount == transaction.original_amount
-        )
+        existing_transaction = None
 
         if transaction_id:
-            query = query.filter(DBTransaction.transaction_id == transaction_id)
+            # Scenario 1: Has transaction_id - try exact match first
+            existing_transaction = self.db.query(DBTransaction).filter(
+                DBTransaction.account_id == account.id,
+                DBTransaction.transaction_id == transaction_id
+            ).first()
 
-        existing_transaction = query.first()
+            # Scenario 3: If not found and this is completed, check for matching pending transaction
+            # This handles the pending → completed transition
+            if not existing_transaction and transaction.status.value == 'completed':
+                existing_transaction = self.db.query(DBTransaction).filter(
+                    DBTransaction.account_id == account.id,
+                    DBTransaction.transaction_date == transaction_date,
+                    DBTransaction.description == transaction.description,
+                    DBTransaction.original_amount == transaction.original_amount,
+                    DBTransaction.status == 'pending'
+                ).first()
+        else:
+            # Scenario 2: No transaction_id (pending) - match on date + merchant + amount
+            existing_transaction = self.db.query(DBTransaction).filter(
+                DBTransaction.account_id == account.id,
+                DBTransaction.transaction_date == transaction_date,
+                DBTransaction.description == transaction.description,
+                DBTransaction.original_amount == transaction.original_amount
+            ).first()
 
         if existing_transaction:
-            # Update existing transaction
+            # Update existing transaction (handles both update and pending→completed transition)
+            existing_transaction.transaction_id = transaction_id  # Sets ID when pending→completed
             existing_transaction.processed_date = processed_date
             existing_transaction.charged_amount = transaction.charged_amount
             existing_transaction.charged_currency = transaction.charged_currency
