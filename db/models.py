@@ -3,7 +3,7 @@ SQLAlchemy ORM models for financial data aggregator
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy import (
     Column, Integer, String, Text, Float, Date, DateTime, Boolean,
     ForeignKey, Index, UniqueConstraint
@@ -65,8 +65,12 @@ class Transaction(Base):
     installment_total = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # User-editable fields (overrides for source data)
+    user_category = Column(String(100), nullable=True)
+
     # Relationships
     account = relationship("Account", back_populates="transactions")
+    transaction_tags = relationship("TransactionTag", back_populates="transaction", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('idx_transactions_account', 'account_id'),
@@ -77,6 +81,16 @@ class Transaction(Base):
             name='uq_transaction'
         ),
     )
+
+    @property
+    def tags(self) -> List[str]:
+        """Get list of tag names for this transaction"""
+        return [tt.tag.name for tt in self.transaction_tags]
+
+    @property
+    def effective_category(self) -> Optional[str]:
+        """Get user category if set, otherwise source category"""
+        return self.user_category or self.category
 
     def __repr__(self):
         return f"<Transaction(id={self.id}, date={self.transaction_date}, description={self.description[:30]}, amount={self.original_amount})>"
@@ -137,3 +151,45 @@ class SyncHistory(Base):
 
     def __repr__(self):
         return f"<SyncHistory(id={self.id}, type={self.sync_type}, status={self.status}, started={self.started_at})>"
+
+
+class Tag(Base):
+    """
+    Tag for organizing transactions
+    """
+    __tablename__ = "tags"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False, unique=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    transaction_tags = relationship("TransactionTag", back_populates="tag", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<Tag(id={self.id}, name={self.name})>"
+
+
+class TransactionTag(Base):
+    """
+    Many-to-many relationship between transactions and tags
+    """
+    __tablename__ = "transaction_tags"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    transaction_id = Column(Integer, ForeignKey('transactions.id', ondelete='CASCADE'), nullable=False)
+    tag_id = Column(Integer, ForeignKey('tags.id', ondelete='CASCADE'), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    transaction = relationship("Transaction", back_populates="transaction_tags")
+    tag = relationship("Tag", back_populates="transaction_tags")
+
+    __table_args__ = (
+        UniqueConstraint('transaction_id', 'tag_id', name='uq_transaction_tag'),
+        Index('idx_transaction_tags_transaction', 'transaction_id'),
+        Index('idx_transaction_tags_tag', 'tag_id'),
+    )
+
+    def __repr__(self):
+        return f"<TransactionTag(transaction_id={self.transaction_id}, tag_id={self.tag_id})>"

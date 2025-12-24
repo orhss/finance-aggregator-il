@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add a flexible tagging system to transactions and enable editing of transaction fields (category, memo). Tags provide user-defined organization beyond source-provided categories, with full CLI integration for filtering, reporting, and analytics.
+Add a flexible tagging system to transactions and enable editing of transaction category. Tags provide user-defined organization beyond source-provided categories, with full CLI integration for filtering, reporting, and analytics.
 
 ## Design Principles
 
@@ -33,7 +33,7 @@ Add a flexible tagging system to transactions and enable editing of transaction 
 │                     Database Layer                               │
 │  Transaction (MODIFY)   Tag (NEW)        TransactionTag (NEW)   │
 │  + user_category        - id             - transaction_id (FK)  │
-│  + user_memo            - name (unique)  - tag_id (FK)          │
+│                         - name (unique)  - tag_id (FK)          │
 │                         - created_at                             │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -69,16 +69,14 @@ CREATE INDEX idx_transaction_tags_tag ON transaction_tags(tag_id);
 
 ```sql
 ALTER TABLE transactions ADD COLUMN user_category VARCHAR(100);
-ALTER TABLE transactions ADD COLUMN user_memo TEXT;
 ```
 
 **Field Strategy:**
 - `category` - Original from source (CAL, etc.) - never modified
 - `user_category` - User's override - editable
-- `memo` - Original from source - never modified
-- `user_memo` - User's override - editable
+- `memo` - Original from source - read-only
 
-**Display Logic:** Show `user_category` if set, otherwise `category`. Same for memo.
+**Display Logic:** Show `user_category` if set, otherwise `category`.
 
 ### SQLAlchemy Models
 
@@ -116,7 +114,6 @@ class Transaction(Base):
     # ... existing fields ...
 
     user_category = Column(String(100), nullable=True)
-    user_memo = Column(Text, nullable=True)
     transaction_tags = relationship("TransactionTag", back_populates="transaction", cascade="all, delete-orphan")
 
     @property
@@ -126,10 +123,6 @@ class Transaction(Base):
     @property
     def effective_category(self) -> Optional[str]:
         return self.user_category or self.category
-
-    @property
-    def effective_memo(self) -> Optional[str]:
-        return self.user_memo or self.memo
 ```
 
 ## Service Layer
@@ -156,7 +149,7 @@ class TagService:
     def bulk_tag_by_category(self, category: str, tag_names: List[str]) -> int
 
     # Transaction editing
-    def update_transaction(self, transaction_id: int, user_category: str = None, user_memo: str = None) -> bool
+    def update_transaction(self, transaction_id: int, user_category: str = None) -> bool
 
     # Stats
     def get_tag_stats(self) -> List[Dict]  # [{name, count, total_amount}, ...]
@@ -238,7 +231,6 @@ fin-cli transactions browse --untagged
 │  Category:    סופרמרקט                                         │
 │                                                                │
 │  User Category: [groceries___________]                         │
-│  Memo:          [Weekly shopping______]                        │
 │  Tags:          [groceries] [x]  [+Add]                        │
 │                                                                │
 │                        [Save]  [Cancel]                        │
@@ -250,7 +242,6 @@ fin-cli transactions browse --untagged
 ```bash
 # Edit transaction
 fin-cli transactions edit <id> --category "groceries"
-fin-cli transactions edit <id> --memo "Weekly shopping"
 fin-cli transactions edit --merchant "רמי לוי" --category "groceries"
 
 # Tag transactions
@@ -330,8 +321,6 @@ def migrate_database(engine):
             cols = {c['name'] for c in inspector.get_columns('transactions')}
             if 'user_category' not in cols:
                 conn.execute(text("ALTER TABLE transactions ADD COLUMN user_category VARCHAR(100)"))
-            if 'user_memo' not in cols:
-                conn.execute(text("ALTER TABLE transactions ADD COLUMN user_memo TEXT"))
 
         # Create tags table
         if 'tags' not in existing_tables:
@@ -431,7 +420,6 @@ class EditScreen(ModalScreen):
         yield Container(
             Static("Edit Transaction", classes="title"),
             Input(placeholder="User category", id="category"),
-            Input(placeholder="Memo", id="memo"),
             Horizontal(
                 Button("Save", variant="primary", id="save"),
                 Button("Cancel", id="cancel"),
@@ -477,17 +465,17 @@ class TagScreen(ModalScreen):
 
 ## Implementation Plan
 
-### Phase 1: Database Layer
+### Phase 1: Database Layer ✅ COMPLETE
 **Goal:** Schema changes and models ready
 
-| Task | File | Description |
-|------|------|-------------|
-| 1.1 | `db/models.py` | Add `Tag` model |
-| 1.2 | `db/models.py` | Add `TransactionTag` model |
-| 1.3 | `db/models.py` | Add `user_category`, `user_memo` to `Transaction` |
-| 1.4 | `db/models.py` | Add `tags`, `effective_category`, `effective_memo` properties |
-| 1.5 | `db/database.py` | Add `migrate_tags_schema()` function |
-| 1.6 | - | Test: Run migration on existing DB |
+| Task | File | Description | Status |
+|------|------|-------------|--------|
+| 1.1 | `db/models.py` | Add `Tag` model | ✅ |
+| 1.2 | `db/models.py` | Add `TransactionTag` model | ✅ |
+| 1.3 | `db/models.py` | Add `user_category` to `Transaction` | ✅ |
+| 1.4 | `db/models.py` | Add `tags`, `effective_category` properties | ✅ |
+| 1.5 | `db/database.py` | Add `migrate_tags_schema()` function | ✅ |
+| 1.6 | - | Test: Run migration on existing DB | ✅ |
 
 **Checkpoint:** `fin-cli init --upgrade` creates new tables/columns
 
@@ -504,7 +492,7 @@ class TagScreen(ModalScreen):
 | 2.4 | `services/tag_service.py` | Implement `tag_transaction()` |
 | 2.5 | `services/tag_service.py` | Implement `untag_transaction()` |
 | 2.6 | `services/tag_service.py` | Implement `rename_tag()`, `delete_tag()` |
-| 2.7 | `services/tag_service.py` | Implement `update_transaction()` (category/memo edit) |
+| 2.7 | `services/tag_service.py` | Implement `update_transaction()` (category edit) |
 | 2.8 | `services/tag_service.py` | Implement `get_tag_stats()` |
 | 2.9 | - | Test: Unit tests for TagService |
 
