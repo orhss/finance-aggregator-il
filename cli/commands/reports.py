@@ -66,7 +66,8 @@ def overall_stats():
 @app.command("monthly")
 def monthly_report(
     year: int = typer.Option(None, "--year", "-y", help="Year (default: current year)"),
-    month: int = typer.Option(None, "--month", "-m", help="Month 1-12 (default: current month)")
+    month: int = typer.Option(None, "--month", "-m", help="Month 1-12 (default: current month)"),
+    group_by: Optional[str] = typer.Option(None, "--group-by", "-g", help="Group by: tags, status, type, account")
 ):
     """
     Generate monthly spending report
@@ -86,11 +87,86 @@ def monthly_report(
             console.print("[red]Month must be between 1 and 12[/red]")
             raise typer.Exit(code=1)
 
-        summary = analytics.get_monthly_summary(year, month)
-
         # Create header
         month_name = date(year, month, 1).strftime("%B %Y")
         console.print(f"\n[bold cyan]Monthly Report - {month_name}[/bold cyan]\n")
+
+        # If grouping by tags, show tag breakdown
+        if group_by == "tags":
+            breakdown = analytics.get_monthly_tag_breakdown(year, month)
+
+            if not breakdown:
+                console.print("[yellow]No transactions found for this month[/yellow]")
+                analytics.close()
+                return
+
+            # Create table
+            table = Table(title=f"Spending by Tag - {month_name}", show_header=True, header_style="bold cyan", box=box.ROUNDED)
+            table.add_column("Tag", style="bold", width=25)
+            table.add_column("Amount", justify="right", width=15)
+            table.add_column("% of Total", justify="right", width=12)
+            table.add_column("Count", justify="right", width=10)
+
+            # Sort by amount descending
+            items = sorted(breakdown.items(), key=lambda x: abs(x[1]['total_amount']), reverse=True)
+
+            total_transactions = 0
+            grand_total = 0
+
+            # Separate untagged from tagged for display
+            tagged_items = [(k, v) for k, v in items if k != '(untagged)']
+            untagged_item = next(((k, v) for k, v in items if k == '(untagged)'), None)
+
+            for tag_name, data in tagged_items:
+                amount = data['total_amount']
+                amount_str = f"₪{amount:,.2f}"
+                if amount < 0:
+                    amount_str = f"[red]{amount_str}[/red]"
+                else:
+                    amount_str = f"[green]{amount_str}[/green]"
+
+                table.add_row(
+                    f"[cyan]{tag_name}[/cyan]",
+                    amount_str,
+                    f"{data['percentage']:.1f}%",
+                    str(data['count'])
+                )
+                total_transactions += data['count']
+                grand_total += abs(amount)
+
+            # Add separator and untagged row
+            if untagged_item:
+                table.add_section()
+                tag_name, data = untagged_item
+                amount = data['total_amount']
+                amount_str = f"₪{amount:,.2f}"
+                if amount < 0:
+                    amount_str = f"[red]{amount_str}[/red]"
+
+                table.add_row(
+                    f"[dim]{tag_name}[/dim]",
+                    f"[dim]{amount_str}[/dim]",
+                    f"[dim]{data['percentage']:.1f}%[/dim]",
+                    f"[dim]{data['count']}[/dim]"
+                )
+                total_transactions += data['count']
+                grand_total += abs(amount)
+
+            # Add total row
+            table.add_section()
+            table.add_row(
+                "[bold]TOTAL[/bold]",
+                f"[bold]₪{grand_total:,.2f}[/bold]",
+                "[bold]100%[/bold]",
+                f"[bold]{total_transactions}[/bold]"
+            )
+
+            console.print(table)
+            analytics.close()
+            return
+
+        # Standard monthly report
+        summary = analytics.get_monthly_summary(year, month)
 
         # Transaction count and amounts
         info_lines = [
@@ -107,7 +183,7 @@ def monthly_report(
         console.print()
 
         # By status table
-        if summary['by_status']:
+        if summary['by_status'] and (group_by is None or group_by == "status"):
             status_table = Table(title="Transactions by Status", show_header=True, header_style="bold cyan", box=box.ROUNDED)
             status_table.add_column("Status", style="bold")
             status_table.add_column("Count", justify="right")
@@ -120,7 +196,7 @@ def monthly_report(
             console.print()
 
         # By type table
-        if summary['by_type']:
+        if summary['by_type'] and (group_by is None or group_by == "type"):
             type_table = Table(title="Transactions by Type", show_header=True, header_style="bold cyan", box=box.ROUNDED)
             type_table.add_column("Type", style="bold")
             type_table.add_column("Count", justify="right")
@@ -132,7 +208,7 @@ def monthly_report(
             console.print()
 
         # By account table
-        if summary['by_account']:
+        if summary['by_account'] and (group_by is None or group_by == "account"):
             account_table = Table(title="Transactions by Account", show_header=True, header_style="bold cyan", box=box.ROUNDED)
             account_table.add_column("Account", style="bold")
             account_table.add_column("Count", justify="right")
@@ -406,6 +482,130 @@ def sync_history(
 
     except Exception as e:
         console.print(f"[red]Error showing sync history: {str(e)}[/red]")
+        raise typer.Exit(code=1)
+
+
+@app.command("tags")
+def tag_breakdown(
+    from_date: Optional[str] = typer.Option(None, "--from", help="Start date (YYYY-MM-DD)"),
+    to_date: Optional[str] = typer.Option(None, "--to", help="End date (YYYY-MM-DD)"),
+    sort: str = typer.Option("amount", "--sort", "-s", help="Sort by: amount, count, name, percentage")
+):
+    """
+    Show transaction breakdown by tag
+    """
+    try:
+        analytics = AnalyticsService()
+
+        # Parse dates
+        from_date_obj = None
+        to_date_obj = None
+
+        if from_date:
+            try:
+                from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
+            except ValueError:
+                console.print("[red]Invalid from date format. Use YYYY-MM-DD[/red]")
+                raise typer.Exit(code=1)
+
+        if to_date:
+            try:
+                to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
+            except ValueError:
+                console.print("[red]Invalid to date format. Use YYYY-MM-DD[/red]")
+                raise typer.Exit(code=1)
+
+        breakdown = analytics.get_tag_breakdown(from_date=from_date_obj, to_date=to_date_obj)
+
+        if not breakdown:
+            console.print("[yellow]No transactions found for tag breakdown[/yellow]")
+            return
+
+        # Build title with date range
+        title = "Spending by Tag"
+        if from_date_obj or to_date_obj:
+            date_range = []
+            if from_date_obj:
+                date_range.append(f"from {from_date_obj}")
+            if to_date_obj:
+                date_range.append(f"to {to_date_obj}")
+            title += f" ({' '.join(date_range)})"
+
+        # Create table
+        table = Table(title=title, show_header=True, header_style="bold cyan", box=box.ROUNDED)
+        table.add_column("Tag", style="bold", width=25)
+        table.add_column("Amount", justify="right", width=15)
+        table.add_column("% of Total", justify="right", width=12)
+        table.add_column("Count", justify="right", width=10)
+
+        # Sort breakdown
+        items = list(breakdown.items())
+        if sort == "amount":
+            items.sort(key=lambda x: abs(x[1]['total_amount']), reverse=True)
+        elif sort == "count":
+            items.sort(key=lambda x: x[1]['count'], reverse=True)
+        elif sort == "name":
+            items.sort(key=lambda x: x[0].lower())
+        elif sort == "percentage":
+            items.sort(key=lambda x: x[1]['percentage'], reverse=True)
+
+        total_transactions = 0
+        grand_total = 0
+
+        # Separate untagged from tagged for display
+        tagged_items = [(k, v) for k, v in items if k != '(untagged)']
+        untagged_item = next(((k, v) for k, v in items if k == '(untagged)'), None)
+
+        for tag_name, data in tagged_items:
+            amount = data['total_amount']
+            amount_str = f"₪{amount:,.2f}"
+            if amount < 0:
+                amount_str = f"[red]{amount_str}[/red]"
+            else:
+                amount_str = f"[green]{amount_str}[/green]"
+
+            table.add_row(
+                f"[cyan]{tag_name}[/cyan]",
+                amount_str,
+                f"{data['percentage']:.1f}%",
+                str(data['count'])
+            )
+            total_transactions += data['count']
+            grand_total += abs(amount)
+
+        # Add separator and untagged row
+        if untagged_item:
+            table.add_section()
+            tag_name, data = untagged_item
+            amount = data['total_amount']
+            amount_str = f"₪{amount:,.2f}"
+            if amount < 0:
+                amount_str = f"[red]{amount_str}[/red]"
+
+            table.add_row(
+                f"[dim]{tag_name}[/dim]",
+                f"[dim]{amount_str}[/dim]",
+                f"[dim]{data['percentage']:.1f}%[/dim]",
+                f"[dim]{data['count']}[/dim]"
+            )
+            total_transactions += data['count']
+            grand_total += abs(amount)
+
+        # Add total row
+        table.add_section()
+        table.add_row(
+            "[bold]TOTAL[/bold]",
+            f"[bold]₪{grand_total:,.2f}[/bold]",
+            "[bold]100%[/bold]",
+            f"[bold]{total_transactions}[/bold]"
+        )
+
+        console.print(table)
+
+        analytics.close()
+
+    except Exception as e:
+        console.print(f"[red]Error generating tag breakdown: {str(e)}[/red]")
         raise typer.Exit(code=1)
 
 

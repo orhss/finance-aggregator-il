@@ -500,37 +500,38 @@ class TagScreen(ModalScreen):
 
 ---
 
-### Phase 3: Basic CLI Commands
+### Phase 3: Basic CLI Commands ✅ COMPLETE
 **Goal:** Tag management via CLI
 
-| Task | File | Description |
-|------|------|-------------|
-| 3.1 | `cli/commands/tags.py` | Create file with typer app |
-| 3.2 | `cli/commands/tags.py` | Implement `tags list` command |
-| 3.3 | `cli/commands/tags.py` | Implement `tags rename` command |
-| 3.4 | `cli/commands/tags.py` | Implement `tags delete` command |
-| 3.5 | `cli/commands/tags.py` | Implement `tags migrate` command |
-| 3.6 | `cli/main.py` | Register tags command group |
-| 3.7 | - | Test: Run all tags commands |
+| Task | File | Description | Status |
+|------|------|-------------|--------|
+| 3.1 | `cli/commands/tags.py` | Create file with typer app | ✅ |
+| 3.2 | `cli/commands/tags.py` | Implement `tags list` command | ✅ |
+| 3.3 | `cli/commands/tags.py` | Implement `tags rename` command | ✅ |
+| 3.4 | `cli/commands/tags.py` | Implement `tags delete` command | ✅ |
+| 3.5 | `cli/commands/tags.py` | Implement `tags migrate` command | ✅ |
+| 3.6 | `cli/main.py` | Register tags command group | ✅ |
+| 3.7 | - | Test: Run all tags commands | ✅ |
 
 **Checkpoint:** `fin-cli tags list` shows tags with stats
 
 ---
 
-### Phase 4: Transaction CLI Commands
+### Phase 4: Transaction CLI Commands ✅ COMPLETE
 **Goal:** Tag and edit transactions via CLI
 
-| Task | File | Description |
-|------|------|-------------|
-| 4.1 | `cli/commands/transactions.py` | Add `transactions tag` command |
-| 4.2 | `cli/commands/transactions.py` | Add `transactions untag` command |
-| 4.3 | `cli/commands/transactions.py` | Add `transactions edit` command |
-| 4.4 | `cli/commands/transactions.py` | Add `--tag` filter to `transactions list` |
-| 4.5 | `cli/commands/transactions.py` | Add `--untagged` filter to `transactions list` |
-| 4.6 | `cli/commands/transactions.py` | Update `transactions show` to display tags |
-| 4.7 | `services/tag_service.py` | Add `bulk_tag_by_merchant()` |
-| 4.8 | `services/tag_service.py` | Add `bulk_tag_by_category()` |
-| 4.9 | - | Test: Tag transactions via CLI |
+| Task | File | Description | Status |
+|------|------|-------------|--------|
+| 4.1 | `cli/commands/transactions.py` | Add `transactions tag` command | ✅ |
+| 4.2 | `cli/commands/transactions.py` | Add `transactions untag` command | ✅ |
+| 4.3 | `cli/commands/transactions.py` | Add `transactions edit` command | ✅ |
+| 4.4 | `cli/commands/transactions.py` | Add `--tag` filter to `transactions list` | ✅ |
+| 4.5 | `cli/commands/transactions.py` | Add `--untagged` filter to `transactions list` | ✅ |
+| 4.6 | `cli/commands/transactions.py` | Update `transactions show` to display tags | ✅ |
+| 4.7 | `services/tag_service.py` | Add `bulk_tag_by_merchant()` | ✅ |
+| 4.8 | `services/tag_service.py` | Add `bulk_tag_by_category()` | ✅ |
+| 4.9 | `services/analytics_service.py` | Add `tags` + `untagged_only` params to `get_transactions()` | ✅ |
+| 4.10 | - | Test: Tag transactions via CLI | ✅ |
 
 **Checkpoint:** `fin-cli transactions tag 123 groceries` works
 

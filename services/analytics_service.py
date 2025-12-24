@@ -473,6 +473,104 @@ class AnalyticsService:
 
         return categories
 
+    # ==================== Tag Analytics Methods ====================
+
+    def get_tag_breakdown(
+        self,
+        from_date: Optional[date] = None,
+        to_date: Optional[date] = None,
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Get transaction breakdown by tag
+
+        Args:
+            from_date: Start date filter
+            to_date: End date filter
+
+        Returns:
+            Dictionary with tag breakdown: {tag_name: {count, total_amount, percentage}, ...}
+            Includes special "(untagged)" key for transactions without tags
+        """
+        # Build base query for tagged transactions
+        query = (
+            self.session.query(
+                Tag.name,
+                func.count(Transaction.id).label('count'),
+                func.coalesce(func.sum(Transaction.original_amount), 0).label('total_amount')
+            )
+            .join(TransactionTag, Tag.id == TransactionTag.tag_id)
+            .join(Transaction, TransactionTag.transaction_id == Transaction.id)
+        )
+
+        if from_date:
+            query = query.filter(Transaction.transaction_date >= from_date)
+        if to_date:
+            query = query.filter(Transaction.transaction_date <= to_date)
+
+        query = query.group_by(Tag.id)
+        tagged_results = query.all()
+
+        # Get untagged transactions
+        tagged_ids_subquery = self.session.query(TransactionTag.transaction_id).distinct()
+        untagged_query = self.session.query(
+            func.count(Transaction.id).label('count'),
+            func.coalesce(func.sum(Transaction.original_amount), 0).label('total_amount')
+        ).filter(~Transaction.id.in_(tagged_ids_subquery))
+
+        if from_date:
+            untagged_query = untagged_query.filter(Transaction.transaction_date >= from_date)
+        if to_date:
+            untagged_query = untagged_query.filter(Transaction.transaction_date <= to_date)
+
+        untagged_result = untagged_query.first()
+
+        # Calculate grand total for percentages
+        grand_total = sum(abs(float(r.total_amount)) for r in tagged_results)
+        if untagged_result and untagged_result.count > 0:
+            grand_total += abs(float(untagged_result.total_amount))
+
+        # Build result dictionary
+        result = {}
+        for r in tagged_results:
+            amount = float(r.total_amount)
+            percentage = (abs(amount) / grand_total * 100) if grand_total > 0 else 0
+            result[r.name] = {
+                'count': r.count,
+                'total_amount': amount,
+                'percentage': percentage
+            }
+
+        # Add untagged
+        if untagged_result and untagged_result.count > 0:
+            amount = float(untagged_result.total_amount)
+            percentage = (abs(amount) / grand_total * 100) if grand_total > 0 else 0
+            result['(untagged)'] = {
+                'count': untagged_result.count,
+                'total_amount': amount,
+                'percentage': percentage
+            }
+
+        return result
+
+    def get_monthly_tag_breakdown(self, year: int, month: int) -> Dict[str, Dict[str, Any]]:
+        """
+        Get monthly transaction breakdown by tag
+
+        Args:
+            year: Year
+            month: Month (1-12)
+
+        Returns:
+            Dictionary with tag breakdown for the month
+        """
+        from calendar import monthrange
+
+        # Calculate date range for the month
+        first_day = date(year, month, 1)
+        last_day = date(year, month, monthrange(year, month)[1])
+
+        return self.get_tag_breakdown(from_date=first_day, to_date=last_day)
+
     # ==================== Sync History Methods ====================
 
     def get_sync_history(
