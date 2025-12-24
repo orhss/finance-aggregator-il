@@ -10,6 +10,7 @@ from rich.panel import Panel
 from rich import box
 from typing import Optional
 
+from cli.utils import fix_rtl
 from services.analytics_service import AnalyticsService
 
 app = typer.Typer(help="Generate reports and analytics")
@@ -198,7 +199,7 @@ def category_breakdown(
 
         for category, data in sorted_categories:
             table.add_row(
-                category,
+                fix_rtl(category) if category else "Uncategorized",
                 str(data['count']),
                 f"{data['total_amount']:,.2f} ILS",
                 f"{data['avg_amount']:,.2f} ILS"

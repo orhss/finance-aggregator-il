@@ -9,6 +9,7 @@ from rich.table import Table
 from rich.panel import Panel
 from typing import Optional
 
+from cli.utils import fix_rtl
 from services.analytics_service import AnalyticsService
 
 app = typer.Typer(help="Manage transactions")
@@ -95,7 +96,7 @@ def list_transactions(
             table.add_row(
                 str(txn.id),
                 txn.transaction_date.strftime("%Y-%m-%d"),
-                txn.description[:35],
+                fix_rtl(txn.description[:35]),
                 amount_str,
                 status_str,
                 account_str
@@ -168,7 +169,7 @@ def show_transaction(
         if transaction.processed_date:
             info_lines.append(f"[bold]Processed Date:[/bold] {transaction.processed_date}")
 
-        info_lines.append(f"[bold]Description:[/bold] {transaction.description}")
+        info_lines.append(f"[bold]Description:[/bold] {fix_rtl(transaction.description)}")
 
         # Amount information
         amount_color = "green" if transaction.original_amount >= 0 else "red"
@@ -191,10 +192,10 @@ def show_transaction(
 
         # Category and memo
         if transaction.category:
-            info_lines.append(f"[bold]Category:[/bold] {transaction.category}")
+            info_lines.append(f"[bold]Category:[/bold] {fix_rtl(transaction.category)}")
 
         if transaction.memo:
-            info_lines.append(f"[bold]Memo:[/bold] {transaction.memo}")
+            info_lines.append(f"[bold]Memo:[/bold] {fix_rtl(transaction.memo)}")
 
         # Installment information
         if transaction.installment_number is not None and transaction.installment_total is not None:

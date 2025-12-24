@@ -2,8 +2,10 @@
 CLI utility functions for improved user experience
 """
 
+import re
 from typing import Optional, Any
 from rich.console import Console
+from bidi.algorithm import get_display
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich.panel import Panel
@@ -91,3 +93,34 @@ def confirm_action(message: str, default: bool = False) -> bool:
     """
     import typer
     return typer.confirm(message, default=default)
+
+
+# Hebrew Unicode range pattern
+_HEBREW_PATTERN = re.compile(r'[\u0590-\u05FF]')
+
+
+def contains_hebrew(text: str) -> bool:
+    """Check if text contains Hebrew characters"""
+    return bool(_HEBREW_PATTERN.search(text))
+
+
+def fix_rtl(text: Optional[str]) -> str:
+    """
+    Fix RTL text display for terminals.
+
+    Only applies bidi algorithm if text contains Hebrew characters,
+    otherwise returns the original text unchanged.
+
+    Args:
+        text: Text that may contain Hebrew characters
+
+    Returns:
+        Text with proper RTL display for LTR terminals
+    """
+    if not text:
+        return text or ""
+
+    if contains_hebrew(text):
+        return get_display(text)
+
+    return text
