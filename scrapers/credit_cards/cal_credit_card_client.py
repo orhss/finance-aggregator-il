@@ -700,11 +700,20 @@ class CALCreditCardScraper:
             self.cleanup()
 
 
-# Example usage
-if __name__ == "__main__":
+def main():
+    """Main entry point for CAL Credit Card Scraper"""
+    import argparse
     import os
     from dotenv import load_dotenv
+    from scrapers.config.logging_config import add_logging_args, setup_logging_from_args
 
+    parser = argparse.ArgumentParser(description="CAL Credit Card Transaction Scraper")
+    add_logging_args(parser)
+    parser.add_argument("--months-back", type=int, default=3, help="Months of history to fetch (default: 3)")
+    parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
+    args = parser.parse_args()
+
+    setup_logging_from_args(args)
     load_dotenv()
 
     credentials = CALCredentials(
@@ -712,10 +721,10 @@ if __name__ == "__main__":
         password=os.getenv("CAL_PASSWORD", "")
     )
 
-    scraper = CALCreditCardScraper(credentials, headless=False)
+    scraper = CALCreditCardScraper(credentials, headless=args.headless)
 
     try:
-        accounts = scraper.scrape(months_back=3)
+        accounts = scraper.scrape(months_back=args.months_back)
 
         for account in accounts:
             print(f"\n{'='*60}")
@@ -732,3 +741,7 @@ if __name__ == "__main__":
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()
+
+
+if __name__ == "__main__":
+    main()

@@ -7,6 +7,7 @@ Handles login and data extraction for Phoenix pension site using:
 - PensionAutomatorBase for reusable login flows
 """
 
+import argparse
 import os
 import re
 from datetime import datetime
@@ -14,6 +15,7 @@ from typing import Optional, Dict, Any
 import logging
 
 import dotenv
+from scrapers.config.logging_config import add_logging_args, setup_logging_from_args
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -300,11 +302,12 @@ class PhoenixSeleniumMFAAutomator(PensionAutomatorBase):
 def main():
     """Example usage of the MFA automation system for Phoenix pension site"""
 
-    # IMPORTANT: Configure logging FIRST!
-    logging.basicConfig(
-        level=logging.INFO,  # Change to DEBUG for more details
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    parser = argparse.ArgumentParser(description="Phoenix Pension Scraper")
+    add_logging_args(parser)
+    parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
+    args = parser.parse_args()
+
+    setup_logging_from_args(args)
 
     print("=== Starting Phoenix Pension Automation ===")
     print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -336,7 +339,7 @@ def main():
 
     # Create automation handler
     print("\n4. Creating automation handler...")
-    automator = PhoenixSeleniumMFAAutomator(email_retriever, headless=False)  # Set True for headless
+    automator = PhoenixSeleniumMFAAutomator(email_retriever, headless=args.headless)
 
     try:
         # Execute complete automation flow

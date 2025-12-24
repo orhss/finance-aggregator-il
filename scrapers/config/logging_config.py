@@ -2,10 +2,60 @@
 Centralized logging configuration for all scrapers
 """
 
+import argparse
 import logging
 import sys
 from pathlib import Path
 from typing import Optional
+
+
+def add_logging_args(parser: argparse.ArgumentParser) -> None:
+    """
+    Add standard logging arguments (-v, -d) to an argument parser.
+
+    Args:
+        parser: ArgumentParser instance to add arguments to
+
+    Usage:
+        parser = argparse.ArgumentParser(description="My scraper")
+        add_logging_args(parser)
+        args = parser.parse_args()
+        setup_logging_from_args(args)
+    """
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Enable verbose output (INFO level)"
+    )
+    group.add_argument(
+        "-d", "--debug",
+        action="store_true",
+        help="Enable debug output (DEBUG level)"
+    )
+    parser.add_argument(
+        "--log-file",
+        type=Path,
+        help="Optional file to write logs to"
+    )
+
+
+def setup_logging_from_args(args: argparse.Namespace) -> None:
+    """
+    Configure logging based on parsed command-line arguments.
+
+    Args:
+        args: Parsed arguments from ArgumentParser with add_logging_args()
+    """
+    if args.debug:
+        level = "DEBUG"
+    elif args.verbose:
+        level = "INFO"
+    else:
+        level = "WARNING"
+
+    log_file = getattr(args, 'log_file', None)
+    setup_logging(level=level, log_file=log_file)
 
 
 def setup_logging(

@@ -7,6 +7,7 @@ Handles login and data extraction for Migdal pension site using:
 - PensionAutomatorBase for reusable login flows
 """
 
+import argparse
 import os
 import re
 from datetime import datetime
@@ -14,6 +15,7 @@ from typing import Optional, Dict, Any
 import logging
 
 import dotenv
+from scrapers.config.logging_config import add_logging_args, setup_logging_from_args
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -265,11 +267,12 @@ class MigdalSeleniumMFAAutomator(PensionAutomatorBase):
 def main():
     """Example usage of the MFA automation system for Israeli pension site"""
 
-    # IMPORTANT: Configure logging FIRST!
-    logging.basicConfig(
-        level=logging.INFO,  # Change to DEBUG for more details
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    parser = argparse.ArgumentParser(description="Migdal Pension Scraper")
+    add_logging_args(parser)
+    parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
+    args = parser.parse_args()
+
+    setup_logging_from_args(args)
 
     print("=== Starting Migdal Pension Automation ===")
     print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -278,7 +281,7 @@ def main():
     print("\n1. Configuring email access...")
     email_config = EmailConfig(
         email_address=os.getenv("USER_EMAIL"),
-        password=USER_EMAIL_APP_PASSWORD,  # Gmail app password
+        password=os.getenv("USER_EMAIL_APP_PASSWORD"),  # Gmail app password
         imap_server="imap.gmail.com"
     )
     print(f"Email configured for: {email_config.email_address}")
@@ -299,7 +302,7 @@ def main():
 
     # Create automation handler
     print("\n4. Creating automation handler...")
-    automator = MigdalSeleniumMFAAutomator(email_retriever, headless=False)  # Set True for headless
+    automator = MigdalSeleniumMFAAutomator(email_retriever, headless=args.headless)
 
     try:
         # Perform login with ID and MFA
