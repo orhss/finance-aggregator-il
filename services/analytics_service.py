@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy import func, extract, and_, or_
 from sqlalchemy.orm import Session, joinedload
-from db.models import Account, Transaction, Balance, SyncHistory
+from db.models import Account, Transaction, Balance, SyncHistory, Tag, TransactionTag
 from db.database import get_db
 
 
@@ -129,6 +129,8 @@ class AnalyticsService:
         to_date: Optional[date] = None,
         status: Optional[str] = None,
         institution: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        untagged_only: bool = False,
         limit: Optional[int] = None,
         offset: int = 0
     ) -> List[Transaction]:
@@ -141,6 +143,8 @@ class AnalyticsService:
             to_date: End date
             status: Transaction status ('pending', 'completed')
             institution: Filter by institution
+            tags: Filter by tags (AND logic - must have all specified tags)
+            untagged_only: If True, only return transactions without any tags
             limit: Maximum number of results
             offset: Number of results to skip
 
@@ -163,6 +167,21 @@ class AnalyticsService:
 
         if institution:
             query = query.filter(Account.institution == institution)
+
+        # Tag filtering
+        if untagged_only:
+            # Get transactions that have no tags
+            tagged_ids = self.session.query(TransactionTag.transaction_id).distinct()
+            query = query.filter(~Transaction.id.in_(tagged_ids))
+        elif tags:
+            # Filter by tags (AND logic - must have all specified tags)
+            for tag_name in tags:
+                tag_subquery = (
+                    self.session.query(TransactionTag.transaction_id)
+                    .join(Tag)
+                    .filter(func.lower(Tag.name) == func.lower(tag_name))
+                )
+                query = query.filter(Transaction.id.in_(tag_subquery))
 
         query = query.order_by(Transaction.transaction_date.desc())
 
