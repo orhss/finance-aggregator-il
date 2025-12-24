@@ -1,0 +1,443 @@
+"""
+Interactive Transaction Browser TUI
+
+A Textual-based terminal UI for browsing, searching, tagging, and editing transactions.
+"""
+
+from datetime import date, datetime
+from typing import Optional, List, Dict, Any
+
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.widgets import DataTable, Header, Footer, Input, Static, Button, Label
+from textual.containers import Container, Horizontal, Vertical, Grid
+from textual.screen import ModalScreen
+from textual.message import Message
+from textual import on
+
+from services.analytics_service import AnalyticsService
+from services.tag_service import TagService
+from cli.utils import fix_rtl
+
+
+class EditScreen(ModalScreen):
+    """Modal screen for editing transaction category"""
+
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel"),
+    ]
+
+    def __init__(self, transaction_id: int, transaction_data: Dict[str, Any]):
+        super().__init__()
+        self.transaction_id = transaction_id
+        self.transaction_data = transaction_data
+
+    def compose(self) -> ComposeResult:
+        with Container(id="edit-dialog"):
+            yield Static("Edit Transaction", id="edit-title")
+            yield Static(f"Date: {self.transaction_data.get('date', 'N/A')}", classes="edit-field")
+            yield Static(f"Description: {self.transaction_data.get('description', 'N/A')}", classes="edit-field")
+            yield Static(f"Amount: {self.transaction_data.get('amount', 'N/A')}", classes="edit-field")
+            yield Static(f"Original Category: {self.transaction_data.get('category', 'N/A')}", classes="edit-field")
+            yield Label("User Category:")
+            yield Input(
+                value=self.transaction_data.get('user_category', '') or '',
+                placeholder="Enter category...",
+                id="category-input"
+            )
+            with Horizontal(id="edit-buttons"):
+                yield Button("Save", variant="primary", id="save-btn")
+                yield Button("Cancel", variant="default", id="cancel-btn")
+
+    @on(Button.Pressed, "#save-btn")
+    def handle_save(self) -> None:
+        category_input = self.query_one("#category-input", Input)
+        new_category = category_input.value.strip()
+
+        tag_service = TagService()
+        success = tag_service.update_transaction(
+            self.transaction_id,
+            user_category=new_category if new_category else None
+        )
+
+        if success:
+            self.dismiss({"saved": True, "category": new_category})
+        else:
+            self.dismiss({"saved": False, "error": "Failed to save"})
+
+    @on(Button.Pressed, "#cancel-btn")
+    def handle_cancel(self) -> None:
+        self.dismiss({"saved": False})
+
+    def action_cancel(self) -> None:
+        self.dismiss({"saved": False})
+
+
+class TagScreen(ModalScreen):
+    """Modal screen for adding/removing tags"""
+
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel"),
+    ]
+
+    def __init__(self, transaction_id: int, current_tags: List[str]):
+        super().__init__()
+        self.transaction_id = transaction_id
+        self.current_tags = current_tags
+
+    def compose(self) -> ComposeResult:
+        with Container(id="tag-dialog"):
+            yield Static("Manage Tags", id="tag-title")
+            yield Static(f"Current tags: {', '.join(self.current_tags) if self.current_tags else '(none)'}", id="current-tags")
+            yield Label("Add tag:")
+            yield Input(placeholder="Enter tag name...", id="tag-input")
+            with Horizontal(id="tag-buttons"):
+                yield Button("Add", variant="primary", id="add-btn")
+                yield Button("Remove", variant="warning", id="remove-btn")
+                yield Button("Close", variant="default", id="close-btn")
+
+    @on(Button.Pressed, "#add-btn")
+    def handle_add(self) -> None:
+        tag_input = self.query_one("#tag-input", Input)
+        tag_name = tag_input.value.strip()
+
+        if tag_name:
+            tag_service = TagService()
+            added = tag_service.tag_transaction(self.transaction_id, [tag_name])
+            if added > 0:
+                self.current_tags.append(tag_name)
+                self.query_one("#current-tags", Static).update(
+                    f"Current tags: {', '.join(self.current_tags)}"
+                )
+            tag_input.value = ""
+
+    @on(Button.Pressed, "#remove-btn")
+    def handle_remove(self) -> None:
+        tag_input = self.query_one("#tag-input", Input)
+        tag_name = tag_input.value.strip()
+
+        if tag_name and tag_name in self.current_tags:
+            tag_service = TagService()
+            removed = tag_service.untag_transaction(self.transaction_id, [tag_name])
+            if removed > 0:
+                self.current_tags.remove(tag_name)
+                self.query_one("#current-tags", Static).update(
+                    f"Current tags: {', '.join(self.current_tags) if self.current_tags else '(none)'}"
+                )
+            tag_input.value = ""
+
+    @on(Button.Pressed, "#close-btn")
+    def handle_close(self) -> None:
+        self.dismiss({"tags": self.current_tags})
+
+    def action_cancel(self) -> None:
+        self.dismiss({"tags": self.current_tags})
+
+
+class TransactionBrowser(App):
+    """Interactive transaction browser TUI"""
+
+    CSS = """
+    Screen {
+        background: $surface;
+    }
+
+    #search-container {
+        height: 3;
+        padding: 0 1;
+    }
+
+    #search-input {
+        width: 100%;
+    }
+
+    #transactions-table {
+        height: 1fr;
+    }
+
+    #status-bar {
+        height: 1;
+        padding: 0 1;
+        background: $primary;
+        color: $text;
+    }
+
+    /* Edit dialog styles */
+    #edit-dialog {
+        width: 60;
+        height: auto;
+        padding: 1 2;
+        background: $surface;
+        border: solid $primary;
+    }
+
+    #edit-title {
+        text-align: center;
+        text-style: bold;
+        padding-bottom: 1;
+    }
+
+    .edit-field {
+        padding: 0 0 0 1;
+    }
+
+    #edit-buttons {
+        padding-top: 1;
+        align: center middle;
+    }
+
+    #edit-buttons Button {
+        margin: 0 1;
+    }
+
+    /* Tag dialog styles */
+    #tag-dialog {
+        width: 50;
+        height: auto;
+        padding: 1 2;
+        background: $surface;
+        border: solid $primary;
+    }
+
+    #tag-title {
+        text-align: center;
+        text-style: bold;
+        padding-bottom: 1;
+    }
+
+    #current-tags {
+        padding: 0 0 1 0;
+        color: $text-muted;
+    }
+
+    #tag-buttons {
+        padding-top: 1;
+        align: center middle;
+    }
+
+    #tag-buttons Button {
+        margin: 0 1;
+    }
+    """
+
+    BINDINGS = [
+        Binding("q", "quit", "Quit"),
+        Binding("escape", "quit", "Quit"),
+        Binding("t", "tag", "Tag"),
+        Binding("e", "edit", "Edit"),
+        Binding("enter", "edit", "Edit"),
+        Binding("r", "refresh", "Refresh"),
+        Binding("/", "focus_search", "Search"),
+    ]
+
+    def __init__(
+        self,
+        from_date: Optional[date] = None,
+        to_date: Optional[date] = None,
+        tags: Optional[List[str]] = None,
+        untagged_only: bool = False,
+        institution: Optional[str] = None,
+    ):
+        super().__init__()
+        self.filter_from_date = from_date
+        self.filter_to_date = to_date
+        self.filter_tags = tags
+        self.filter_untagged = untagged_only
+        self.filter_institution = institution
+        self.transactions: List[Any] = []
+        self.transaction_map: Dict[str, int] = {}  # row_key -> transaction_id
+        self.search_text = ""
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with Container(id="search-container"):
+            yield Input(placeholder="Type to filter... (press / to focus)", id="search-input")
+        yield DataTable(id="transactions-table")
+        yield Static("", id="status-bar")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        """Initialize the table and load data"""
+        table = self.query_one("#transactions-table", DataTable)
+        table.cursor_type = "row"
+        table.zebra_stripes = True
+
+        # Add columns
+        table.add_column("ID", width=6)
+        table.add_column("Date", width=12)
+        table.add_column("Description", width=35)
+        table.add_column("Amount", width=15)
+        table.add_column("Category", width=20)
+        table.add_column("Tags", width=25)
+
+        self.load_transactions()
+
+    def load_transactions(self) -> None:
+        """Load transactions from database"""
+        analytics = AnalyticsService()
+        tag_service = TagService()
+
+        self.transactions = analytics.get_transactions(
+            from_date=self.filter_from_date,
+            to_date=self.filter_to_date,
+            tags=self.filter_tags,
+            untagged_only=self.filter_untagged,
+            institution=self.filter_institution,
+            limit=500  # Reasonable limit for TUI
+        )
+
+        table = self.query_one("#transactions-table", DataTable)
+        table.clear()
+        self.transaction_map.clear()
+
+        for txn in self.transactions:
+            # Apply search filter
+            if self.search_text:
+                search_lower = self.search_text.lower()
+                if (search_lower not in (txn.description or '').lower() and
+                    search_lower not in (txn.category or '').lower() and
+                    search_lower not in (txn.user_category or '').lower()):
+                    continue
+
+            # Get tags for this transaction
+            txn_tags = tag_service.get_transaction_tags(txn.id)
+            tags_str = ", ".join([t.name for t in txn_tags[:3]]) if txn_tags else ""
+            if len(txn_tags) > 3:
+                tags_str += f" +{len(txn_tags) - 3}"
+
+            # Format amount
+            amount = txn.original_amount
+            amount_str = f"{amount:,.2f} {txn.original_currency}"
+
+            # Get effective category
+            category = txn.user_category or txn.category or ""
+
+            row_key = table.add_row(
+                str(txn.id),
+                txn.transaction_date.strftime("%Y-%m-%d"),
+                fix_rtl(txn.description[:35]) if txn.description else "",
+                amount_str,
+                fix_rtl(category[:20]) if category else "",
+                tags_str,
+            )
+            self.transaction_map[row_key] = txn.id
+
+        # Update status bar
+        status = self.query_one("#status-bar", Static)
+        filter_info = []
+        if self.filter_from_date:
+            filter_info.append(f"from:{self.filter_from_date}")
+        if self.filter_to_date:
+            filter_info.append(f"to:{self.filter_to_date}")
+        if self.filter_tags:
+            filter_info.append(f"tags:{','.join(self.filter_tags)}")
+        if self.filter_untagged:
+            filter_info.append("untagged")
+        if self.filter_institution:
+            filter_info.append(f"inst:{self.filter_institution}")
+
+        filter_str = f" | Filters: {' '.join(filter_info)}" if filter_info else ""
+        status.update(f"Showing {table.row_count} transactions{filter_str}")
+
+        analytics.close()
+
+    def get_selected_transaction(self) -> Optional[Dict[str, Any]]:
+        """Get currently selected transaction data"""
+        table = self.query_one("#transactions-table", DataTable)
+
+        if table.row_count == 0:
+            return None
+
+        row_key = table.cursor_row
+        if row_key is None or row_key >= table.row_count:
+            return None
+
+        # Get the row key from cursor position
+        cursor_row = table.cursor_row
+        row_keys = list(self.transaction_map.keys())
+        if cursor_row >= len(row_keys):
+            return None
+
+        row_key = row_keys[cursor_row]
+        txn_id = self.transaction_map.get(row_key)
+
+        if not txn_id:
+            return None
+
+        # Find the transaction
+        for txn in self.transactions:
+            if txn.id == txn_id:
+                tag_service = TagService()
+                txn_tags = tag_service.get_transaction_tags(txn.id)
+
+                return {
+                    "id": txn.id,
+                    "date": txn.transaction_date.strftime("%Y-%m-%d"),
+                    "description": txn.description,
+                    "amount": f"{txn.original_amount:,.2f} {txn.original_currency}",
+                    "category": txn.category or "",
+                    "user_category": txn.user_category or "",
+                    "tags": [t.name for t in txn_tags],
+                }
+
+        return None
+
+    def action_edit(self) -> None:
+        """Open edit dialog for selected transaction"""
+        txn_data = self.get_selected_transaction()
+        if txn_data:
+            self.push_screen(
+                EditScreen(txn_data["id"], txn_data),
+                self.on_edit_complete
+            )
+
+    def on_edit_complete(self, result: Dict[str, Any]) -> None:
+        """Handle edit dialog completion"""
+        if result.get("saved"):
+            self.load_transactions()
+
+    def action_tag(self) -> None:
+        """Open tag dialog for selected transaction"""
+        txn_data = self.get_selected_transaction()
+        if txn_data:
+            self.push_screen(
+                TagScreen(txn_data["id"], txn_data["tags"]),
+                self.on_tag_complete
+            )
+
+    def on_tag_complete(self, result: Dict[str, Any]) -> None:
+        """Handle tag dialog completion"""
+        self.load_transactions()
+
+    def action_refresh(self) -> None:
+        """Reload transactions"""
+        self.load_transactions()
+
+    def action_focus_search(self) -> None:
+        """Focus the search input"""
+        search_input = self.query_one("#search-input", Input)
+        search_input.focus()
+
+    @on(Input.Changed, "#search-input")
+    def on_search_changed(self, event: Input.Changed) -> None:
+        """Filter transactions based on search input"""
+        self.search_text = event.value
+        self.load_transactions()
+
+
+def run_browser(
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
+    tags: Optional[List[str]] = None,
+    untagged_only: bool = False,
+    institution: Optional[str] = None,
+) -> None:
+    """Run the transaction browser TUI"""
+    app = TransactionBrowser(
+        from_date=from_date,
+        to_date=to_date,
+        tags=tags,
+        untagged_only=untagged_only,
+        institution=institution,
+    )
+    app.run()
