@@ -246,3 +246,60 @@ def load_config() -> Dict[str, Any]:
         with open(CONFIG_FILE, 'r') as f:
             return json.load(f)
     return {}
+
+
+def get_card_holders() -> Dict[str, str]:
+    """
+    Get card holder mappings (last 4 digits -> name)
+
+    Returns:
+        Dictionary mapping card last 4 digits to holder name
+    """
+    config = load_config()
+    return config.get("card_holders", {})
+
+
+def set_card_holder(last4: str, name: str):
+    """
+    Set card holder name for a card
+
+    Args:
+        last4: Last 4 digits of the card
+        name: Name/label for the card holder (e.g., "Husband", "Wife", "Or")
+    """
+    config = load_config()
+    if "card_holders" not in config:
+        config["card_holders"] = {}
+    config["card_holders"][last4] = name
+    save_config(config)
+
+
+def remove_card_holder(last4: str) -> bool:
+    """
+    Remove card holder mapping
+
+    Args:
+        last4: Last 4 digits of the card
+
+    Returns:
+        True if removed, False if not found
+    """
+    config = load_config()
+    if "card_holders" in config and last4 in config["card_holders"]:
+        del config["card_holders"][last4]
+        save_config(config)
+        return True
+    return False
+
+
+def get_card_holder_name(last4: str) -> Optional[str]:
+    """
+    Get card holder name for a specific card
+
+    Args:
+        last4: Last 4 digits of the card
+
+    Returns:
+        Card holder name or None if not configured
+    """
+    return get_card_holders().get(last4)

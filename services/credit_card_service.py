@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from db.models import Account, Transaction as DBTransaction
 from config.constants import AccountType, Institution, SyncType
+from config.settings import get_card_holder_name
 from services.base_service import BaseSyncService
 from services.tag_service import TagService
 from scrapers.credit_cards.cal_credit_card_client import (
@@ -200,13 +201,25 @@ class CreditCardService(BaseSyncService):
         self.db.add(db_transaction)
         self.db.flush()  # Get the transaction ID before committing
 
-        # Auto-tag new transaction based on category
-        if transaction.category:
-            try:
-                tag_service = TagService(session=self.db)
-                tag_service.tag_transaction(db_transaction.id, [transaction.category])
-            except Exception:
-                pass  # Don't fail sync if tagging fails
+        # Auto-tag new transaction
+        try:
+            tag_service = TagService(session=self.db)
+            tags_to_add = []
+
+            # Tag with category
+            if transaction.category:
+                tags_to_add.append(transaction.category)
+
+            # Tag with card holder name if configured
+            if account.account_number:
+                holder_name = get_card_holder_name(account.account_number)
+                if holder_name:
+                    tags_to_add.append(holder_name)
+
+            if tags_to_add:
+                tag_service.tag_transaction(db_transaction.id, tags_to_add)
+        except Exception:
+            pass  # Don't fail sync if tagging fails
 
         return True
 

@@ -13,8 +13,12 @@ from config.settings import (
     update_credential,
     Credentials,
     CREDENTIALS_FILE,
-    CONFIG_DIR
+    CONFIG_DIR,
+    get_card_holders,
+    set_card_holder,
+    remove_card_holder,
 )
+from services.tag_service import TagService
 
 app = typer.Typer(help="Manage configuration and credentials")
 
@@ -195,6 +199,86 @@ def setup():
         print_error(f"Setup failed: {e}")
         import traceback
         traceback.print_exc()
+        raise typer.Exit(code=1)
+
+
+@app.command("card-holder")
+def manage_card_holder(
+    last4: str = typer.Argument(..., help="Last 4 digits of the card"),
+    name: Optional[str] = typer.Argument(None, help="Card holder name (omit to remove)"),
+    apply_to_existing: bool = typer.Option(True, "--apply/--no-apply", help="Apply tag to existing transactions"),
+):
+    """
+    Set or remove card holder name for a card
+
+    The card holder name will be used as an automatic tag for all transactions
+    from that card, allowing you to filter spending by card holder.
+
+    By default, the tag is also applied to all existing transactions from this card.
+    Use --no-apply to only apply to future transactions.
+
+    Examples:
+        fin-cli config card-holder 1234 "Or"
+        fin-cli config card-holder 5678 "Wife"
+        fin-cli config card-holder 1234 "Or" --no-apply
+        fin-cli config card-holder 1234  # Remove mapping
+    """
+    try:
+        if len(last4) != 4 or not last4.isdigit():
+            print_error("Card must be exactly 4 digits")
+            raise typer.Exit(code=1)
+
+        if name:
+            set_card_holder(last4, name)
+            print_success(f"Card ****{last4} is now tagged as '{name}'")
+
+            # Apply to existing transactions
+            if apply_to_existing:
+                tag_service = TagService()
+                count = tag_service.bulk_tag_by_card(last4, name)
+                if count > 0:
+                    print_success(f"Tagged {count} existing transactions with '{name}'")
+                else:
+                    print_info("No existing transactions to tag (all already tagged or no transactions found)")
+        else:
+            if remove_card_holder(last4):
+                print_success(f"Removed card holder mapping for ****{last4}")
+                print_info("Note: Existing tags are not removed. Use 'fin-cli tags delete <name>' to remove them.")
+            else:
+                print_error(f"No card holder mapping found for ****{last4}")
+                raise typer.Exit(code=1)
+
+    except typer.Exit:
+        raise
+    except Exception as e:
+        print_error(f"Failed to update card holder: {e}")
+        raise typer.Exit(code=1)
+
+
+@app.command("card-holders")
+def list_card_holders():
+    """
+    List all configured card holders
+    """
+    try:
+        holders = get_card_holders()
+
+        if not holders:
+            print_info("No card holders configured")
+            print_info("Use 'fin-cli config card-holder <last4> <name>' to add one")
+            return
+
+        table = Table(title="Card Holders", show_header=True, header_style="bold cyan")
+        table.add_column("Card", width=10)
+        table.add_column("Holder Name", width=20)
+
+        for last4, name in sorted(holders.items()):
+            table.add_row(f"****{last4}", name)
+
+        console.print(table)
+
+    except Exception as e:
+        print_error(f"Failed to list card holders: {e}")
         raise typer.Exit(code=1)
 
 

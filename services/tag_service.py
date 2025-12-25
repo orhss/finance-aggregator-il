@@ -6,7 +6,7 @@ import logging
 from typing import List, Optional, Dict, Any
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from db.models import Tag, TransactionTag, Transaction
+from db.models import Tag, TransactionTag, Transaction, Account
 from db.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -398,3 +398,55 @@ class TagService:
             logger.info(f"Migrated categories to tags: {results}")
 
         return results
+
+    def bulk_tag_by_card(self, card_last4: str, tag_name: str, dry_run: bool = False) -> int:
+        """
+        Tag all transactions from a specific card with the given tag
+
+        Args:
+            card_last4: Last 4 digits of the card (account_number)
+            tag_name: Tag name to add (usually card holder name)
+            dry_run: If True, don't commit changes, just return count
+
+        Returns:
+            Number of transactions tagged
+        """
+        # Find accounts with this card number
+        accounts = self.session.query(Account).filter(
+            Account.account_number == card_last4
+        ).all()
+
+        if not accounts:
+            return 0
+
+        account_ids = [a.id for a in accounts]
+
+        # Get the tag (create if needed for dry run check)
+        tag = self.get_tag_by_name(tag_name)
+
+        if tag:
+            # Find transactions not yet tagged
+            tagged_ids = self.session.query(TransactionTag.transaction_id).filter(
+                TransactionTag.tag_id == tag.id
+            )
+            transactions = self.session.query(Transaction).filter(
+                Transaction.account_id.in_(account_ids),
+                ~Transaction.id.in_(tagged_ids)
+            ).all()
+        else:
+            # Tag doesn't exist, all transactions need tagging
+            transactions = self.session.query(Transaction).filter(
+                Transaction.account_id.in_(account_ids)
+            ).all()
+
+        if dry_run:
+            return len(transactions)
+
+        count = 0
+        for txn in transactions:
+            added = self.tag_transaction(txn.id, [tag_name])
+            if added > 0:
+                count += 1
+
+        logger.info(f"Tagged {count} transactions from card ****{card_last4} with '{tag_name}'")
+        return count
