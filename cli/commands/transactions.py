@@ -128,8 +128,9 @@ def list_transactions(
         table.add_column("Date", width=12)
         table.add_column("Description", width=30)
         table.add_column("Amount", justify="right", width=15)
-        table.add_column("Tags", width=20)
-        table.add_column("Account", width=12)
+        table.add_column("Card", width=6)
+        table.add_column("Tags", width=18)
+        table.add_column("Account", width=10)
 
         for txn in transactions:
             # Format amount with color
@@ -151,12 +152,14 @@ def list_transactions(
             # Get account info
             account = analytics.get_account_by_id(txn.account_id)
             account_str = f"{account.institution}" if account else "Unknown"
+            card_str = account.account_number if account else ""
 
             table.add_row(
                 str(txn.id),
                 txn.transaction_date.strftime("%Y-%m-%d"),
                 fix_rtl(txn.description[:30]),
                 amount_str,
+                card_str,
                 tags_str,
                 account_str
             )

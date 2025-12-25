@@ -265,10 +265,11 @@ class TransactionBrowser(App):
         # Add columns
         table.add_column("ID", width=6)
         table.add_column("Date", width=12)
-        table.add_column("Description", width=35)
+        table.add_column("Description", width=30)
         table.add_column("Amount", width=15)
-        table.add_column("Category", width=20)
-        table.add_column("Tags", width=25)
+        table.add_column("Card", width=6)
+        table.add_column("Category", width=18)
+        table.add_column("Tags", width=20)
 
         self.load_transactions()
 
@@ -312,12 +313,17 @@ class TransactionBrowser(App):
             # Get effective category
             category = txn.user_category or txn.category or ""
 
+            # Get card info from account
+            account = analytics.get_account_by_id(txn.account_id)
+            card_str = account.account_number if account else ""
+
             row_key = table.add_row(
                 str(txn.id),
                 txn.transaction_date.strftime("%Y-%m-%d"),
-                fix_rtl(txn.description[:35]) if txn.description else "",
+                fix_rtl(txn.description[:30]) if txn.description else "",
                 amount_str,
-                fix_rtl(category[:20]) if category else "",
+                card_str,
+                fix_rtl(category[:18]) if category else "",
                 tags_str,
             )
             self.transaction_map[row_key] = txn.id
