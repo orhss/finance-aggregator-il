@@ -656,6 +656,205 @@ class AnalyticsService:
 
     # ==================== Sync History Methods ====================
 
+    # ==================== Spending Trends Methods ====================
+
+    def get_monthly_spending_trends(
+        self,
+        months: int = 6,
+        tag: Optional[str] = None,
+        card_last4: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get monthly spending totals for trend analysis
+
+        Args:
+            months: Number of months to include (default 6)
+            tag: Optional tag filter
+            card_last4: Optional filter by card last 4 digits (account_number)
+
+        Returns:
+            List of dicts with: year, month, total_amount, transaction_count
+            Ordered from oldest to newest
+        """
+        from dateutil.relativedelta import relativedelta
+
+        # Calculate date range
+        today = date.today()
+        # Start from beginning of (months-1) months ago to include current month
+        start_date = date(today.year, today.month, 1) - relativedelta(months=months - 1)
+
+        # Build query
+        query = self.session.query(
+            extract('year', Transaction.transaction_date).label('year'),
+            extract('month', Transaction.transaction_date).label('month'),
+            func.sum(Transaction.original_amount).label('total_amount'),
+            func.count(Transaction.id).label('transaction_count')
+        ).filter(
+            Transaction.transaction_date >= start_date
+        )
+
+        # Apply tag filter
+        if tag:
+            tag_obj = self.session.query(Tag).filter(
+                func.lower(Tag.name) == func.lower(tag)
+            ).first()
+            if tag_obj:
+                query = query.join(
+                    TransactionTag, Transaction.id == TransactionTag.transaction_id
+                ).filter(TransactionTag.tag_id == tag_obj.id)
+            else:
+                return []
+
+        # Apply card holder filter (last 4 digits = account_number)
+        if card_last4:
+            query = query.join(Account, Transaction.account_id == Account.id).filter(
+                Account.account_number == card_last4
+            )
+
+        query = query.group_by(
+            extract('year', Transaction.transaction_date),
+            extract('month', Transaction.transaction_date)
+        ).order_by(
+            extract('year', Transaction.transaction_date),
+            extract('month', Transaction.transaction_date)
+        )
+
+        results = query.all()
+
+        # Convert to list of dicts
+        monthly_data = []
+        for r in results:
+            monthly_data.append({
+                'year': int(r.year),
+                'month': int(r.month),
+                'total_amount': float(r.total_amount) if r.total_amount else 0,
+                'transaction_count': r.transaction_count
+            })
+
+        return monthly_data
+
+    def get_category_trends(
+        self,
+        months: int = 6,
+        top_n: int = 5
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Get spending trends by category over multiple months
+
+        Args:
+            months: Number of months to analyze
+            top_n: Number of top categories to return
+
+        Returns:
+            Dict with category name as key, list of monthly amounts as value
+            Plus 'totals' key with overall totals per category
+        """
+        from dateutil.relativedelta import relativedelta
+
+        today = date.today()
+        start_date = date(today.year, today.month, 1) - relativedelta(months=months - 1)
+
+        # Get category totals to find top N
+        category_totals = self.session.query(
+            Transaction.category,
+            func.sum(func.abs(Transaction.original_amount)).label('total')
+        ).filter(
+            Transaction.transaction_date >= start_date,
+            Transaction.category.isnot(None)
+        ).group_by(
+            Transaction.category
+        ).order_by(
+            func.sum(func.abs(Transaction.original_amount)).desc()
+        ).limit(top_n).all()
+
+        top_categories = [c.category for c in category_totals]
+
+        if not top_categories:
+            return {'categories': {}, 'totals': {}}
+
+        # Get monthly breakdown for top categories
+        monthly_query = self.session.query(
+            Transaction.category,
+            extract('year', Transaction.transaction_date).label('year'),
+            extract('month', Transaction.transaction_date).label('month'),
+            func.sum(Transaction.original_amount).label('amount')
+        ).filter(
+            Transaction.transaction_date >= start_date,
+            Transaction.category.in_(top_categories)
+        ).group_by(
+            Transaction.category,
+            extract('year', Transaction.transaction_date),
+            extract('month', Transaction.transaction_date)
+        ).all()
+
+        # Organize by category
+        categories: Dict[str, List[Dict[str, Any]]] = {cat: [] for cat in top_categories}
+        for r in monthly_query:
+            categories[r.category].append({
+                'year': int(r.year),
+                'month': int(r.month),
+                'amount': abs(float(r.amount)) if r.amount else 0
+            })
+
+        # Sort each category's data by date
+        for cat in categories:
+            categories[cat].sort(key=lambda x: (x['year'], x['month']))
+
+        # Build totals dict
+        totals = {c.category: float(c.total) for c in category_totals}
+
+        return {'categories': categories, 'totals': totals}
+
+    def get_spending_by_card_holder(
+        self,
+        months: int = 6
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Get spending breakdown by card holder (last 4 digits = account_number)
+
+        Args:
+            months: Number of months to include
+
+        Returns:
+            Dict with last4 as key, {total_amount, transaction_count, percentage} as value
+        """
+        from dateutil.relativedelta import relativedelta
+
+        today = date.today()
+        start_date = date(today.year, today.month, 1) - relativedelta(months=months - 1)
+
+        # Query transactions grouped by account_number (which is the last 4 digits for credit cards)
+        results = self.session.query(
+            Account.account_number,
+            func.sum(func.abs(Transaction.original_amount)).label('total_amount'),
+            func.count(Transaction.id).label('transaction_count')
+        ).join(
+            Transaction, Account.id == Transaction.account_id
+        ).filter(
+            Transaction.transaction_date >= start_date,
+            Account.account_type == 'credit_card'
+        ).group_by(
+            Account.account_number
+        ).all()
+
+        # Calculate grand total
+        grand_total = sum(float(r.total_amount or 0) for r in results)
+
+        # Build result dict
+        by_card: Dict[str, Dict[str, Any]] = {}
+        for r in results:
+            last4 = r.account_number
+            total = float(r.total_amount or 0)
+            by_card[last4] = {
+                'total_amount': total,
+                'transaction_count': r.transaction_count,
+                'percentage': (total / grand_total * 100) if grand_total > 0 else 0
+            }
+
+        return by_card
+
+    # ==================== Sync History Methods ====================
+
     def get_sync_history(
         self,
         limit: int = 10,

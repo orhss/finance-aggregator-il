@@ -7,14 +7,204 @@ from datetime import date, datetime
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+from rich.text import Text
 from rich import box
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from cli.utils import fix_rtl
 from services.analytics_service import AnalyticsService
 
 app = typer.Typer(help="Generate reports and analytics")
 console = Console()
+
+
+# ==================== Visualization Helpers ====================
+
+def make_bar(value: float, max_value: float, width: int = 30, color: str = "cyan") -> str:
+    """
+    Create an ASCII bar for visualization
+
+    Args:
+        value: The value to represent
+        max_value: Maximum value (for scaling)
+        width: Width of the bar in characters
+        color: Rich color for the bar
+
+    Returns:
+        Rich-formatted bar string
+    """
+    if max_value <= 0:
+        return ""
+    ratio = min(abs(value) / max_value, 1.0)
+    filled = int(ratio * width)
+    bar = "█" * filled
+    return f"[{color}]{bar}[/{color}]"
+
+
+def make_sparkline(values: List[float], width: int = 6) -> str:
+    """
+    Create a sparkline using Unicode block characters
+
+    Args:
+        values: List of values to visualize
+        width: Number of characters in sparkline
+
+    Returns:
+        Sparkline string using ▁▂▃▄▅▆▇█ characters
+    """
+    if not values:
+        return ""
+
+    blocks = " ▁▂▃▄▅▆▇█"
+    min_val = min(values)
+    max_val = max(values)
+    range_val = max_val - min_val
+
+    if range_val == 0:
+        return "▄" * min(len(values), width)
+
+    # Normalize and map to block characters
+    result = []
+    for v in values[-width:]:  # Take last 'width' values
+        normalized = (v - min_val) / range_val
+        block_idx = int(normalized * (len(blocks) - 1))
+        result.append(blocks[block_idx])
+
+    return "".join(result)
+
+
+def get_trend_indicator(current: float, previous: float) -> tuple[str, str]:
+    """
+    Get trend arrow and color based on change
+
+    Args:
+        current: Current value
+        previous: Previous value
+
+    Returns:
+        Tuple of (arrow, color)
+    """
+    if previous == 0:
+        return "→", "dim"
+
+    change_pct = ((current - previous) / abs(previous)) * 100
+
+    if abs(change_pct) < 2:
+        return "→", "dim"
+    elif change_pct > 0:
+        return "↗", "red"  # Spending up is red (bad)
+    else:
+        return "↘", "green"  # Spending down is green (good)
+
+
+def format_change(current: float, previous: float) -> str:
+    """
+    Format percentage change with color
+
+    Args:
+        current: Current value
+        previous: Previous value
+
+    Returns:
+        Formatted change string with color
+    """
+    if previous == 0:
+        return "[dim]baseline[/dim]"
+
+    change_pct = ((current - previous) / abs(previous)) * 100
+    sign = "+" if change_pct > 0 else ""
+
+    if abs(change_pct) < 2:
+        return f"[dim]{sign}{change_pct:.1f}%[/dim]"
+    elif change_pct > 0:
+        return f"[red]{sign}{change_pct:.1f}%[/red]"
+    else:
+        return f"[green]{change_pct:.1f}%[/green]"
+
+
+def generate_insights(
+    monthly_data: List[Dict[str, Any]],
+    category_data: Dict[str, Any]
+) -> List[str]:
+    """
+    Generate automatic insights from spending data
+
+    Args:
+        monthly_data: List of monthly spending dicts
+        category_data: Category trends data
+
+    Returns:
+        List of insight strings
+    """
+    insights = []
+
+    if not monthly_data:
+        return insights
+
+    # Find highest/lowest spending months
+    amounts = [(m['total_amount'], m['month'], m['year']) for m in monthly_data]
+    if amounts:
+        max_month = max(amounts, key=lambda x: abs(x[0]))
+        min_month = min(amounts, key=lambda x: abs(x[0]))
+
+        month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+        # Highest spending month
+        insights.append(
+            f"{month_names[max_month[1]-1]} {max_month[2]} had highest spending "
+            f"(₪{abs(max_month[0]):,.0f})"
+        )
+
+    # Month-over-month trend for last month
+    if len(monthly_data) >= 2:
+        last = monthly_data[-1]
+        prev = monthly_data[-2]
+        change_pct = ((last['total_amount'] - prev['total_amount']) /
+                      abs(prev['total_amount']) * 100) if prev['total_amount'] else 0
+
+        month_names = ['January', 'February', 'March', 'April', 'May', 'June',
+                       'July', 'August', 'September', 'October', 'November', 'December']
+
+        if abs(change_pct) >= 5:
+            direction = "up" if change_pct > 0 else "down"
+            insights.append(
+                f"{month_names[last['month']-1]} spending {direction} {abs(change_pct):.0f}% "
+                f"vs {month_names[prev['month']-1]}"
+            )
+
+    # Check for consecutive increases/decreases
+    if len(monthly_data) >= 3:
+        consecutive_up = 0
+        consecutive_down = 0
+        for i in range(1, len(monthly_data)):
+            if monthly_data[i]['total_amount'] > monthly_data[i-1]['total_amount']:
+                consecutive_up += 1
+                consecutive_down = 0
+            elif monthly_data[i]['total_amount'] < monthly_data[i-1]['total_amount']:
+                consecutive_down += 1
+                consecutive_up = 0
+
+        if consecutive_up >= 2:
+            insights.append(f"Spending trending up for {consecutive_up + 1} consecutive months")
+        elif consecutive_down >= 2:
+            insights.append(f"Spending trending down for {consecutive_down + 1} consecutive months")
+
+    # Category insights
+    if category_data and 'categories' in category_data:
+        categories = category_data['categories']
+        for cat_name, cat_months in categories.items():
+            if len(cat_months) >= 2:
+                first_half = sum(m['amount'] for m in cat_months[:len(cat_months)//2])
+                second_half = sum(m['amount'] for m in cat_months[len(cat_months)//2:])
+                if first_half > 0:
+                    change = ((second_half - first_half) / first_half) * 100
+                    if change > 20:
+                        insights.append(f"{fix_rtl(cat_name)} trending up significantly")
+                    elif change < -20:
+                        insights.append(f"{fix_rtl(cat_name)} spending decreased")
+
+    return insights[:4]  # Limit to 4 insights
 
 
 @app.command("stats")
@@ -543,6 +733,229 @@ def balance_report(
 
     except Exception as e:
         console.print(f"[red]Error generating balance report: {str(e)}[/red]")
+        raise typer.Exit(code=1)
+
+
+@app.command("trends")
+def spending_trends(
+    months: int = typer.Option(6, "--months", "-m", help="Number of months to analyze (default: 6)"),
+    tag: Optional[str] = typer.Option(None, "--tag", "-t", help="Filter by tag"),
+    card: Optional[str] = typer.Option(None, "--card", "-c", help="Filter by card last 4 digits"),
+    show_categories: bool = typer.Option(True, "--categories/--no-categories", help="Show category trends"),
+    show_cards: bool = typer.Option(True, "--cards/--no-cards", help="Show card holder breakdown")
+):
+    """
+    Show spending trends over time with visualizations
+
+    Examples:
+        fin-cli reports trends                    # Last 6 months overview
+        fin-cli reports trends --months 12        # Last 12 months
+        fin-cli reports trends --tag groceries    # Trends for specific tag
+        fin-cli reports trends --card 1234        # Trends for specific card
+    """
+    try:
+        analytics = AnalyticsService()
+
+        # Get monthly spending data
+        monthly_data = analytics.get_monthly_spending_trends(
+            months=months,
+            tag=tag,
+            card_last4=card
+        )
+
+        if not monthly_data:
+            filter_desc = ""
+            if tag:
+                filter_desc = f" for tag '{tag}'"
+            if card:
+                filter_desc += f" for card *{card}"
+            console.print(f"[yellow]No transaction data found{filter_desc}[/yellow]")
+            analytics.close()
+            return
+
+        # Build date range string
+        first_month = monthly_data[0]
+        last_month = monthly_data[-1]
+        month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        date_range = f"{month_names[first_month['month']-1]} {first_month['year']} - {month_names[last_month['month']-1]} {last_month['year']}"
+
+        # Header panel
+        title_parts = ["SPENDING TRENDS REPORT"]
+        if tag:
+            title_parts.append(f"Tag: {fix_rtl(tag)}")
+        if card:
+            title_parts.append(f"Card: *{card}")
+
+        header_text = f"[bold cyan]{' | '.join(title_parts)}[/bold cyan]\n[dim]{date_range}[/dim]"
+        console.print(Panel(header_text, box=box.DOUBLE))
+        console.print()
+
+        # ==================== Monthly Overview Table ====================
+        max_amount = max(abs(m['total_amount']) for m in monthly_data) if monthly_data else 1
+
+        monthly_table = Table(
+            title="Monthly Spending Overview",
+            show_header=True,
+            header_style="bold cyan",
+            box=box.ROUNDED
+        )
+        monthly_table.add_column("Month", width=10)
+        monthly_table.add_column("Total", justify="right", width=12)
+        monthly_table.add_column("vs Prev", justify="right", width=10)
+        monthly_table.add_column("Trend", width=35)
+        monthly_table.add_column("Count", justify="right", width=8)
+
+        # Calculate average
+        total_spending = sum(abs(m['total_amount']) for m in monthly_data)
+        avg_spending = total_spending / len(monthly_data) if monthly_data else 0
+
+        # Display months (newest first for readability)
+        for i, m in enumerate(reversed(monthly_data)):
+            month_str = f"{month_names[m['month']-1]} {m['year']}"
+            amount = abs(m['total_amount'])
+            amount_str = f"₪{amount:,.0f}"
+
+            # Calculate change vs previous month
+            original_idx = len(monthly_data) - 1 - i
+            if original_idx > 0:
+                prev_amount = abs(monthly_data[original_idx - 1]['total_amount'])
+                change_str = format_change(amount, prev_amount)
+            else:
+                change_str = "[dim]baseline[/dim]"
+
+            # Create bar
+            bar = make_bar(amount, max_amount, width=30)
+
+            monthly_table.add_row(
+                month_str,
+                amount_str,
+                change_str,
+                bar,
+                str(m['transaction_count'])
+            )
+
+        # Add average row
+        monthly_table.add_section()
+        monthly_table.add_row(
+            "[bold]Average[/bold]",
+            f"[bold]₪{avg_spending:,.0f}[/bold]",
+            "",
+            f"[dim]{months}-month avg[/dim]",
+            ""
+        )
+
+        console.print(monthly_table)
+        console.print()
+
+        # ==================== Category Trends ====================
+        if show_categories and not tag:  # Don't show categories if filtering by tag
+            category_data = analytics.get_category_trends(months=months, top_n=5)
+
+            if category_data and category_data.get('categories'):
+                cat_table = Table(
+                    title="Category Trends (Top 5)",
+                    show_header=True,
+                    header_style="bold cyan",
+                    box=box.ROUNDED
+                )
+                cat_table.add_column("Category", width=20)
+                cat_table.add_column("Total", justify="right", width=12)
+                cat_table.add_column("Trend", width=8)
+                cat_table.add_column("Sparkline", width=12)
+
+                # Sort by total
+                sorted_cats = sorted(
+                    category_data['totals'].items(),
+                    key=lambda x: x[1],
+                    reverse=True
+                )
+
+                for cat_name, total in sorted_cats:
+                    cat_months = category_data['categories'].get(cat_name, [])
+                    amounts = [m['amount'] for m in cat_months]
+
+                    # Calculate trend
+                    if len(amounts) >= 2:
+                        first_half = sum(amounts[:len(amounts)//2]) or 1
+                        second_half = sum(amounts[len(amounts)//2:])
+                        trend_pct = ((second_half - first_half) / first_half) * 100
+
+                        if abs(trend_pct) < 5:
+                            trend_str = "[dim]→ stable[/dim]"
+                        elif trend_pct > 0:
+                            trend_str = f"[red]↗ +{trend_pct:.0f}%[/red]"
+                        else:
+                            trend_str = f"[green]↘ {trend_pct:.0f}%[/green]"
+                    else:
+                        trend_str = "[dim]—[/dim]"
+
+                    # Sparkline
+                    sparkline = make_sparkline(amounts, width=months)
+
+                    cat_table.add_row(
+                        fix_rtl(cat_name)[:20],
+                        f"₪{total:,.0f}",
+                        trend_str,
+                        f"[cyan]{sparkline}[/cyan]"
+                    )
+
+                console.print(cat_table)
+                console.print()
+        else:
+            category_data = None
+
+        # ==================== Card Holder Breakdown ====================
+        if show_cards and not card:  # Don't show if already filtering by card
+            card_data = analytics.get_spending_by_card_holder(months=months)
+
+            if card_data:
+                card_table = Table(
+                    title="By Card Holder (Last 4 Digits)",
+                    show_header=True,
+                    header_style="bold cyan",
+                    box=box.ROUNDED
+                )
+                card_table.add_column("Card", width=10)
+                card_table.add_column("Total", justify="right", width=12)
+                card_table.add_column("% Share", justify="right", width=10)
+                card_table.add_column("Transactions", justify="right", width=12)
+
+                # Sort by amount
+                sorted_cards = sorted(
+                    card_data.items(),
+                    key=lambda x: x[1]['total_amount'],
+                    reverse=True
+                )
+
+                for last4, data in sorted_cards:
+                    card_table.add_row(
+                        f"*{last4}",
+                        f"₪{data['total_amount']:,.0f}",
+                        f"{data['percentage']:.0f}%",
+                        str(data['transaction_count'])
+                    )
+
+                console.print(card_table)
+                console.print()
+
+        # ==================== Insights ====================
+        insights = generate_insights(monthly_data, category_data)
+
+        if insights:
+            insight_lines = [f"  • {insight}" for insight in insights]
+            insight_text = "\n".join(insight_lines)
+            console.print(Panel(
+                insight_text,
+                title="[bold]Insights[/bold]",
+                border_style="dim",
+                box=box.ROUNDED
+            ))
+
+        analytics.close()
+
+    except Exception as e:
+        console.print(f"[red]Error generating trends report: {str(e)}[/red]")
         raise typer.Exit(code=1)
 
 
