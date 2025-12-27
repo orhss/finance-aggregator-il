@@ -327,29 +327,84 @@ class CALCreditCardScraper:
         except Exception as e:
             raise CALAuthorizationError(f"Error extracting authorization token: {e}")
 
-    def extract_card_info(self):
-        """Extract card information from session storage"""
-        try:
-            init_data = self.driver.execute_script(
-                "return JSON.parse(sessionStorage.getItem('init'));"
-            )
+    def extract_card_info(self, max_retries: int = 5, retry_delay: float = 2.0):
+        """Extract card information from session storage with retry logic"""
+        last_error = None
 
-            if not init_data or 'result' not in init_data or 'cards' not in init_data['result']:
-                raise CALScraperError("Failed to extract card information from session storage")
+        for attempt in range(max_retries):
+            try:
+                # Get all session storage keys for debugging
+                all_keys = self.driver.execute_script(
+                    "return Object.keys(sessionStorage);"
+                )
+                logger.debug(f"Session storage keys (attempt {attempt + 1}): {all_keys}")
 
-            cards = init_data['result']['cards']
-            self.cards = [
-                {
-                    'cardUniqueId': card['cardUniqueId'],
-                    'last4Digits': card['last4Digits']
-                }
-                for card in cards
-            ]
+                # Try to get the init data
+                init_raw = self.driver.execute_script(
+                    "return sessionStorage.getItem('init');"
+                )
 
-            logger.debug(f"Extracted {len(self.cards)} card(s): {[c['last4Digits'] for c in self.cards]}")
+                if not init_raw:
+                    logger.debug(f"Attempt {attempt + 1}: 'init' key not found in session storage")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        continue
+                    raise CALScraperError(
+                        f"Failed to extract card information: 'init' key not in session storage. "
+                        f"Available keys: {all_keys}"
+                    )
 
-        except Exception as e:
-            raise CALScraperError(f"Error extracting card info: {e}")
+                init_data = json.loads(init_raw)
+                logger.debug(f"init_data keys: {list(init_data.keys()) if isinstance(init_data, dict) else type(init_data)}")
+
+                if 'result' not in init_data:
+                    logger.debug(f"Attempt {attempt + 1}: 'result' key not found. Keys: {list(init_data.keys())}")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        continue
+                    raise CALScraperError(
+                        f"Failed to extract card information: 'result' key not in init_data. "
+                        f"Available keys: {list(init_data.keys())}"
+                    )
+
+                if 'cards' not in init_data['result']:
+                    logger.debug(f"Attempt {attempt + 1}: 'cards' key not found. Result keys: {list(init_data['result'].keys())}")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        continue
+                    raise CALScraperError(
+                        f"Failed to extract card information: 'cards' key not in result. "
+                        f"Available keys: {list(init_data['result'].keys())}"
+                    )
+
+                cards = init_data['result']['cards']
+                self.cards = [
+                    {
+                        'cardUniqueId': card['cardUniqueId'],
+                        'last4Digits': card['last4Digits']
+                    }
+                    for card in cards
+                ]
+
+                logger.debug(f"Extracted {len(self.cards)} card(s): {[c['last4Digits'] for c in self.cards]}")
+                return  # Success
+
+            except CALScraperError:
+                raise  # Re-raise our specific errors
+            except json.JSONDecodeError as e:
+                last_error = e
+                logger.debug(f"Attempt {attempt + 1}: JSON decode error: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    continue
+            except Exception as e:
+                last_error = e
+                logger.debug(f"Attempt {attempt + 1}: Unexpected error: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    continue
+
+        raise CALScraperError(f"Error extracting card info after {max_retries} attempts: {last_error}")
 
     def get_api_headers(self) -> Dict[str, str]:
         """Get headers for API requests"""
