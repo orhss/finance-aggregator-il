@@ -28,6 +28,13 @@ def effective_amount_expr():
     return func.coalesce(Transaction.charged_amount, Transaction.original_amount)
 
 
+# SQLAlchemy expression for effective category in queries
+# Use COALESCE(user_category, category) so user overrides take precedence
+def effective_category_expr():
+    """SQLAlchemy expression for effective category: COALESCE(user_category, category)"""
+    return func.coalesce(Transaction.user_category, Transaction.category)
+
+
 class AnalyticsService:
     """
     Service for querying and analyzing financial data
@@ -470,7 +477,8 @@ class AnalyticsService:
 
         categories = {}
         for txn in transactions:
-            category = txn.category or 'Uncategorized'
+            # Use effective_category (user_category if set, otherwise original category)
+            category = txn.effective_category or 'Uncategorized'
 
             if category not in categories:
                 categories[category] = {
@@ -648,7 +656,8 @@ class AnalyticsService:
         for txn in transactions:
             effective_amt = get_effective_amount(txn)
             total_amount += effective_amt
-            category = txn.category or '(uncategorized)'
+            # Use effective_category (user_category if set, otherwise original category)
+            category = txn.effective_category or '(uncategorized)'
 
             if category not in by_category:
                 by_category[category] = {'count': 0, 'total_amount': 0}
@@ -664,7 +673,7 @@ class AnalyticsService:
                 'description': txn.description,
                 'amount': get_effective_amount(txn),
                 'currency': txn.charged_currency or txn.original_currency,
-                'category': txn.category or '(uncategorized)'
+                'category': txn.effective_category or '(uncategorized)'
             }
             for txn in transactions
         ]
@@ -776,15 +785,18 @@ class AnalyticsService:
         today = date.today()
         start_date = date(today.year, today.month, 1) - relativedelta(months=months - 1)
 
-        # Get category totals to find top N - use effective_amount_expr for proper installment handling
+        # Get category totals to find top N
+        # Use effective_category_expr (user_category if set, otherwise category)
+        # Use effective_amount_expr for proper installment handling
+        eff_category = effective_category_expr()
         category_totals = self.session.query(
-            Transaction.category,
+            eff_category.label('category'),
             func.sum(func.abs(effective_amount_expr())).label('total')
         ).filter(
             Transaction.transaction_date >= start_date,
-            Transaction.category.isnot(None)
+            eff_category.isnot(None)
         ).group_by(
-            Transaction.category
+            eff_category
         ).order_by(
             func.sum(func.abs(effective_amount_expr())).desc()
         ).limit(top_n).all()
@@ -794,17 +806,18 @@ class AnalyticsService:
         if not top_categories:
             return {'categories': {}, 'totals': {}}
 
-        # Get monthly breakdown for top categories - use effective_amount_expr
+        # Get monthly breakdown for top categories
+        # Use effective_category_expr and effective_amount_expr
         monthly_query = self.session.query(
-            Transaction.category,
+            eff_category.label('category'),
             extract('year', Transaction.transaction_date).label('year'),
             extract('month', Transaction.transaction_date).label('month'),
             func.sum(effective_amount_expr()).label('amount')
         ).filter(
             Transaction.transaction_date >= start_date,
-            Transaction.category.in_(top_categories)
+            eff_category.in_(top_categories)
         ).group_by(
-            Transaction.category,
+            eff_category,
             extract('year', Transaction.transaction_date),
             extract('month', Transaction.transaction_date)
         ).all()
