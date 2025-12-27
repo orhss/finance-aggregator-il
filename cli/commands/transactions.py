@@ -133,9 +133,11 @@ def list_transactions(
         table.add_column("Account", width=10)
 
         for txn in transactions:
-            # Format amount with color
-            amount_str = f"{txn.original_amount:,.2f} {txn.original_currency}"
-            if txn.original_amount < 0:
+            # Format amount with color - use charged_amount (actual payment) if available
+            amount = txn.charged_amount if txn.charged_amount is not None else txn.original_amount
+            currency = txn.charged_currency or txn.original_currency
+            amount_str = f"{amount:,.2f} {currency}"
+            if amount < 0:
                 amount_str = f"[red]{amount_str}[/red]"
             else:
                 amount_str = f"[green]{amount_str}[/green]"

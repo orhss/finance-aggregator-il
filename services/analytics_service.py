@@ -10,6 +10,24 @@ from db.models import Account, Transaction, Balance, SyncHistory, Tag, Transacti
 from db.database import get_db
 
 
+def get_effective_amount(txn: Transaction) -> float:
+    """
+    Get the effective amount for a transaction.
+    Uses charged_amount (actual payment, e.g., per-installment) if available,
+    otherwise falls back to original_amount (total purchase price).
+    """
+    if txn.charged_amount is not None:
+        return txn.charged_amount
+    return txn.original_amount or 0
+
+
+# SQLAlchemy expression for effective amount in queries
+# Use COALESCE(charged_amount, original_amount) for SQL aggregations
+def effective_amount_expr():
+    """SQLAlchemy expression for effective amount: COALESCE(charged_amount, original_amount)"""
+    return func.coalesce(Transaction.charged_amount, Transaction.original_amount)
+
+
 class AnalyticsService:
     """
     Service for querying and analyzing financial data
@@ -462,7 +480,8 @@ class AnalyticsService:
                 }
 
             categories[category]["count"] += 1
-            categories[category]["total_amount"] += abs(txn.original_amount or 0)
+            # Use charged_amount (actual payment) if available, otherwise original_amount
+            categories[category]["total_amount"] += abs(get_effective_amount(txn))
 
         # Calculate averages
         for category in categories:
@@ -492,11 +511,12 @@ class AnalyticsService:
             Includes special "(untagged)" key for transactions without tags
         """
         # Build base query for tagged transactions
+        # Use effective_amount_expr() to get charged_amount if available, otherwise original_amount
         query = (
             self.session.query(
                 Tag.name,
                 func.count(Transaction.id).label('count'),
-                func.coalesce(func.sum(Transaction.original_amount), 0).label('total_amount')
+                func.coalesce(func.sum(effective_amount_expr()), 0).label('total_amount')
             )
             .join(TransactionTag, Tag.id == TransactionTag.tag_id)
             .join(Transaction, TransactionTag.transaction_id == Transaction.id)
@@ -514,7 +534,7 @@ class AnalyticsService:
         tagged_ids_subquery = self.session.query(TransactionTag.transaction_id).distinct()
         untagged_query = self.session.query(
             func.count(Transaction.id).label('count'),
-            func.coalesce(func.sum(Transaction.original_amount), 0).label('total_amount')
+            func.coalesce(func.sum(effective_amount_expr()), 0).label('total_amount')
         ).filter(~Transaction.id.in_(tagged_ids_subquery))
 
         if from_date:
@@ -621,18 +641,20 @@ class AnalyticsService:
         transactions = query.all()
 
         # Calculate totals and category breakdown
+        # Use effective amount (charged_amount if available, otherwise original_amount)
         total_amount = 0
         by_category: Dict[str, Dict[str, Any]] = {}
 
         for txn in transactions:
-            total_amount += txn.original_amount
+            effective_amt = get_effective_amount(txn)
+            total_amount += effective_amt
             category = txn.category or '(uncategorized)'
 
             if category not in by_category:
                 by_category[category] = {'count': 0, 'total_amount': 0}
 
             by_category[category]['count'] += 1
-            by_category[category]['total_amount'] += txn.original_amount
+            by_category[category]['total_amount'] += effective_amt
 
         # Build transaction list
         txn_list = [
@@ -640,8 +662,8 @@ class AnalyticsService:
                 'id': txn.id,
                 'date': txn.transaction_date,
                 'description': txn.description,
-                'amount': txn.original_amount,
-                'currency': txn.original_currency,
+                'amount': get_effective_amount(txn),
+                'currency': txn.charged_currency or txn.original_currency,
                 'category': txn.category or '(uncategorized)'
             }
             for txn in transactions
@@ -683,11 +705,11 @@ class AnalyticsService:
         # Start from beginning of (months-1) months ago to include current month
         start_date = date(today.year, today.month, 1) - relativedelta(months=months - 1)
 
-        # Build query
+        # Build query - use effective_amount_expr for proper installment handling
         query = self.session.query(
             extract('year', Transaction.transaction_date).label('year'),
             extract('month', Transaction.transaction_date).label('month'),
-            func.sum(Transaction.original_amount).label('total_amount'),
+            func.sum(effective_amount_expr()).label('total_amount'),
             func.count(Transaction.id).label('transaction_count')
         ).filter(
             Transaction.transaction_date >= start_date
@@ -754,17 +776,17 @@ class AnalyticsService:
         today = date.today()
         start_date = date(today.year, today.month, 1) - relativedelta(months=months - 1)
 
-        # Get category totals to find top N
+        # Get category totals to find top N - use effective_amount_expr for proper installment handling
         category_totals = self.session.query(
             Transaction.category,
-            func.sum(func.abs(Transaction.original_amount)).label('total')
+            func.sum(func.abs(effective_amount_expr())).label('total')
         ).filter(
             Transaction.transaction_date >= start_date,
             Transaction.category.isnot(None)
         ).group_by(
             Transaction.category
         ).order_by(
-            func.sum(func.abs(Transaction.original_amount)).desc()
+            func.sum(func.abs(effective_amount_expr())).desc()
         ).limit(top_n).all()
 
         top_categories = [c.category for c in category_totals]
@@ -772,12 +794,12 @@ class AnalyticsService:
         if not top_categories:
             return {'categories': {}, 'totals': {}}
 
-        # Get monthly breakdown for top categories
+        # Get monthly breakdown for top categories - use effective_amount_expr
         monthly_query = self.session.query(
             Transaction.category,
             extract('year', Transaction.transaction_date).label('year'),
             extract('month', Transaction.transaction_date).label('month'),
-            func.sum(Transaction.original_amount).label('amount')
+            func.sum(effective_amount_expr()).label('amount')
         ).filter(
             Transaction.transaction_date >= start_date,
             Transaction.category.in_(top_categories)
@@ -824,9 +846,10 @@ class AnalyticsService:
         start_date = date(today.year, today.month, 1) - relativedelta(months=months - 1)
 
         # Query transactions grouped by account_number (which is the last 4 digits for credit cards)
+        # Use effective_amount_expr for proper installment handling
         results = self.session.query(
             Account.account_number,
-            func.sum(func.abs(Transaction.original_amount)).label('total_amount'),
+            func.sum(func.abs(effective_amount_expr())).label('total_amount'),
             func.count(Transaction.id).label('transaction_count')
         ).join(
             Transaction, Account.id == Transaction.account_id

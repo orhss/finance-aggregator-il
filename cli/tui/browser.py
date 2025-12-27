@@ -9,7 +9,8 @@ from typing import Optional, List, Dict, Any
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.widgets import DataTable, Header, Footer, Input, Static, Button, Label
+from textual.widgets import DataTable, Header, Footer, Input, Static, Button, Label, OptionList
+from textual.widgets.option_list import Option
 from textual.containers import Container, Horizontal, Vertical, Grid
 from textual.screen import ModalScreen
 from textual.message import Message
@@ -33,12 +34,16 @@ class EditScreen(ModalScreen):
         self.transaction_data = transaction_data
 
     def compose(self) -> ComposeResult:
+        # Apply RTL fix for Hebrew text in description and category
+        description = fix_rtl(self.transaction_data.get('description', 'N/A'))
+        category = fix_rtl(self.transaction_data.get('category', 'N/A') or 'N/A')
+
         with Container(id="edit-dialog"):
             yield Static("Edit Transaction", id="edit-title")
             yield Static(f"Date: {self.transaction_data.get('date', 'N/A')}", classes="edit-field")
-            yield Static(f"Description: {self.transaction_data.get('description', 'N/A')}", classes="edit-field")
+            yield Static(f"Description: {description}", classes="edit-field")
             yield Static(f"Amount: {self.transaction_data.get('amount', 'N/A')}", classes="edit-field")
-            yield Static(f"Original Category: {self.transaction_data.get('category', 'N/A')}", classes="edit-field")
+            yield Static(f"Original Category: {category}", classes="edit-field")
             yield Label("User Category:")
             yield Input(
                 value=self.transaction_data.get('user_category', '') or '',
@@ -74,27 +79,87 @@ class EditScreen(ModalScreen):
 
 
 class TagScreen(ModalScreen):
-    """Modal screen for adding/removing tags"""
+    """Modal screen for adding/removing tags with autocomplete"""
 
     BINDINGS = [
         Binding("escape", "cancel", "Cancel"),
+        Binding("down", "focus_suggestions", "Suggestions", show=False),
     ]
 
     def __init__(self, transaction_id: int, current_tags: List[str]):
         super().__init__()
         self.transaction_id = transaction_id
         self.current_tags = current_tags
+        self.all_tags: List[str] = []
 
     def compose(self) -> ComposeResult:
         with Container(id="tag-dialog"):
             yield Static("Manage Tags", id="tag-title")
-            yield Static(f"Current tags: {', '.join(self.current_tags) if self.current_tags else '(none)'}", id="current-tags")
-            yield Label("Add tag:")
-            yield Input(placeholder="Enter tag name...", id="tag-input")
+            yield Static(self._format_current_tags(), id="current-tags")
+            yield Label("Tag name:")
+            yield Input(placeholder="Enter or select tag...", id="tag-input")
+            yield OptionList(id="tag-suggestions")
             with Horizontal(id="tag-buttons"):
                 yield Button("Add", variant="primary", id="add-btn")
                 yield Button("Remove", variant="warning", id="remove-btn")
                 yield Button("Close", variant="default", id="close-btn")
+
+    def on_mount(self) -> None:
+        """Load all existing tags when screen mounts"""
+        tag_service = TagService()
+        tags = tag_service.get_all_tags()
+        self.all_tags = [tag.name for tag in tags]
+        # Initially hide suggestions
+        self.query_one("#tag-suggestions", OptionList).display = False
+
+    def _format_current_tags(self) -> str:
+        """Format current tags with RTL support"""
+        if not self.current_tags:
+            return "Current tags: (none)"
+        # Apply RTL fix to each tag for proper Hebrew display
+        formatted_tags = [fix_rtl(tag) for tag in self.current_tags]
+        return f"Current tags: {', '.join(formatted_tags)}"
+
+    def _update_suggestions(self, query: str) -> None:
+        """Update suggestion list based on input"""
+        option_list = self.query_one("#tag-suggestions", OptionList)
+        option_list.clear_options()
+
+        if not query:
+            option_list.display = False
+            return
+
+        # Filter tags that match the query (case-insensitive)
+        query_lower = query.lower()
+        matching = [tag for tag in self.all_tags if query_lower in tag.lower()]
+
+        if matching:
+            for tag in matching[:10]:  # Limit to 10 suggestions
+                # Display with RTL fix for Hebrew tags
+                option_list.add_option(Option(fix_rtl(tag), id=tag))
+            option_list.display = True
+        else:
+            option_list.display = False
+
+    @on(Input.Changed, "#tag-input")
+    def handle_input_changed(self, event: Input.Changed) -> None:
+        """Update suggestions as user types"""
+        self._update_suggestions(event.value)
+
+    @on(OptionList.OptionSelected, "#tag-suggestions")
+    def handle_suggestion_selected(self, event: OptionList.OptionSelected) -> None:
+        """Fill input with selected suggestion"""
+        if event.option.id:
+            tag_input = self.query_one("#tag-input", Input)
+            tag_input.value = str(event.option.id)
+            self.query_one("#tag-suggestions", OptionList).display = False
+            tag_input.focus()
+
+    def action_focus_suggestions(self) -> None:
+        """Focus the suggestions list"""
+        option_list = self.query_one("#tag-suggestions", OptionList)
+        if option_list.display and option_list.option_count > 0:
+            option_list.focus()
 
     @on(Button.Pressed, "#add-btn")
     def handle_add(self) -> None:
@@ -106,10 +171,12 @@ class TagScreen(ModalScreen):
             added = tag_service.tag_transaction(self.transaction_id, [tag_name])
             if added > 0:
                 self.current_tags.append(tag_name)
-                self.query_one("#current-tags", Static).update(
-                    f"Current tags: {', '.join(self.current_tags)}"
-                )
+                # Add to all_tags if it's new
+                if tag_name not in self.all_tags:
+                    self.all_tags.append(tag_name)
+                self.query_one("#current-tags", Static).update(self._format_current_tags())
             tag_input.value = ""
+            self.query_one("#tag-suggestions", OptionList).display = False
 
     @on(Button.Pressed, "#remove-btn")
     def handle_remove(self) -> None:
@@ -121,10 +188,9 @@ class TagScreen(ModalScreen):
             removed = tag_service.untag_transaction(self.transaction_id, [tag_name])
             if removed > 0:
                 self.current_tags.remove(tag_name)
-                self.query_one("#current-tags", Static).update(
-                    f"Current tags: {', '.join(self.current_tags) if self.current_tags else '(none)'}"
-                )
+                self.query_one("#current-tags", Static).update(self._format_current_tags())
             tag_input.value = ""
+            self.query_one("#tag-suggestions", OptionList).display = False
 
     @on(Button.Pressed, "#close-btn")
     def handle_close(self) -> None:
@@ -192,7 +258,7 @@ class TransactionBrowser(App):
 
     /* Tag dialog styles */
     #tag-dialog {
-        width: 50;
+        width: 70;
         height: auto;
         padding: 1 2;
         background: $surface;
@@ -208,6 +274,27 @@ class TransactionBrowser(App):
     #current-tags {
         padding: 0 0 1 0;
         color: $text-muted;
+    }
+
+    #tag-input {
+        width: 100%;
+    }
+
+    #tag-suggestions {
+        max-height: 8;
+        width: 100%;
+        background: $surface-darken-1;
+        border: solid $primary-darken-1;
+        margin-top: 0;
+        padding: 0;
+    }
+
+    #tag-suggestions:focus {
+        border: solid $primary;
+    }
+
+    #tag-suggestions > .option-list--option {
+        padding: 0 1;
     }
 
     #tag-buttons {
@@ -306,9 +393,10 @@ class TransactionBrowser(App):
             if len(txn_tags) > 3:
                 tags_str += f" +{len(txn_tags) - 3}"
 
-            # Format amount
-            amount = txn.original_amount
-            amount_str = f"{amount:,.2f} {txn.original_currency}"
+            # Format amount - use charged_amount (actual payment) if available
+            amount = txn.charged_amount if txn.charged_amount is not None else txn.original_amount
+            currency = txn.charged_currency or txn.original_currency
+            amount_str = f"{amount:,.2f} {currency}"
 
             # Get effective category
             category = txn.user_category or txn.category or ""
@@ -376,11 +464,14 @@ class TransactionBrowser(App):
                 tag_service = TagService()
                 txn_tags = tag_service.get_transaction_tags(txn.id)
 
+                # Use charged_amount (actual payment) if available
+                amount = txn.charged_amount if txn.charged_amount is not None else txn.original_amount
+                currency = txn.charged_currency or txn.original_currency
                 return {
                     "id": txn.id,
                     "date": txn.transaction_date.strftime("%Y-%m-%d"),
                     "description": txn.description,
-                    "amount": f"{txn.original_amount:,.2f} {txn.original_currency}",
+                    "amount": f"{amount:,.2f} {currency}",
                     "category": txn.category or "",
                     "user_category": txn.user_category or "",
                     "tags": [t.name for t in txn_tags],

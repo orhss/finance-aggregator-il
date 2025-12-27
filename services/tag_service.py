@@ -12,6 +12,11 @@ from db.database import get_db
 logger = logging.getLogger(__name__)
 
 
+def _effective_amount_expr():
+    """SQLAlchemy expression for effective amount: COALESCE(charged_amount, original_amount)"""
+    return func.coalesce(Transaction.charged_amount, Transaction.original_amount)
+
+
 class TagService:
     """
     Service for managing tags and editing transactions
@@ -306,10 +311,12 @@ class TagService:
         Returns:
             List of dicts: [{name, count, total_amount}, ...]
         """
+        # Use effective amount (charged_amount if available, otherwise original_amount)
+        # for proper installment handling
         results = self.session.query(
             Tag.name,
             func.count(TransactionTag.id).label('count'),
-            func.coalesce(func.sum(Transaction.original_amount), 0).label('total_amount')
+            func.coalesce(func.sum(_effective_amount_expr()), 0).label('total_amount')
         ).outerjoin(
             TransactionTag, Tag.id == TransactionTag.tag_id
         ).outerjoin(
@@ -338,11 +345,12 @@ class TagService:
         Get total amount of untagged transactions
 
         Returns:
-            Sum of original_amount for untagged transactions
+            Sum of effective amount (charged_amount if available, otherwise original_amount)
+            for untagged transactions
         """
         tagged_ids = self.session.query(TransactionTag.transaction_id).distinct()
         result = self.session.query(
-            func.coalesce(func.sum(Transaction.original_amount), 0)
+            func.coalesce(func.sum(_effective_amount_expr()), 0)
         ).filter(
             ~Transaction.id.in_(tagged_ids)
         ).scalar()
