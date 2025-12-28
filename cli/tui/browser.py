@@ -356,7 +356,7 @@ class TransactionBrowser(App):
         table.add_column("Amount", width=15)
         table.add_column("Card", width=6)
         table.add_column("Category", width=18)
-        table.add_column("Tags", width=20)
+        table.add_column("Tags", width=35)
 
         self.load_transactions()
 
@@ -389,9 +389,9 @@ class TransactionBrowser(App):
 
             # Get tags for this transaction
             txn_tags = tag_service.get_transaction_tags(txn.id)
-            tags_str = ", ".join([fix_rtl(t.name) for t in txn_tags[:3]]) if txn_tags else ""
-            if len(txn_tags) > 3:
-                tags_str += f" +{len(txn_tags) - 3}"
+            tags_str = ", ".join([fix_rtl(t.name) for t in txn_tags[:4]]) if txn_tags else ""
+            if len(txn_tags) > 4:
+                tags_str += f" +{len(txn_tags) - 4}"
 
             # Format amount - use charged_amount (actual payment) if available
             amount = txn.charged_amount if txn.charged_amount is not None else txn.original_amount
