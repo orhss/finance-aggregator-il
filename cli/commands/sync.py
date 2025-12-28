@@ -14,6 +14,7 @@ from config.settings import load_credentials, get_settings
 from services.broker_service import BrokerService
 from services.pension_service import PensionService
 from services.credit_card_service import CreditCardService
+from services.rules_service import RulesService, RULES_FILE
 
 app = typer.Typer(help="Synchronize financial data from institutions")
 console = Console()
@@ -219,6 +220,32 @@ def sync_phoenix(
         db.close()
 
 
+def _apply_rules_after_sync(db, transaction_count: int) -> None:
+    """Apply categorization rules after sync if rules file exists"""
+    if not RULES_FILE.exists():
+        return
+
+    if transaction_count == 0:
+        return
+
+    try:
+        rules_service = RulesService(session=db)
+        rules = rules_service.get_rules()
+
+        if not rules:
+            return
+
+        # Apply rules only to transactions without user_category
+        result = rules_service.apply_rules(only_uncategorized=True)
+
+        if result["modified"] > 0:
+            console.print(f"  [blue]Rules applied:[/blue] {result['modified']} transactions auto-categorized")
+
+    except Exception as e:
+        # Don't fail sync if rules application fails
+        console.print(f"  [yellow]Warning: Could not apply rules: {e}[/yellow]")
+
+
 @app.command("cal")
 def sync_cal(
     headless: bool = typer.Option(True, "--headless/--visible", help="Run browsers in headless mode"),
@@ -272,6 +299,9 @@ def sync_cal(
             console.print(f"  Cards synced: {result.cards_synced}")
             console.print(f"  Transactions added: {result.transactions_added}")
             console.print(f"  Transactions updated: {result.transactions_updated}")
+
+            # Auto-apply categorization rules to new/updated transactions
+            _apply_rules_after_sync(db, result.transactions_added + result.transactions_updated)
         else:
             console.print(f"[red]✗ Failed: {result.error_message}[/red]")
             raise typer.Exit(1)
