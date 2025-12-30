@@ -18,6 +18,11 @@ from scrapers.credit_cards.cal_credit_card_client import (
     Transaction,
     CALScraperError
 )
+from scrapers.credit_cards.max_credit_card_client import (
+    MaxCreditCardScraper,
+    MaxCredentials,
+    MaxScraperError
+)
 
 
 class CreditCardSyncResult:
@@ -84,6 +89,73 @@ class CreditCardService(BaseSyncService):
                         account_number=card_account.account_number,
                         account_name=f"CAL Card ****{card_account.account_number}",
                         card_unique_id=card_account.card_unique_id
+                    )
+                    result.cards_synced += 1
+
+                    # Save transactions (no commit per transaction - handled by context)
+                    for transaction in card_account.transactions:
+                        if self._save_transaction(db_account, transaction):
+                            result.transactions_added += 1
+                        else:
+                            result.transactions_updated += 1
+
+                # Update sync record
+                sync_record.records_added = result.transactions_added
+                sync_record.records_updated = result.transactions_updated
+
+                result.success = True
+
+        except Exception as e:
+            result.error_message = str(e)
+
+        return result
+
+    def sync_max(
+        self,
+        username: str,
+        password: str,
+        months_back: int = 3,
+        months_forward: int = 1,
+        headless: bool = True
+    ) -> CreditCardSyncResult:
+        """
+        Sync Max credit card data.
+
+        Args:
+            username: Max username
+            password: Max password
+            months_back: Number of months to fetch backwards (default: 3)
+            months_forward: Number of months to fetch forward (default: 1)
+            headless: Run browser in headless mode (default: True)
+
+        Returns:
+            CreditCardSyncResult with sync operation details
+        """
+        result = CreditCardSyncResult()
+
+        try:
+            with self.sync_transaction(SyncType.CREDIT_CARD, Institution.MAX) as sync_record:
+                result.sync_history_id = sync_record.id
+
+                # Create credentials and scraper
+                credentials = MaxCredentials(username=username, password=password)
+                scraper = MaxCreditCardScraper(credentials, headless=headless)
+
+                # Scrape transactions
+                card_accounts = scraper.scrape(months_back=months_back, months_forward=months_forward)
+
+                if not card_accounts:
+                    raise MaxScraperError("No card accounts found for Max")
+
+                # Process each card account
+                for card_account in card_accounts:
+                    # Get or create account in database (no commit - handled by context)
+                    db_account = self.get_or_create_account(
+                        account_type=AccountType.CREDIT_CARD,
+                        institution=Institution.MAX,
+                        account_number=card_account.account_number,
+                        account_name=f"Max Card {card_account.account_number}",
+                        card_unique_id=None  # Max doesn't use card_unique_id
                     )
                     result.cards_synced += 1
 

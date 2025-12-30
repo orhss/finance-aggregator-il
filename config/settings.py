@@ -52,6 +52,7 @@ class Credentials(BaseModel):
     migdal: PensionCredentials = Field(default_factory=PensionCredentials)
     phoenix: PensionCredentials = Field(default_factory=PensionCredentials)
     cal: CreditCardCredentials = Field(default_factory=CreditCardCredentials)
+    max: CreditCardCredentials = Field(default_factory=CreditCardCredentials)
     email: EmailCredentials = Field(default_factory=EmailCredentials)
 
 
@@ -181,6 +182,10 @@ def load_credentials() -> Credentials:
         cal=CreditCardCredentials(
             username=os.getenv("CAL_USERNAME"),
             password=os.getenv("CAL_PASSWORD"),
+        ),
+        max=CreditCardCredentials(
+            username=os.getenv("MAX_USERNAME"),
+            password=os.getenv("MAX_PASSWORD"),
         ),
         email=EmailCredentials(
             address=os.getenv("USER_EMAIL"),

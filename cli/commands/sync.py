@@ -43,6 +43,7 @@ def sync_all(
     sync_migdal(headless=headless)
     sync_phoenix(headless=headless)
     sync_cal(headless=headless, months_back=months_back)
+    sync_max(headless=headless, months_back=months_back)
 
     console.print("\n[bold green]✓ Full synchronization complete![/bold green]")
 
@@ -286,6 +287,70 @@ def sync_cal(
             result = service.sync_cal(
                 username=credentials.cal.username,
                 password=credentials.cal.password,
+                months_back=months_back,
+                months_forward=months_forward,
+                headless=headless
+            )
+
+            progress.update(task, completed=True)
+
+        # Display results
+        if result.success:
+            console.print(f"[green]✓ Success![/green]")
+            console.print(f"  Cards synced: {result.cards_synced}")
+            console.print(f"  Transactions added: {result.transactions_added}")
+            console.print(f"  Transactions updated: {result.transactions_updated}")
+
+            # Auto-apply categorization rules to new/updated transactions
+            _apply_rules_after_sync(db, result.transactions_added + result.transactions_updated)
+        else:
+            console.print(f"[red]✗ Failed: {result.error_message}[/red]")
+            raise typer.Exit(1)
+
+    finally:
+        db.close()
+
+
+@app.command("max")
+def sync_max(
+    headless: bool = typer.Option(True, "--headless/--visible", help="Run browsers in headless mode"),
+    months_back: int = typer.Option(3, "--months-back", help="Number of months to fetch backwards"),
+    months_forward: int = typer.Option(1, "--months-forward", help="Number of months to fetch forward"),
+):
+    """
+    Sync Max credit card data
+    """
+    console.print("[bold cyan]Syncing Max credit card...[/bold cyan]")
+
+    # Check database
+    if not check_database_exists():
+        console.print("[bold red]Error: Database not initialized. Run 'fin-cli init' first.[/bold red]")
+        raise typer.Exit(1)
+
+    # Load credentials
+    credentials = load_credentials()
+
+    if not credentials.max.username or not credentials.max.password:
+        console.print("[bold red]Error: Max credentials not configured.[/bold red]")
+        console.print("Run 'fin-cli config' to set up credentials.")
+        raise typer.Exit(1)
+
+    # Create database session
+    db = SessionLocal()
+
+    try:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Syncing Max...", total=None)
+
+            # Create service and sync
+            service = CreditCardService(db)
+            result = service.sync_max(
+                username=credentials.max.username,
+                password=credentials.max.password,
                 months_back=months_back,
                 months_forward=months_forward,
                 headless=headless

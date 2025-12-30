@@ -75,6 +75,10 @@ def show(
         table.add_row("CAL", "Username", mask_value(credentials.cal.username))
         table.add_row("", "Password", mask_value(credentials.cal.password))
 
+        # Max credit card
+        table.add_row("Max", "Username", mask_value(credentials.max.username))
+        table.add_row("", "Password", mask_value(credentials.max.password))
+
         # Email (for MFA)
         table.add_row("Email (MFA)", "Address", mask_value(credentials.email.address))
         table.add_row("", "Password", mask_value(credentials.email.password))
@@ -114,7 +118,7 @@ def set(
         institution, field = parts
 
         # Valid institutions
-        valid_institutions = ["excellence", "migdal", "phoenix", "cal", "email"]
+        valid_institutions = ["excellence", "migdal", "phoenix", "cal", "max", "email"]
         if institution not in valid_institutions:
             print_error(f"Invalid institution. Must be one of: {', '.join(valid_institutions)}")
             raise typer.Exit(code=1)
@@ -166,6 +170,13 @@ def setup():
         credentials.cal.username = username if username else None
         credentials.cal.password = password if password else None
 
+        # Max credit card
+        rprint("\n[bold cyan]Max Credit Card[/bold cyan]")
+        username = typer.prompt("Username", default=credentials.max.username or "")
+        password = typer.prompt("Password", default=credentials.max.password or "", hide_input=True)
+        credentials.max.username = username if username else None
+        credentials.max.password = password if password else None
+
         # Email (for MFA)
         rprint("\n[bold cyan]Email (for MFA)[/bold cyan]")
         email = typer.prompt("Email address", default="")
@@ -187,6 +198,7 @@ def setup():
 ✓ Migdal: {'Configured' if credentials.migdal.user_id else 'Not set'}
 ✓ Phoenix: {'Configured' if credentials.phoenix.user_id else 'Not set'}
 ✓ CAL: {'Configured' if credentials.cal.username else 'Not set'}
+✓ Max: {'Configured' if credentials.max.username else 'Not set'}
 ✓ Email: {'Configured' if credentials.email.address else 'Not set'}
 
 [bold]Next Steps:[/bold]
