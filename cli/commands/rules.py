@@ -32,7 +32,8 @@ def list_rules():
     table.add_column("Pattern", style="cyan")
     table.add_column("Match", style="dim", width=10)
     table.add_column("Category", style="green")
-    table.add_column("Tags", style="blue")
+    table.add_column("Add Tags", style="blue")
+    table.add_column("Remove Tags", style="red")
     table.add_column("Description", style="dim")
 
     for i, rule in enumerate(rules, 1):
@@ -42,7 +43,8 @@ def list_rules():
             status + fix_rtl(rule.pattern),
             rule.match_type.value,
             fix_rtl(rule.category) if rule.category else "-",
-            ", ".join(rule.tags) if rule.tags else "-",
+            ", ".join(fix_rtl(t) for t in rule.tags) if rule.tags else "-",
+            ", ".join(fix_rtl(t) for t in rule.remove_tags) if rule.remove_tags else "-",
             fix_rtl(rule.description) if rule.description else "",
         )
 
@@ -55,13 +57,14 @@ def add_rule(
     pattern: str = typer.Argument(..., help="Pattern to match in transaction description"),
     category: Optional[str] = typer.Option(None, "--category", "-c", help="Category to set"),
     tags: Optional[str] = typer.Option(None, "--tags", "-t", help="Comma-separated tags to add"),
+    remove_tags: Optional[str] = typer.Option(None, "--remove-tags", "-r", help="Comma-separated tags to remove"),
     match_type: str = typer.Option("contains", "--match", "-m",
         help="Match type: contains, exact, starts_with, ends_with, regex"),
     description: Optional[str] = typer.Option(None, "--description", "-d", help="Rule description"),
 ):
     """Add a new categorization rule"""
-    if not category and not tags:
-        console.print("[red]Error: Must specify at least --category or --tags[/red]")
+    if not category and not tags and not remove_tags:
+        console.print("[red]Error: Must specify at least --category, --tags, or --remove-tags[/red]")
         raise typer.Exit(1)
 
     try:
@@ -72,12 +75,14 @@ def add_rule(
         raise typer.Exit(1)
 
     tag_list = [t.strip() for t in tags.split(",")] if tags else []
+    remove_tag_list = [t.strip() for t in remove_tags.split(",")] if remove_tags else []
 
     service = RulesService()
     rule = service.add_rule(
         pattern=pattern,
         category=category,
         tags=tag_list,
+        remove_tags=remove_tag_list,
         match_type=match_type_enum,
         description=description,
     )
@@ -87,7 +92,9 @@ def add_rule(
     if category:
         console.print(f"  Category: [green]{category}[/green]")
     if tag_list:
-        console.print(f"  Tags: [blue]{', '.join(tag_list)}[/blue]")
+        console.print(f"  Tags to add: [blue]{', '.join(tag_list)}[/blue]")
+    if remove_tag_list:
+        console.print(f"  Tags to remove: [red]{', '.join(remove_tag_list)}[/red]")
 
 
 @app.command("remove")
@@ -139,7 +146,8 @@ def apply_rules(
         table.add_column("ID", style="dim", width=6)
         table.add_column("Description", max_width=40)
         table.add_column("Category", style="green")
-        table.add_column("Tags", style="blue")
+        table.add_column("Added Tags", style="blue")
+        table.add_column("Removed Tags", style="red")
         table.add_column("Matched Rules", style="dim")
 
         for detail in results["details"][:20]:  # Limit to 20 rows
@@ -148,6 +156,7 @@ def apply_rules(
                 fix_rtl(detail["description"][:40]),
                 detail["category"] or "-",
                 ", ".join(detail["tags"]) if detail["tags"] else "-",
+                ", ".join(detail["remove_tags"]) if detail.get("remove_tags") else "-",
                 ", ".join(detail["matched_rules"]),
             )
 

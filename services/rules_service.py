@@ -41,7 +41,8 @@ class Rule:
     pattern: str
     match_type: MatchType = MatchType.CONTAINS
     category: Optional[str] = None  # Sets user_category
-    tags: List[str] = field(default_factory=list)
+    tags: List[str] = field(default_factory=list)  # Tags to add
+    remove_tags: List[str] = field(default_factory=list)  # Tags to remove
     description: Optional[str] = None  # Human-readable description of the rule
     enabled: bool = True
 
@@ -86,6 +87,9 @@ class Rule:
         if self.tags:
             result["tags"] = self.tags
 
+        if self.remove_tags:
+            result["remove_tags"] = self.remove_tags
+
         if self.description:
             result["description"] = self.description
 
@@ -109,6 +113,7 @@ class Rule:
             match_type=match_type,
             category=data.get("category"),
             tags=data.get("tags", []),
+            remove_tags=data.get("remove_tags", []),
             description=data.get("description"),
             enabled=data.get("enabled", True),
         )
@@ -205,6 +210,7 @@ class RulesService:
         pattern: str,
         category: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        remove_tags: Optional[List[str]] = None,
         match_type: MatchType = MatchType.CONTAINS,
         description: Optional[str] = None,
     ) -> Rule:
@@ -215,6 +221,7 @@ class RulesService:
             pattern: Pattern to match against transaction description
             category: Category to set (user_category)
             tags: Tags to add
+            remove_tags: Tags to remove
             match_type: How to match the pattern
             description: Human-readable description
 
@@ -228,6 +235,7 @@ class RulesService:
             match_type=match_type,
             category=category,
             tags=tags or [],
+            remove_tags=remove_tags or [],
             description=description,
         )
         self._rules.append(rule)
@@ -285,11 +293,12 @@ class RulesService:
         matching_rules = self.find_matching_rules(transaction.description)
 
         if not matching_rules:
-            return {"category": None, "tags": [], "rules": []}
+            return {"category": None, "tags": [], "remove_tags": [], "rules": []}
 
         result = {
             "category": None,
             "tags": [],
+            "remove_tags": [],
             "rules": [rule.pattern for rule in matching_rules],
         }
 
@@ -299,21 +308,32 @@ class RulesService:
                 result["category"] = rule.category
                 break
 
-        # Collect all tags from all matching rules
+        # Collect all tags to add from all matching rules
         all_tags = set()
         for rule in matching_rules:
             all_tags.update(rule.tags)
         result["tags"] = list(all_tags)
 
+        # Collect all tags to remove from all matching rules
+        all_remove_tags = set()
+        for rule in matching_rules:
+            all_remove_tags.update(rule.remove_tags)
+        result["remove_tags"] = list(all_remove_tags)
+
         if not dry_run:
+            tag_service = TagService(session=self.session)
+
             # Apply category
             if result["category"] and transaction.user_category != result["category"]:
                 transaction.user_category = result["category"]
 
-            # Apply tags
+            # Add tags
             if result["tags"]:
-                tag_service = TagService(session=self.session)
                 tag_service.tag_transaction(transaction.id, result["tags"])
+
+            # Remove tags
+            if result["remove_tags"]:
+                tag_service.untag_transaction(transaction.id, result["remove_tags"])
 
             self.session.commit()
 
@@ -363,13 +383,14 @@ class RulesService:
 
             changes = self.apply_rules_to_transaction(txn, dry_run=dry_run)
 
-            if changes["category"] or changes["tags"]:
+            if changes["category"] or changes["tags"] or changes["remove_tags"]:
                 results["modified"] += 1
                 results["details"].append({
                     "id": txn.id,
                     "description": txn.description,
                     "category": changes["category"],
                     "tags": changes["tags"],
+                    "remove_tags": changes["remove_tags"],
                     "matched_rules": changes["rules"],
                 })
 
