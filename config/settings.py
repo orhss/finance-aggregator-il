@@ -5,7 +5,7 @@ Configuration and credential management with encryption
 import json
 import os
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Tuple
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 from cryptography.fernet import Fernet
@@ -35,8 +35,9 @@ class PensionCredentials(BaseModel):
 
 class CreditCardCredentials(BaseModel):
     """Credit card credentials"""
-    username: Optional[str] = None
-    password: Optional[str] = None
+    username: str  # Required for account
+    password: str  # Required for account
+    label: Optional[str] = None  # Optional label like "Personal", "Business"
 
 
 class EmailCredentials(BaseModel):
@@ -51,9 +52,13 @@ class Credentials(BaseModel):
     excellence: BrokerCredentials = Field(default_factory=BrokerCredentials)
     migdal: PensionCredentials = Field(default_factory=PensionCredentials)
     phoenix: PensionCredentials = Field(default_factory=PensionCredentials)
-    cal: CreditCardCredentials = Field(default_factory=CreditCardCredentials)
-    max: CreditCardCredentials = Field(default_factory=CreditCardCredentials)
+    cal: List[CreditCardCredentials] = Field(default_factory=list)  # Multi-account support
+    max: List[CreditCardCredentials] = Field(default_factory=list)  # Multi-account support
     email: EmailCredentials = Field(default_factory=EmailCredentials)
+
+    def get_cc_accounts(self, institution: str) -> List[CreditCardCredentials]:
+        """Get credit card accounts by institution (DRY helper)"""
+        return getattr(self, institution.lower())
 
 
 class Settings(BaseSettings):
@@ -153,6 +158,8 @@ def load_credentials() -> Credentials:
     """
     Load credentials from file or environment variables
 
+    Handles migration from old single-account format to new multi-account format.
+
     Returns:
         Credentials object
     """
@@ -161,37 +168,127 @@ def load_credentials() -> Credentials:
         try:
             with open(CREDENTIALS_FILE, 'rb') as f:
                 encrypted_data = f.read()
-            return decrypt_credentials(encrypted_data)
+
+            # Decrypt and parse
+            key = get_encryption_key()
+            fernet = Fernet(key)
+            decrypted_data = fernet.decrypt(encrypted_data)
+            raw_data = json.loads(decrypted_data.decode())
+
+            # MIGRATION: Convert old single-account format to list
+            for institution in ['cal', 'max']:
+                if institution in raw_data:
+                    value = raw_data[institution]
+
+                    # Old format: single dict with username/password
+                    if isinstance(value, dict) and 'username' in value:
+                        # Only migrate if username and password are not None
+                        if value.get('username') and value.get('password'):
+                            raw_data[institution] = [value]  # Wrap in list
+                        else:
+                            raw_data[institution] = []  # Empty list if no credentials
+
+                    # Already new format: list of dicts
+                    elif isinstance(value, list):
+                        pass  # No migration needed
+
+                    # Empty or null
+                    else:
+                        raw_data[institution] = []
+
+            return Credentials(**raw_data)
+
         except Exception as e:
             print(f"Warning: Could not decrypt credentials file: {e}")
 
     # Fallback to environment variables
-    return Credentials(
-        excellence=BrokerCredentials(
-            username=os.getenv("EXCELLENCE_USERNAME"),
-            password=os.getenv("EXCELLENCE_PASSWORD"),
-        ),
-        migdal=PensionCredentials(
-            user_id=os.getenv("MIGDAL_USER_ID"),
-            email=os.getenv("USER_EMAIL"),
-        ),
-        phoenix=PensionCredentials(
-            user_id=os.getenv("PHOENIX_USER_ID"),
-            email=os.getenv("USER_EMAIL"),
-        ),
-        cal=CreditCardCredentials(
-            username=os.getenv("CAL_USERNAME"),
-            password=os.getenv("CAL_PASSWORD"),
-        ),
-        max=CreditCardCredentials(
-            username=os.getenv("MAX_USERNAME"),
-            password=os.getenv("MAX_PASSWORD"),
-        ),
-        email=EmailCredentials(
-            address=os.getenv("USER_EMAIL"),
-            password=os.getenv("USER_EMAIL_APP_PASSWORD"),
-        ),
+    return _load_from_environment()
+
+
+def _load_from_environment() -> Credentials:
+    """Load credentials from environment variables"""
+
+    # Load single-account institutions
+    excellence = BrokerCredentials(
+        username=os.getenv("EXCELLENCE_USERNAME"),
+        password=os.getenv("EXCELLENCE_PASSWORD"),
     )
+
+    migdal = PensionCredentials(
+        user_id=os.getenv("MIGDAL_USER_ID"),
+        email=os.getenv("USER_EMAIL"),
+    )
+
+    phoenix = PensionCredentials(
+        user_id=os.getenv("PHOENIX_USER_ID"),
+        email=os.getenv("USER_EMAIL"),
+    )
+
+    email = EmailCredentials(
+        address=os.getenv("USER_EMAIL"),
+        password=os.getenv("USER_EMAIL_APP_PASSWORD"),
+    )
+
+    # Load multi-account credit cards
+    cal_accounts = _load_numbered_accounts('CAL')
+    max_accounts = _load_numbered_accounts('MAX')
+
+    return Credentials(
+        excellence=excellence,
+        migdal=migdal,
+        phoenix=phoenix,
+        cal=cal_accounts,
+        max=max_accounts,
+        email=email,
+    )
+
+
+def _load_numbered_accounts(prefix: str) -> List[CreditCardCredentials]:
+    """
+    Load numbered accounts from environment variables
+
+    Supports both:
+    - Old format: CAL_USERNAME, CAL_PASSWORD (single account)
+    - New format: CAL_1_USERNAME, CAL_1_PASSWORD, CAL_2_USERNAME, etc.
+
+    Args:
+        prefix: 'CAL' or 'MAX'
+
+    Returns:
+        List of CreditCardCredentials
+    """
+    accounts = []
+
+    # Try old single-account format first
+    username = os.getenv(f"{prefix}_USERNAME")
+    password = os.getenv(f"{prefix}_PASSWORD")
+
+    if username and password:
+        accounts.append(CreditCardCredentials(
+            username=username,
+            password=password,
+            label=None
+        ))
+        return accounts
+
+    # Try numbered accounts (CAL_1_*, CAL_2_*, etc.)
+    idx = 1
+    while True:
+        username = os.getenv(f"{prefix}_{idx}_USERNAME")
+        password = os.getenv(f"{prefix}_{idx}_PASSWORD")
+        label = os.getenv(f"{prefix}_{idx}_LABEL")
+
+        if not username or not password:
+            break  # No more accounts
+
+        accounts.append(CreditCardCredentials(
+            username=username,
+            password=password,
+            label=label
+        ))
+        idx += 1
+
+    return accounts
 
 
 def update_credential(institution: str, field: str, value: str):
@@ -308,3 +405,124 @@ def get_card_holder_name(last4: str) -> Optional[str]:
         Card holder name or None if not configured
     """
     return get_card_holders().get(last4)
+
+
+# Multi-Account Credit Card Management (DRY)
+
+def _find_account_index(accounts: List[CreditCardCredentials], identifier: str) -> Optional[int]:
+    """
+    Find account index by identifier (index number or label) - DRY helper
+
+    Args:
+        accounts: List of credit card accounts
+        identifier: Index number (as string) or label name
+
+    Returns:
+        Index if found, None otherwise
+    """
+    # Try as index
+    try:
+        idx = int(identifier)
+        return idx if 0 <= idx < len(accounts) else None
+    except ValueError:
+        pass
+
+    # Try as label
+    for idx, account in enumerate(accounts):
+        if account.label == identifier:
+            return idx
+
+    return None
+
+
+def manage_cc_account(
+    institution: str,
+    operation: str,
+    identifier: Optional[str] = None,
+    username: Optional[str] = None,
+    password: Optional[str] = None,
+    label: Optional[str] = None
+) -> Tuple[bool, Optional[List[CreditCardCredentials]]]:
+    """
+    Generic function for all credit card account operations (DRY)
+
+    Args:
+        institution: 'cal' or 'max'
+        operation: 'list', 'add', 'remove', 'update'
+        identifier: Account index or label (for remove/update)
+        username, password, label: Account credentials (for add/update)
+
+    Returns:
+        (success, accounts_list) - accounts_list only for 'list' operation
+    """
+    if institution not in ['cal', 'max']:
+        raise ValueError(f"Invalid institution: {institution}")
+
+    credentials = load_credentials()
+    accounts = credentials.get_cc_accounts(institution)
+
+    if operation == 'list':
+        return True, accounts
+
+    elif operation == 'add':
+        accounts.append(CreditCardCredentials(
+            username=username,
+            password=password,
+            label=label
+        ))
+        save_credentials(credentials)
+        return True, None
+
+    elif operation in ['remove', 'update']:
+        idx = _find_account_index(accounts, identifier)
+        if idx is None:
+            return False, None
+
+        if operation == 'remove':
+            accounts.pop(idx)
+        else:  # update
+            if username is not None:
+                accounts[idx].username = username
+            if password is not None:
+                accounts[idx].password = password
+            if label is not None:
+                accounts[idx].label = label
+
+        save_credentials(credentials)
+        return True, None
+
+    raise ValueError(f"Invalid operation: {operation}")
+
+
+def select_accounts_to_sync(
+    institution: str,
+    filters: Optional[List[str]] = None
+) -> List[Tuple[int, CreditCardCredentials]]:
+    """
+    Select accounts to sync (DRY helper)
+
+    Args:
+        institution: 'cal' or 'max'
+        filters: List of indices or labels (None = all)
+
+    Returns:
+        List of (index, account) tuples
+    """
+    _, accounts = manage_cc_account(institution, 'list')
+
+    if not accounts:
+        raise ValueError(f"No {institution.upper()} accounts configured")
+
+    # No filter = all accounts
+    if not filters:
+        return list(enumerate(accounts))
+
+    # Build selected list
+    selected = []
+    for filter_str in filters:
+        idx = _find_account_index(accounts, filter_str)
+        if idx is None:
+            raise ValueError(f"Account not found: {filter_str}")
+        selected.append((idx, accounts[idx]))
+
+    return selected

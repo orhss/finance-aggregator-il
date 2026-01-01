@@ -12,11 +12,13 @@ from config.settings import (
     save_credentials,
     update_credential,
     Credentials,
+    CreditCardCredentials,
     CREDENTIALS_FILE,
     CONFIG_DIR,
     get_card_holders,
     set_card_holder,
     remove_card_holder,
+    manage_cc_account,
 )
 from services.tag_service import TagService
 
@@ -71,13 +73,29 @@ def show(
         table.add_row("Phoenix", "User ID", mask_value(credentials.phoenix.user_id))
         table.add_row("", "Email", mask_value(credentials.phoenix.email))
 
-        # CAL credit card
-        table.add_row("CAL", "Username", mask_value(credentials.cal.username))
-        table.add_row("", "Password", mask_value(credentials.cal.password))
+        # CAL credit cards (multiple accounts)
+        if credentials.cal:
+            for idx, account in enumerate(credentials.cal):
+                label = f" ({account.label})" if account.label else ""
+                table.add_row(f"CAL [{idx}]{label}", "Username", mask_value(account.username))
+                table.add_row("", "Password", mask_value(account.password))
+                if idx < len(credentials.cal) - 1:  # Add separator between accounts
+                    table.add_row("", "", "")
+        else:
+            table.add_row("CAL", "Username", "[dim]Not configured[/dim]")
+            table.add_row("", "Password", "[dim]Not configured[/dim]")
 
-        # Max credit card
-        table.add_row("Max", "Username", mask_value(credentials.max.username))
-        table.add_row("", "Password", mask_value(credentials.max.password))
+        # Max credit cards (multiple accounts)
+        if credentials.max:
+            for idx, account in enumerate(credentials.max):
+                label = f" ({account.label})" if account.label else ""
+                table.add_row(f"Max [{idx}]{label}", "Username", mask_value(account.username))
+                table.add_row("", "Password", mask_value(account.password))
+                if idx < len(credentials.max) - 1:  # Add separator between accounts
+                    table.add_row("", "", "")
+        else:
+            table.add_row("Max", "Username", "[dim]Not configured[/dim]")
+            table.add_row("", "Password", "[dim]Not configured[/dim]")
 
         # Email (for MFA)
         table.add_row("Email (MFA)", "Address", mask_value(credentials.email.address))
@@ -142,47 +160,68 @@ def setup():
     """
     try:
         rprint("\n[bold blue]Credential Setup Wizard[/bold blue]\n")
-        print_info("Enter credentials for each institution (press Enter to skip)\n")
+        print_info("Enter credentials for each institution (press Enter to keep current value)\n")
 
         credentials = load_credentials()
 
+        # Helper to handle optional prompts - only update if user provides a value
+        def prompt_optional(prompt_text: str, current_value: Optional[str], hide_input: bool = False) -> Optional[str]:
+            """Prompt for optional value, returning None to keep current value unchanged"""
+            if current_value:
+                default_display = "****" if hide_input else current_value
+                prompt_text = f"{prompt_text} [current: {default_display}]"
+            else:
+                prompt_text = f"{prompt_text} [not set]"
+
+            value = typer.prompt(prompt_text, default="", hide_input=hide_input, show_default=False)
+            # Empty string means keep current value
+            if value == "":
+                return current_value
+            return value
+
         # Excellence broker
         rprint("[bold cyan]Excellence Broker[/bold cyan]")
-        username = typer.prompt("Username", default=credentials.excellence.username or "")
-        password = typer.prompt("Password", default=credentials.excellence.password or "", hide_input=True)
-        credentials.excellence.username = username if username else None
-        credentials.excellence.password = password if password else None
+        credentials.excellence.username = prompt_optional("Username", credentials.excellence.username)
+        credentials.excellence.password = prompt_optional("Password", credentials.excellence.password, hide_input=True)
 
         # Migdal pension
         rprint("\n[bold cyan]Migdal Pension[/bold cyan]")
-        user_id = typer.prompt("User ID (Israeli ID)", default=credentials.migdal.user_id or "")
-        credentials.migdal.user_id = user_id if user_id else None
+        credentials.migdal.user_id = prompt_optional("User ID (Israeli ID)", credentials.migdal.user_id)
 
         # Phoenix pension
         rprint("\n[bold cyan]Phoenix Pension[/bold cyan]")
-        user_id = typer.prompt("User ID (Israeli ID)", default=credentials.phoenix.user_id or "")
-        credentials.phoenix.user_id = user_id if user_id else None
+        credentials.phoenix.user_id = prompt_optional("User ID (Israeli ID)", credentials.phoenix.user_id)
 
-        # CAL credit card
+        # CAL credit card (multi-account)
         rprint("\n[bold cyan]CAL Credit Card[/bold cyan]")
-        username = typer.prompt("Username", default=credentials.cal.username or "")
-        password = typer.prompt("Password", default=credentials.cal.password or "", hide_input=True)
-        credentials.cal.username = username if username else None
-        credentials.cal.password = password if password else None
+        if credentials.cal:
+            print_info(f"Currently {len(credentials.cal)} account(s) configured")
+            print_info("Use 'fin-cli config add-account cal' to manage accounts")
+        else:
+            print_info("No accounts configured. Add one now? (or use 'fin-cli config add-account cal')")
+            if typer.confirm("Add CAL account"):
+                username = typer.prompt("Username")
+                password = typer.prompt("Password", hide_input=True)
+                label = typer.prompt("Label (optional)", default="") or None
+                credentials.cal.append(CreditCardCredentials(username=username, password=password, label=label))
 
-        # Max credit card
+        # Max credit card (multi-account)
         rprint("\n[bold cyan]Max Credit Card[/bold cyan]")
-        username = typer.prompt("Username", default=credentials.max.username or "")
-        password = typer.prompt("Password", default=credentials.max.password or "", hide_input=True)
-        credentials.max.username = username if username else None
-        credentials.max.password = password if password else None
+        if credentials.max:
+            print_info(f"Currently {len(credentials.max)} account(s) configured")
+            print_info("Use 'fin-cli config add-account max' to manage accounts")
+        else:
+            print_info("No accounts configured. Add one now? (or use 'fin-cli config add-account max')")
+            if typer.confirm("Add Max account"):
+                username = typer.prompt("Username")
+                password = typer.prompt("Password", hide_input=True)
+                label = typer.prompt("Label (optional)", default="") or None
+                credentials.max.append(CreditCardCredentials(username=username, password=password, label=label))
 
         # Email (for MFA)
         rprint("\n[bold cyan]Email (for MFA)[/bold cyan]")
-        email = typer.prompt("Email address", default="")
-        password = typer.prompt("App password (Gmail)", default="", hide_input=True)
-        credentials.email.address = email if email else None
-        credentials.email.password = password if password else None
+        credentials.email.address = prompt_optional("Email address", credentials.email.address)
+        credentials.email.password = prompt_optional("App password (Gmail)", credentials.email.password, hide_input=True)
 
         # Save credentials
         save_credentials(credentials)
@@ -191,14 +230,17 @@ def setup():
         print_info(f"Credentials stored encrypted at: {CREDENTIALS_FILE}")
 
         # Show summary
+        cal_status = f"{len(credentials.cal)} account(s)" if credentials.cal else "Not set"
+        max_status = f"{len(credentials.max)} account(s)" if credentials.max else "Not set"
+
         summary = f"""
 [bold]Configuration Summary:[/bold]
 
 ✓ Excellence: {'Configured' if credentials.excellence.username else 'Not set'}
 ✓ Migdal: {'Configured' if credentials.migdal.user_id else 'Not set'}
 ✓ Phoenix: {'Configured' if credentials.phoenix.user_id else 'Not set'}
-✓ CAL: {'Configured' if credentials.cal.username else 'Not set'}
-✓ Max: {'Configured' if credentials.max.username else 'Not set'}
+✓ CAL: {cal_status}
+✓ Max: {max_status}
 ✓ Email: {'Configured' if credentials.email.address else 'Not set'}
 
 [bold]Next Steps:[/bold]
@@ -291,6 +333,123 @@ def list_card_holders():
 
     except Exception as e:
         print_error(f"Failed to list card holders: {e}")
+        raise typer.Exit(code=1)
+
+
+# Multi-Account Credit Card Commands
+
+@app.command("list-accounts")
+def list_accounts(
+    institution: str = typer.Argument(..., help="Institution: cal, max")
+):
+    """List all configured accounts for an institution"""
+    try:
+        # Use unified function (DRY)
+        success, accounts = manage_cc_account(institution, 'list')
+
+        if not accounts:
+            print_info(f"No {institution.upper()} accounts configured")
+            print_info(f"Use 'fin-cli config add-account {institution}' to add one")
+            return
+
+        # Display table
+        table = Table(title=f"{institution.upper()} Accounts", show_header=True, header_style="bold cyan")
+        table.add_column("Index", width=8)
+        table.add_column("Username", width=20)
+        table.add_column("Label", width=20)
+
+        for idx, account in enumerate(accounts):
+            masked = account.username[:4] + "****" if len(account.username) > 4 else "****"
+            label = account.label or "[dim]No label[/dim]"
+            table.add_row(str(idx), masked, label)
+
+        console.print(table)
+
+    except ValueError as e:
+        print_error(str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command("add-account")
+def add_account(
+    institution: str = typer.Argument(..., help="Institution: cal, max"),
+    username: Optional[str] = typer.Option(None, "--username", "-u"),
+    password: Optional[str] = typer.Option(None, "--password", "-p"),
+    label: Optional[str] = typer.Option(None, "--label", "-l"),
+):
+    """Add a new account for a credit card institution"""
+    try:
+        # Interactive prompts if not provided
+        if not username:
+            username = typer.prompt(f"{institution.upper()} username")
+        if not password:
+            password = typer.prompt(f"{institution.upper()} password", hide_input=True)
+        if not label:
+            label = typer.prompt("Label (optional, press Enter to skip)", default="") or None
+
+        # Use unified function (DRY)
+        manage_cc_account(institution, 'add', username=username, password=password, label=label)
+
+        label_str = f" ({label})" if label else ""
+        print_success(f"Added {institution.upper()} account{label_str}")
+
+    except ValueError as e:
+        print_error(str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command("remove-account")
+def remove_account(
+    institution: str = typer.Argument(..., help="Institution: cal, max"),
+    identifier: str = typer.Argument(..., help="Account index or label"),
+):
+    """Remove an account by index or label"""
+    try:
+        # Use unified function (DRY)
+        success, _ = manage_cc_account(institution, 'remove', identifier=identifier)
+
+        if success:
+            print_success(f"Removed {institution.upper()} account: {identifier}")
+        else:
+            print_error(f"Account not found: {identifier}")
+            raise typer.Exit(code=1)
+
+    except ValueError as e:
+        print_error(str(e))
+        raise typer.Exit(code=1)
+
+
+@app.command("update-account")
+def update_account(
+    institution: str = typer.Argument(..., help="Institution: cal, max"),
+    identifier: str = typer.Argument(..., help="Account index or label"),
+    username: Optional[str] = typer.Option(None, "--username", "-u"),
+    password: Optional[str] = typer.Option(None, "--password", "-p"),
+    label: Optional[str] = typer.Option(None, "--label", "-l"),
+):
+    """Update account credentials or label"""
+    try:
+        if not any([username, password, label]):
+            print_error("At least one of --username, --password, or --label must be provided")
+            raise typer.Exit(code=1)
+
+        # Use unified function (DRY)
+        success, _ = manage_cc_account(
+            institution, 'update',
+            identifier=identifier,
+            username=username,
+            password=password,
+            label=label
+        )
+
+        if success:
+            print_success(f"Updated {institution.upper()} account: {identifier}")
+        else:
+            print_error(f"Account not found: {identifier}")
+            raise typer.Exit(code=1)
+
+    except ValueError as e:
+        print_error(str(e))
         raise typer.Exit(code=1)
 
 
