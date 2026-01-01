@@ -901,6 +901,7 @@ def spending_trends(
                     )
 
                 console.print(cat_table)
+                console.print(f"[dim]Trend shows % change: recent {months//2} months vs. earlier {months//2} months[/dim]")
                 console.print()
         else:
             category_data = None
