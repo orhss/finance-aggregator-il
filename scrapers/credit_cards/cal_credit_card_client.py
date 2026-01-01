@@ -698,11 +698,11 @@ class CALCreditCardScraper:
                 month_data = self.fetch_completed_transactions(card_id, month, year)
                 completed_data_list.append(month_data)
 
-                # Move to previous month
+                # Move to previous month (set day=1 to avoid "day out of range" errors)
                 if current_date.month == 1:
-                    current_date = current_date.replace(year=current_date.year - 1, month=12)
+                    current_date = current_date.replace(year=current_date.year - 1, month=12, day=1)
                 else:
-                    current_date = current_date.replace(month=current_date.month - 1)
+                    current_date = current_date.replace(month=current_date.month - 1, day=1)
 
             # Convert to Transaction objects
             transactions = self.convert_transactions(completed_data_list, pending_data)
