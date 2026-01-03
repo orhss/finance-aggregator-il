@@ -29,8 +29,8 @@ class BrokerCredentials(BaseModel):
 
 class PensionCredentials(BaseModel):
     """Pension fund credentials"""
-    user_id: Optional[str] = None
-    email: Optional[str] = None
+    user_id: str  # Required for account
+    label: Optional[str] = None  # Optional label like "Personal", "Work"
 
 
 class CreditCardCredentials(BaseModel):
@@ -50,14 +50,18 @@ class EmailCredentials(BaseModel):
 class Credentials(BaseModel):
     """All credentials for different institutions"""
     excellence: BrokerCredentials = Field(default_factory=BrokerCredentials)
-    migdal: PensionCredentials = Field(default_factory=PensionCredentials)
-    phoenix: PensionCredentials = Field(default_factory=PensionCredentials)
+    migdal: List[PensionCredentials] = Field(default_factory=list)  # Multi-account support
+    phoenix: List[PensionCredentials] = Field(default_factory=list)  # Multi-account support
     cal: List[CreditCardCredentials] = Field(default_factory=list)  # Multi-account support
     max: List[CreditCardCredentials] = Field(default_factory=list)  # Multi-account support
     email: EmailCredentials = Field(default_factory=EmailCredentials)
 
     def get_cc_accounts(self, institution: str) -> List[CreditCardCredentials]:
         """Get credit card accounts by institution (DRY helper)"""
+        return getattr(self, institution.lower())
+
+    def get_pension_accounts(self, institution: str) -> List[PensionCredentials]:
+        """Get pension accounts by institution (DRY helper)"""
         return getattr(self, institution.lower())
 
 
@@ -176,17 +180,24 @@ def load_credentials() -> Credentials:
             raw_data = json.loads(decrypted_data.decode())
 
             # MIGRATION: Convert old single-account format to list
-            for institution in ['cal', 'max']:
+            for institution in ['cal', 'max', 'migdal', 'phoenix']:
                 if institution in raw_data:
                     value = raw_data[institution]
 
-                    # Old format: single dict with username/password
-                    if isinstance(value, dict) and 'username' in value:
-                        # Only migrate if username and password are not None
-                        if value.get('username') and value.get('password'):
+                    # Old format: single dict with credentials
+                    if isinstance(value, dict):
+                        # Credit cards have username/password
+                        if 'username' in value:
+                            if value.get('username') and value.get('password'):
+                                raw_data[institution] = [value]  # Wrap in list
+                            else:
+                                raw_data[institution] = []  # Empty list if no credentials
+                        # Pensions have user_id
+                        elif 'user_id' in value and value.get('user_id'):
                             raw_data[institution] = [value]  # Wrap in list
+                        # Empty dict
                         else:
-                            raw_data[institution] = []  # Empty list if no credentials
+                            raw_data[institution] = []
 
                     # Already new format: list of dicts
                     elif isinstance(value, list):
@@ -208,35 +219,29 @@ def load_credentials() -> Credentials:
 def _load_from_environment() -> Credentials:
     """Load credentials from environment variables"""
 
-    # Load single-account institutions
+    # Load single-account broker
     excellence = BrokerCredentials(
         username=os.getenv("EXCELLENCE_USERNAME"),
         password=os.getenv("EXCELLENCE_PASSWORD"),
     )
 
-    migdal = PensionCredentials(
-        user_id=os.getenv("MIGDAL_USER_ID"),
-        email=os.getenv("USER_EMAIL"),
-    )
+    # Load multi-account pensions
+    migdal_accounts = _load_numbered_pension_accounts('MIGDAL')
+    phoenix_accounts = _load_numbered_pension_accounts('PHOENIX')
 
-    phoenix = PensionCredentials(
-        user_id=os.getenv("PHOENIX_USER_ID"),
-        email=os.getenv("USER_EMAIL"),
-    )
+    # Load multi-account credit cards
+    cal_accounts = _load_numbered_accounts('CAL')
+    max_accounts = _load_numbered_accounts('MAX')
 
     email = EmailCredentials(
         address=os.getenv("USER_EMAIL"),
         password=os.getenv("USER_EMAIL_APP_PASSWORD"),
     )
 
-    # Load multi-account credit cards
-    cal_accounts = _load_numbered_accounts('CAL')
-    max_accounts = _load_numbered_accounts('MAX')
-
     return Credentials(
         excellence=excellence,
-        migdal=migdal,
-        phoenix=phoenix,
+        migdal=migdal_accounts,
+        phoenix=phoenix_accounts,
         cal=cal_accounts,
         max=max_accounts,
         email=email,
@@ -284,6 +289,50 @@ def _load_numbered_accounts(prefix: str) -> List[CreditCardCredentials]:
         accounts.append(CreditCardCredentials(
             username=username,
             password=password,
+            label=label
+        ))
+        idx += 1
+
+    return accounts
+
+
+def _load_numbered_pension_accounts(prefix: str) -> List[PensionCredentials]:
+    """
+    Load numbered pension accounts from environment variables
+
+    Supports both:
+    - Old format: MIGDAL_USER_ID (single account)
+    - New format: MIGDAL_1_USER_ID, MIGDAL_2_USER_ID, etc.
+
+    Args:
+        prefix: 'MIGDAL' or 'PHOENIX'
+
+    Returns:
+        List of PensionCredentials
+    """
+    accounts = []
+
+    # Try old single-account format first
+    user_id = os.getenv(f"{prefix}_USER_ID")
+
+    if user_id:
+        accounts.append(PensionCredentials(
+            user_id=user_id,
+            label=None
+        ))
+        return accounts
+
+    # Try numbered accounts (MIGDAL_1_*, MIGDAL_2_*, etc.)
+    idx = 1
+    while True:
+        user_id = os.getenv(f"{prefix}_{idx}_USER_ID")
+        label = os.getenv(f"{prefix}_{idx}_LABEL")
+
+        if not user_id:
+            break  # No more accounts
+
+        accounts.append(PensionCredentials(
+            user_id=user_id,
             label=label
         ))
         idx += 1
@@ -521,6 +570,98 @@ def select_accounts_to_sync(
     selected = []
     for filter_str in filters:
         idx = _find_account_index(accounts, filter_str)
+        if idx is None:
+            raise ValueError(f"Account not found: {filter_str}")
+        selected.append((idx, accounts[idx]))
+
+    return selected
+
+
+# Multi-Account Pension Management (DRY - reuses patterns from credit cards)
+
+def manage_pension_account(
+    institution: str,
+    operation: str,
+    identifier: Optional[str] = None,
+    user_id: Optional[str] = None,
+    label: Optional[str] = None
+) -> Tuple[bool, Optional[List[PensionCredentials]]]:
+    """
+    Generic function for all pension account operations (DRY - mirrors manage_cc_account)
+
+    Args:
+        institution: 'migdal' or 'phoenix'
+        operation: 'list', 'add', 'remove', 'update'
+        identifier: Account index or label (for remove/update)
+        user_id: User ID for account (for add/update)
+        label: Optional label (for add/update)
+
+    Returns:
+        (success, accounts_list) - accounts_list only for 'list' operation
+    """
+    if institution not in ['migdal', 'phoenix']:
+        raise ValueError(f"Invalid institution: {institution}")
+
+    credentials = load_credentials()
+    accounts = credentials.get_pension_accounts(institution)
+
+    if operation == 'list':
+        return True, accounts
+
+    elif operation == 'add':
+        accounts.append(PensionCredentials(
+            user_id=user_id,
+            label=label
+        ))
+        save_credentials(credentials)
+        return True, None
+
+    elif operation in ['remove', 'update']:
+        idx = _find_account_index(accounts, identifier)  # Reuses credit card helper!
+        if idx is None:
+            return False, None
+
+        if operation == 'remove':
+            accounts.pop(idx)
+        else:  # update
+            if user_id is not None:
+                accounts[idx].user_id = user_id
+            if label is not None:
+                accounts[idx].label = label
+
+        save_credentials(credentials)
+        return True, None
+
+    raise ValueError(f"Invalid operation: {operation}")
+
+
+def select_pension_accounts_to_sync(
+    institution: str,
+    filters: Optional[List[str]] = None
+) -> List[Tuple[int, PensionCredentials]]:
+    """
+    Select pension accounts to sync (DRY - mirrors select_accounts_to_sync)
+
+    Args:
+        institution: 'migdal' or 'phoenix'
+        filters: List of indices or labels (None = all)
+
+    Returns:
+        List of (index, account) tuples
+    """
+    _, accounts = manage_pension_account(institution, 'list')
+
+    if not accounts:
+        raise ValueError(f"No {institution.upper()} accounts configured")
+
+    # No filter = all accounts
+    if not filters:
+        return list(enumerate(accounts))
+
+    # Build selected list
+    selected = []
+    for filter_str in filters:
+        idx = _find_account_index(accounts, filter_str)  # Reuses credit card helper!
         if idx is None:
             raise ValueError(f"Account not found: {filter_str}")
         selected.append((idx, accounts[idx]))

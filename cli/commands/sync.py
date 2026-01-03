@@ -10,7 +10,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from pathlib import Path
 
 from db.database import SessionLocal, check_database_exists, DEFAULT_DB_PATH
-from config.settings import load_credentials, get_settings, select_accounts_to_sync
+from config.settings import load_credentials, get_settings, select_accounts_to_sync, select_pension_accounts_to_sync
 from services.broker_service import BrokerService
 from services.pension_service import PensionService
 from services.credit_card_service import CreditCardService
@@ -40,8 +40,9 @@ def sync_all(
 
     # Sync each source
     sync_excellence(headless=headless)
-    sync_migdal(headless=headless)
-    sync_phoenix(headless=headless)
+    # Pensions now sync all configured accounts
+    sync_migdal(headless=headless, account=None)  # None = all accounts
+    sync_phoenix(headless=headless, account=None)  # None = all accounts
     # Credit cards now sync all configured accounts
     sync_cal(headless=headless, months_back=months_back, account=None)  # None = all accounts
     sync_max(headless=headless, months_back=months_back, account=None)  # None = all accounts
@@ -104,122 +105,158 @@ def sync_excellence(
         db.close()
 
 
-@app.command("migdal")
-def sync_migdal(
-    headless: bool = typer.Option(True, "--headless/--visible", help="Run browsers in headless mode"),
+def _sync_pension_multi_account(
+    institution: str,
+    service_method: str,
+    account_filters: Optional[List[str]],
+    headless: bool
 ):
     """
-    Sync Migdal pension data
-    """
-    console.print("[bold cyan]Syncing Migdal pension...[/bold cyan]")
+    Generic multi-account pension sync (DRY - mirrors credit card pattern)
 
-    # Check database
-    if not check_database_exists():
-        console.print("[bold red]Error: Database not initialized. Run 'fin-cli init' first.[/bold red]")
+    Args:
+        institution: 'migdal' or 'phoenix'
+        service_method: 'sync_migdal' or 'sync_phoenix'
+        account_filters: Account selection filters
+        headless: Headless mode flag
+    """
+    inst_upper = institution.upper()
+    console.print(f"[bold cyan]Syncing {inst_upper} pension fund...[/bold cyan]\n")
+
+    # Get global email credentials (shared by all accounts)
+    credentials = load_credentials()
+    email_address = credentials.email.address
+    email_password = credentials.email.password
+
+    if not email_address or not email_password:
+        console.print("[bold red]Error: Email credentials not configured[/bold red]")
         raise typer.Exit(1)
 
-    # Load credentials
-    credentials = load_credentials()
-
-    if not credentials.migdal.user_id or not credentials.email.address or not credentials.email.password:
-        console.print("[bold red]Error: Migdal credentials not configured.[/bold red]")
-        console.print("Run 'fin-cli config' to set up credentials.")
+    # Select accounts
+    try:
+        accounts_to_sync = select_pension_accounts_to_sync(institution, account_filters)
+    except ValueError as e:
+        console.print(f"[bold red]Error: {e}[/bold red]")
         raise typer.Exit(1)
 
     # Create database session
     db = SessionLocal()
 
+    # Track results
+    total_accounts = len(accounts_to_sync)
+    succeeded, failed = 0, 0
+    errors = []
+
     try:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Syncing Migdal (this may take a while due to MFA)...", total=None)
+        # Sync each account sequentially
+        for current, (idx, account_creds) in enumerate(accounts_to_sync, 1):
+            label = f" ({account_creds.label})" if account_creds.label else ""
+            console.print(f"\n[bold cyan][{current}/{total_accounts}] Account {idx}{label}[/bold cyan]")
 
-            # Create service and sync
-            service = PensionService(db)
-            result = service.sync_migdal(
-                user_id=credentials.migdal.user_id,
-                email_address=credentials.email.address,
-                email_password=credentials.email.password,
-                headless=headless
-            )
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                task = progress.add_task("  Syncing (MFA may take a while)...", total=None)
 
-            progress.update(task, completed=True)
+                try:
+                    service = PensionService(db)
+                    # Call the appropriate service method dynamically
+                    result = getattr(service, service_method)(
+                        user_id=account_creds.user_id,
+                        email_address=email_address,  # Shared
+                        email_password=email_password,  # Shared
+                        headless=headless
+                    )
 
-        # Display results
-        if result.success:
-            console.print(f"[green]✓ Success![/green]")
-            console.print(f"  Accounts synced: {result.accounts_synced}")
-            console.print(f"  Balances added: {result.balances_added}")
-            if result.financial_data:
-                console.print(f"  Data: {result.financial_data}")
-        else:
-            console.print(f"[red]✗ Failed: {result.error_message}[/red]")
+                    progress.update(task, completed=True)
+
+                    if result.success:
+                        console.print(f"  [green]✓ Success![/green]")
+                        console.print(f"    Holdings synced: {result.holdings_count or 0}")
+                        succeeded += 1
+                    else:
+                        console.print(f"  [red]✗ Failed: {result.error_message}[/red]")
+                        failed += 1
+                        errors.append(f"Account {idx}{label}: {result.error_message}")
+
+                except Exception as e:
+                    progress.update(task, completed=True)
+                    console.print(f"  [red]✗ Failed: {e}[/red]")
+                    failed += 1
+                    errors.append(f"Account {idx}{label}: {str(e)}")
+
+        # Print summary
+        console.print("\n" + "━" * 60)
+        console.print("[bold]Summary[/bold]")
+        console.print("━" * 60)
+
+        if succeeded > 0:
+            console.print(f"  [green]✓ Succeeded: {succeeded}/{total_accounts} accounts[/green]")
+        if failed > 0:
+            console.print(f"  [red]✗ Failed: {failed}/{total_accounts} accounts[/red]")
+            for error in errors:
+                console.print(f"    - {error}")
+
+        if failed == total_accounts:
             raise typer.Exit(1)
 
     finally:
         db.close()
+
+
+@app.command("migdal")
+def sync_migdal(
+    headless: bool = typer.Option(True, "--headless/--visible", help="Run browsers in headless mode"),
+    account: Optional[List[str]] = typer.Option(None, "--account", "-a", help="Account index or label (default: all)"),
+):
+    """
+    Sync Migdal pension fund data (supports multiple accounts)
+
+    Examples:
+        fin-cli sync migdal                    # Sync all accounts
+        fin-cli sync migdal --account 0        # Sync first account only
+        fin-cli sync migdal --account personal # Sync account labeled "personal"
+        fin-cli sync migdal -a 0 -a 2          # Sync accounts 0 and 2
+    """
+    if not check_database_exists():
+        console.print("[bold red]Error: Database not initialized. Run 'fin-cli init' first.[/bold red]")
+        raise typer.Exit(1)
+
+    # Call the generic helper function (DRY)
+    _sync_pension_multi_account(
+        institution='migdal',
+        service_method='sync_migdal',
+        account_filters=account,
+        headless=headless
+    )
 
 
 @app.command("phoenix")
 def sync_phoenix(
     headless: bool = typer.Option(True, "--headless/--visible", help="Run browsers in headless mode"),
+    account: Optional[List[str]] = typer.Option(None, "--account", "-a", help="Account index or label (default: all)"),
 ):
     """
-    Sync Phoenix pension data
-    """
-    console.print("[bold cyan]Syncing Phoenix pension...[/bold cyan]")
+    Sync Phoenix pension fund data (supports multiple accounts)
 
-    # Check database
+    Examples:
+        fin-cli sync phoenix                    # Sync all accounts
+        fin-cli sync phoenix --account 0        # Sync first account only
+        fin-cli sync phoenix --account work     # Sync account labeled "work"
+    """
     if not check_database_exists():
         console.print("[bold red]Error: Database not initialized. Run 'fin-cli init' first.[/bold red]")
         raise typer.Exit(1)
 
-    # Load credentials
-    credentials = load_credentials()
-
-    if not credentials.phoenix.user_id or not credentials.email.address or not credentials.email.password:
-        console.print("[bold red]Error: Phoenix credentials not configured.[/bold red]")
-        console.print("Run 'fin-cli config' to set up credentials.")
-        raise typer.Exit(1)
-
-    # Create database session
-    db = SessionLocal()
-
-    try:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Syncing Phoenix (this may take a while due to MFA)...", total=None)
-
-            # Create service and sync
-            service = PensionService(db)
-            result = service.sync_phoenix(
-                user_id=credentials.phoenix.user_id,
-                email_address=credentials.email.address,
-                email_password=credentials.email.password,
-                headless=headless
-            )
-
-            progress.update(task, completed=True)
-
-        # Display results
-        if result.success:
-            console.print(f"[green]✓ Success![/green]")
-            console.print(f"  Accounts synced: {result.accounts_synced}")
-            console.print(f"  Balances added: {result.balances_added}")
-            if result.financial_data:
-                console.print(f"  Data: {result.financial_data}")
-        else:
-            console.print(f"[red]✗ Failed: {result.error_message}[/red]")
-            raise typer.Exit(1)
-
-    finally:
-        db.close()
+    # Call the generic helper function (DRY)
+    _sync_pension_multi_account(
+        institution='phoenix',
+        service_method='sync_phoenix',
+        account_filters=account,
+        headless=headless
+    )
 
 
 def _apply_rules_after_sync(db, transaction_count: int) -> None:

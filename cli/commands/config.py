@@ -13,12 +13,14 @@ from config.settings import (
     update_credential,
     Credentials,
     CreditCardCredentials,
+    PensionCredentials,
     CREDENTIALS_FILE,
     CONFIG_DIR,
     get_card_holders,
     set_card_holder,
     remove_card_holder,
     manage_cc_account,
+    manage_pension_account,
 )
 from services.tag_service import TagService
 
@@ -65,13 +67,25 @@ def show(
         table.add_row("Excellence", "Username", mask_value(credentials.excellence.username))
         table.add_row("", "Password", mask_value(credentials.excellence.password))
 
-        # Migdal pension
-        table.add_row("Migdal", "User ID", mask_value(credentials.migdal.user_id))
-        table.add_row("", "Email", mask_value(credentials.migdal.email))
+        # Migdal pension (multiple accounts)
+        if credentials.migdal:
+            for idx, account in enumerate(credentials.migdal):
+                label = f" ({account.label})" if account.label else ""
+                table.add_row(f"Migdal [{idx}]{label}", "User ID", mask_value(account.user_id))
+                if idx < len(credentials.migdal) - 1:  # Add separator between accounts
+                    table.add_row("", "", "")
+        else:
+            table.add_row("Migdal", "User ID", "[dim]Not configured[/dim]")
 
-        # Phoenix pension
-        table.add_row("Phoenix", "User ID", mask_value(credentials.phoenix.user_id))
-        table.add_row("", "Email", mask_value(credentials.phoenix.email))
+        # Phoenix pension (multiple accounts)
+        if credentials.phoenix:
+            for idx, account in enumerate(credentials.phoenix):
+                label = f" ({account.label})" if account.label else ""
+                table.add_row(f"Phoenix [{idx}]{label}", "User ID", mask_value(account.user_id))
+                if idx < len(credentials.phoenix) - 1:  # Add separator between accounts
+                    table.add_row("", "", "")
+        else:
+            table.add_row("Phoenix", "User ID", "[dim]Not configured[/dim]")
 
         # CAL credit cards (multiple accounts)
         if credentials.cal:
@@ -184,13 +198,29 @@ def setup():
         credentials.excellence.username = prompt_optional("Username", credentials.excellence.username)
         credentials.excellence.password = prompt_optional("Password", credentials.excellence.password, hide_input=True)
 
-        # Migdal pension
+        # Migdal pension (multi-account)
         rprint("\n[bold cyan]Migdal Pension[/bold cyan]")
-        credentials.migdal.user_id = prompt_optional("User ID (Israeli ID)", credentials.migdal.user_id)
+        if credentials.migdal:
+            print_info(f"Currently {len(credentials.migdal)} account(s) configured")
+            print_info("Use 'fin-cli config add-account migdal' to manage accounts")
+        else:
+            print_info("No accounts configured. Add one now? (or use 'fin-cli config add-account migdal')")
+            if typer.confirm("Add Migdal account"):
+                user_id = typer.prompt("User ID (Israeli ID)")
+                label = typer.prompt("Label (optional)", default="") or None
+                credentials.migdal.append(PensionCredentials(user_id=user_id, label=label))
 
-        # Phoenix pension
+        # Phoenix pension (multi-account)
         rprint("\n[bold cyan]Phoenix Pension[/bold cyan]")
-        credentials.phoenix.user_id = prompt_optional("User ID (Israeli ID)", credentials.phoenix.user_id)
+        if credentials.phoenix:
+            print_info(f"Currently {len(credentials.phoenix)} account(s) configured")
+            print_info("Use 'fin-cli config add-account phoenix' to manage accounts")
+        else:
+            print_info("No accounts configured. Add one now? (or use 'fin-cli config add-account phoenix')")
+            if typer.confirm("Add Phoenix account"):
+                user_id = typer.prompt("User ID (Israeli ID)")
+                label = typer.prompt("Label (optional)", default="") or None
+                credentials.phoenix.append(PensionCredentials(user_id=user_id, label=label))
 
         # CAL credit card (multi-account)
         rprint("\n[bold cyan]CAL Credit Card[/bold cyan]")
@@ -230,6 +260,8 @@ def setup():
         print_info(f"Credentials stored encrypted at: {CREDENTIALS_FILE}")
 
         # Show summary
+        migdal_status = f"{len(credentials.migdal)} account(s)" if credentials.migdal else "Not set"
+        phoenix_status = f"{len(credentials.phoenix)} account(s)" if credentials.phoenix else "Not set"
         cal_status = f"{len(credentials.cal)} account(s)" if credentials.cal else "Not set"
         max_status = f"{len(credentials.max)} account(s)" if credentials.max else "Not set"
 
@@ -237,8 +269,8 @@ def setup():
 [bold]Configuration Summary:[/bold]
 
 ✓ Excellence: {'Configured' if credentials.excellence.username else 'Not set'}
-✓ Migdal: {'Configured' if credentials.migdal.user_id else 'Not set'}
-✓ Phoenix: {'Configured' if credentials.phoenix.user_id else 'Not set'}
+✓ Migdal: {migdal_status}
+✓ Phoenix: {phoenix_status}
 ✓ CAL: {cal_status}
 ✓ Max: {max_status}
 ✓ Email: {'Configured' if credentials.email.address else 'Not set'}
@@ -340,12 +372,21 @@ def list_card_holders():
 
 @app.command("list-accounts")
 def list_accounts(
-    institution: str = typer.Argument(..., help="Institution: cal, max")
+    institution: str = typer.Argument(..., help="Institution: cal, max, migdal, phoenix")
 ):
     """List all configured accounts for an institution"""
     try:
-        # Use unified function (DRY)
-        success, accounts = manage_cc_account(institution, 'list')
+        # Determine institution type
+        if institution in ['cal', 'max']:
+            success, accounts = manage_cc_account(institution, 'list')
+            field_name = "Username"
+            field_getter = lambda acc: acc.username
+        elif institution in ['migdal', 'phoenix']:
+            success, accounts = manage_pension_account(institution, 'list')
+            field_name = "User ID"
+            field_getter = lambda acc: acc.user_id
+        else:
+            raise ValueError(f"Invalid institution: {institution}")
 
         if not accounts:
             print_info(f"No {institution.upper()} accounts configured")
@@ -355,11 +396,12 @@ def list_accounts(
         # Display table
         table = Table(title=f"{institution.upper()} Accounts", show_header=True, header_style="bold cyan")
         table.add_column("Index", width=8)
-        table.add_column("Username", width=20)
+        table.add_column(field_name, width=20)
         table.add_column("Label", width=20)
 
         for idx, account in enumerate(accounts):
-            masked = account.username[:4] + "****" if len(account.username) > 4 else "****"
+            field_value = field_getter(account)
+            masked = field_value[:4] + "****" if len(field_value) > 4 else "****"
             label = account.label or "[dim]No label[/dim]"
             table.add_row(str(idx), masked, label)
 
@@ -372,23 +414,36 @@ def list_accounts(
 
 @app.command("add-account")
 def add_account(
-    institution: str = typer.Argument(..., help="Institution: cal, max"),
-    username: Optional[str] = typer.Option(None, "--username", "-u"),
-    password: Optional[str] = typer.Option(None, "--password", "-p"),
+    institution: str = typer.Argument(..., help="Institution: cal, max, migdal, phoenix"),
+    username: Optional[str] = typer.Option(None, "--username", "-u", help="Username (for credit cards)"),
+    password: Optional[str] = typer.Option(None, "--password", "-p", help="Password (for credit cards)"),
+    user_id: Optional[str] = typer.Option(None, "--user-id", help="User ID (for pensions)"),
     label: Optional[str] = typer.Option(None, "--label", "-l"),
 ):
-    """Add a new account for a credit card institution"""
+    """Add a new account for an institution"""
     try:
-        # Interactive prompts if not provided
-        if not username:
-            username = typer.prompt(f"{institution.upper()} username")
-        if not password:
-            password = typer.prompt(f"{institution.upper()} password", hide_input=True)
-        if not label:
-            label = typer.prompt("Label (optional, press Enter to skip)", default="") or None
+        # Credit cards
+        if institution in ['cal', 'max']:
+            if not username:
+                username = typer.prompt(f"{institution.upper()} username")
+            if not password:
+                password = typer.prompt(f"{institution.upper()} password", hide_input=True)
+            if not label:
+                label = typer.prompt("Label (optional, press Enter to skip)", default="") or None
 
-        # Use unified function (DRY)
-        manage_cc_account(institution, 'add', username=username, password=password, label=label)
+            manage_cc_account(institution, 'add', username=username, password=password, label=label)
+
+        # Pensions
+        elif institution in ['migdal', 'phoenix']:
+            if not user_id:
+                user_id = typer.prompt(f"{institution.upper()} user ID")
+            if not label:
+                label = typer.prompt("Label (optional, press Enter to skip)", default="") or None
+
+            manage_pension_account(institution, 'add', user_id=user_id, label=label)
+
+        else:
+            raise ValueError(f"Invalid institution: {institution}")
 
         label_str = f" ({label})" if label else ""
         print_success(f"Added {institution.upper()} account{label_str}")
@@ -400,13 +455,18 @@ def add_account(
 
 @app.command("remove-account")
 def remove_account(
-    institution: str = typer.Argument(..., help="Institution: cal, max"),
+    institution: str = typer.Argument(..., help="Institution: cal, max, migdal, phoenix"),
     identifier: str = typer.Argument(..., help="Account index or label"),
 ):
     """Remove an account by index or label"""
     try:
-        # Use unified function (DRY)
-        success, _ = manage_cc_account(institution, 'remove', identifier=identifier)
+        # Route to appropriate function
+        if institution in ['cal', 'max']:
+            success, _ = manage_cc_account(institution, 'remove', identifier=identifier)
+        elif institution in ['migdal', 'phoenix']:
+            success, _ = manage_pension_account(institution, 'remove', identifier=identifier)
+        else:
+            raise ValueError(f"Invalid institution: {institution}")
 
         if success:
             print_success(f"Removed {institution.upper()} account: {identifier}")
@@ -421,26 +481,44 @@ def remove_account(
 
 @app.command("update-account")
 def update_account(
-    institution: str = typer.Argument(..., help="Institution: cal, max"),
+    institution: str = typer.Argument(..., help="Institution: cal, max, migdal, phoenix"),
     identifier: str = typer.Argument(..., help="Account index or label"),
-    username: Optional[str] = typer.Option(None, "--username", "-u"),
-    password: Optional[str] = typer.Option(None, "--password", "-p"),
-    label: Optional[str] = typer.Option(None, "--label", "-l"),
+    username: Optional[str] = typer.Option(None, "--username", "-u", help="New username (credit cards only)"),
+    password: Optional[str] = typer.Option(None, "--password", "-p", help="New password (credit cards only)"),
+    user_id: Optional[str] = typer.Option(None, "--user-id", help="New user ID (pensions only)"),
+    label: Optional[str] = typer.Option(None, "--label", "-l", help="New label"),
 ):
     """Update account credentials or label"""
     try:
-        if not any([username, password, label]):
-            print_error("At least one of --username, --password, or --label must be provided")
-            raise typer.Exit(code=1)
+        # Credit cards
+        if institution in ['cal', 'max']:
+            if not any([username, password, label]):
+                print_error("At least one of --username, --password, or --label must be provided")
+                raise typer.Exit(code=1)
 
-        # Use unified function (DRY)
-        success, _ = manage_cc_account(
-            institution, 'update',
-            identifier=identifier,
-            username=username,
-            password=password,
-            label=label
-        )
+            success, _ = manage_cc_account(
+                institution, 'update',
+                identifier=identifier,
+                username=username,
+                password=password,
+                label=label
+            )
+
+        # Pensions
+        elif institution in ['migdal', 'phoenix']:
+            if not any([user_id, label]):
+                print_error("At least one of --user-id or --label must be provided")
+                raise typer.Exit(code=1)
+
+            success, _ = manage_pension_account(
+                institution, 'update',
+                identifier=identifier,
+                user_id=user_id,
+                label=label
+            )
+
+        else:
+            raise ValueError(f"Invalid institution: {institution}")
 
         if success:
             print_success(f"Updated {institution.upper()} account: {identifier}")
