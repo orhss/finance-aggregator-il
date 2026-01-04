@@ -72,6 +72,8 @@ def show(
             for idx, account in enumerate(credentials.migdal):
                 label = f" ({account.label})" if account.label else ""
                 table.add_row(f"Migdal [{idx}]{label}", "User ID", mask_value(account.user_id))
+                table.add_row("", "Email (MFA)", mask_value(account.email_address) if account.email_address else "[dim]Use global[/dim]")
+                table.add_row("", "Email Password", mask_value(account.email_password) if account.email_password else "[dim]Use global[/dim]")
                 if idx < len(credentials.migdal) - 1:  # Add separator between accounts
                     table.add_row("", "", "")
         else:
@@ -82,6 +84,8 @@ def show(
             for idx, account in enumerate(credentials.phoenix):
                 label = f" ({account.label})" if account.label else ""
                 table.add_row(f"Phoenix [{idx}]{label}", "User ID", mask_value(account.user_id))
+                table.add_row("", "Email (MFA)", mask_value(account.email_address) if account.email_address else "[dim]Use global[/dim]")
+                table.add_row("", "Email Password", mask_value(account.email_password) if account.email_password else "[dim]Use global[/dim]")
                 if idx < len(credentials.phoenix) - 1:  # Add separator between accounts
                     table.add_row("", "", "")
         else:
@@ -419,8 +423,15 @@ def add_account(
     password: Optional[str] = typer.Option(None, "--password", "-p", help="Password (for credit cards)"),
     user_id: Optional[str] = typer.Option(None, "--user-id", help="User ID (for pensions)"),
     label: Optional[str] = typer.Option(None, "--label", "-l"),
+    email_address: Optional[str] = typer.Option(None, "--email-address", help="Email for MFA (for pensions)"),
+    email_password: Optional[str] = typer.Option(None, "--email-password", help="Email password (for pensions)"),
 ):
-    """Add a new account for an institution"""
+    """Add a new account for an institution
+
+    Examples:
+        fin-cli config add-account migdal --user-id 123456789 --label work \\
+            --email-address work@gmail.com --email-password app_password
+    """
     try:
         # Credit cards
         if institution in ['cal', 'max']:
@@ -439,14 +450,28 @@ def add_account(
                 user_id = typer.prompt(f"{institution.upper()} user ID")
             if not label:
                 label = typer.prompt("Label (optional, press Enter to skip)", default="") or None
+            if not email_address:
+                email_address = typer.prompt("Email for MFA (optional, press Enter to skip)", default="") or None
+            if email_address and not email_password:
+                email_password = typer.prompt("Email password", hide_input=True)
 
-            manage_pension_account(institution, 'add', user_id=user_id, label=label)
+            manage_pension_account(
+                institution, 'add',
+                user_id=user_id,
+                label=label,
+                email_address=email_address,
+                email_password=email_password
+            )
 
         else:
             raise ValueError(f"Invalid institution: {institution}")
 
         label_str = f" ({label})" if label else ""
         print_success(f"Added {institution.upper()} account{label_str}")
+
+        # If pension account without email, remind about global fallback
+        if institution in ['migdal', 'phoenix'] and not email_address:
+            print_info("No per-account email set - will use global email credentials as fallback")
 
     except ValueError as e:
         print_error(str(e))
@@ -487,8 +512,15 @@ def update_account(
     password: Optional[str] = typer.Option(None, "--password", "-p", help="New password (credit cards only)"),
     user_id: Optional[str] = typer.Option(None, "--user-id", help="New user ID (pensions only)"),
     label: Optional[str] = typer.Option(None, "--label", "-l", help="New label"),
+    email_address: Optional[str] = typer.Option(None, "--email-address", help="Email for MFA (pensions only)"),
+    email_password: Optional[str] = typer.Option(None, "--email-password", help="Email password (pensions only)"),
 ):
-    """Update account credentials or label"""
+    """Update account credentials or label
+
+    Examples:
+        fin-cli config update-account migdal 0 --email-address personal@gmail.com
+        fin-cli config update-account phoenix work --email-password new_app_password
+    """
     try:
         # Credit cards
         if institution in ['cal', 'max']:
@@ -506,15 +538,17 @@ def update_account(
 
         # Pensions
         elif institution in ['migdal', 'phoenix']:
-            if not any([user_id, label]):
-                print_error("At least one of --user-id or --label must be provided")
+            if not any([user_id, label, email_address, email_password]):
+                print_error("At least one of --user-id, --label, --email-address, or --email-password must be provided")
                 raise typer.Exit(code=1)
 
             success, _ = manage_pension_account(
                 institution, 'update',
                 identifier=identifier,
                 user_id=user_id,
-                label=label
+                label=label,
+                email_address=email_address,
+                email_password=email_password
             )
 
         else:

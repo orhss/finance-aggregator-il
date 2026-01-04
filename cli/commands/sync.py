@@ -123,14 +123,10 @@ def _sync_pension_multi_account(
     inst_upper = institution.upper()
     console.print(f"[bold cyan]Syncing {inst_upper} pension fund...[/bold cyan]\n")
 
-    # Get global email credentials (shared by all accounts)
+    # Get global email credentials (fallback)
     credentials = load_credentials()
-    email_address = credentials.email.address
-    email_password = credentials.email.password
-
-    if not email_address or not email_password:
-        console.print("[bold red]Error: Email credentials not configured[/bold red]")
-        raise typer.Exit(1)
+    global_email_address = credentials.email.address
+    global_email_password = credentials.email.password
 
     # Select accounts
     try:
@@ -153,6 +149,17 @@ def _sync_pension_multi_account(
             label = f" ({account_creds.label})" if account_creds.label else ""
             console.print(f"\n[bold cyan][{current}/{total_accounts}] Account {idx}{label}[/bold cyan]")
 
+            # Use per-account email if set, otherwise fallback to global
+            email_address = account_creds.email_address or global_email_address
+            email_password = account_creds.email_password or global_email_password
+
+            if not email_address or not email_password:
+                console.print("[bold red]Error: Email credentials not configured (neither per-account nor global)[/bold red]")
+                console.print("Configure via: fin-cli config update-account {institution} {idx} --email-address <email> --email-password <password>")
+                failed += 1
+                errors.append(f"Account {idx}{label}: Email credentials missing")
+                continue
+
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
@@ -165,8 +172,8 @@ def _sync_pension_multi_account(
                     # Call the appropriate service method dynamically
                     result = getattr(service, service_method)(
                         user_id=account_creds.user_id,
-                        email_address=email_address,  # Shared
-                        email_password=email_password,  # Shared
+                        email_address=email_address,  # Per-account or global
+                        email_password=email_password,  # Per-account or global
                         headless=headless
                     )
 

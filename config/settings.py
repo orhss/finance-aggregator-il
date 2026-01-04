@@ -31,6 +31,8 @@ class PensionCredentials(BaseModel):
     """Pension fund credentials"""
     user_id: str  # Required for account
     label: Optional[str] = None  # Optional label like "Personal", "Work"
+    email_address: Optional[str] = None  # Optional email for MFA (per-account)
+    email_password: Optional[str] = None  # Optional email password for MFA (per-account)
 
 
 class CreditCardCredentials(BaseModel):
@@ -303,6 +305,7 @@ def _load_numbered_pension_accounts(prefix: str) -> List[PensionCredentials]:
     Supports both:
     - Old format: MIGDAL_USER_ID (single account)
     - New format: MIGDAL_1_USER_ID, MIGDAL_2_USER_ID, etc.
+    - Per-account email: MIGDAL_1_EMAIL_ADDRESS, MIGDAL_1_EMAIL_PASSWORD
 
     Args:
         prefix: 'MIGDAL' or 'PHOENIX'
@@ -318,7 +321,9 @@ def _load_numbered_pension_accounts(prefix: str) -> List[PensionCredentials]:
     if user_id:
         accounts.append(PensionCredentials(
             user_id=user_id,
-            label=None
+            label=None,
+            email_address=os.getenv(f"{prefix}_EMAIL_ADDRESS"),
+            email_password=os.getenv(f"{prefix}_EMAIL_PASSWORD")
         ))
         return accounts
 
@@ -327,13 +332,17 @@ def _load_numbered_pension_accounts(prefix: str) -> List[PensionCredentials]:
     while True:
         user_id = os.getenv(f"{prefix}_{idx}_USER_ID")
         label = os.getenv(f"{prefix}_{idx}_LABEL")
+        email_address = os.getenv(f"{prefix}_{idx}_EMAIL_ADDRESS")
+        email_password = os.getenv(f"{prefix}_{idx}_EMAIL_PASSWORD")
 
         if not user_id:
             break  # No more accounts
 
         accounts.append(PensionCredentials(
             user_id=user_id,
-            label=label
+            label=label,
+            email_address=email_address,
+            email_password=email_password
         ))
         idx += 1
 
@@ -584,7 +593,9 @@ def manage_pension_account(
     operation: str,
     identifier: Optional[str] = None,
     user_id: Optional[str] = None,
-    label: Optional[str] = None
+    label: Optional[str] = None,
+    email_address: Optional[str] = None,
+    email_password: Optional[str] = None
 ) -> Tuple[bool, Optional[List[PensionCredentials]]]:
     """
     Generic function for all pension account operations (DRY - mirrors manage_cc_account)
@@ -595,6 +606,8 @@ def manage_pension_account(
         identifier: Account index or label (for remove/update)
         user_id: User ID for account (for add/update)
         label: Optional label (for add/update)
+        email_address: Optional email for MFA (for add/update)
+        email_password: Optional email password for MFA (for add/update)
 
     Returns:
         (success, accounts_list) - accounts_list only for 'list' operation
@@ -611,7 +624,9 @@ def manage_pension_account(
     elif operation == 'add':
         accounts.append(PensionCredentials(
             user_id=user_id,
-            label=label
+            label=label,
+            email_address=email_address,
+            email_password=email_password
         ))
         save_credentials(credentials)
         return True, None
@@ -628,6 +643,10 @@ def manage_pension_account(
                 accounts[idx].user_id = user_id
             if label is not None:
                 accounts[idx].label = label
+            if email_address is not None:
+                accounts[idx].email_address = email_address
+            if email_password is not None:
+                accounts[idx].email_password = email_password
 
         save_credentials(credentials)
         return True, None
