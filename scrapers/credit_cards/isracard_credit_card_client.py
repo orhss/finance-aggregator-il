@@ -209,11 +209,21 @@ class IsracardCreditCardScraper:
 
         cookies = self.get_cookies()
 
+        # Add headers to match browser requests
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Referer': f'{self.base_url}/personalarea/Login',
+            'Origin': self.base_url,
+            'Content-Type': 'application/json;charset=UTF-8',
+        }
+
         try:
             if method == 'POST':
-                response = requests.post(url, json=data, cookies=cookies, timeout=30)
+                response = requests.post(url, json=data, cookies=cookies, headers=headers, timeout=30)
             else:
-                response = requests.get(url, cookies=cookies, timeout=30)
+                response = requests.get(url, cookies=cookies, headers=headers, timeout=30)
 
             response.raise_for_status()
             return response.json()
@@ -241,7 +251,9 @@ class IsracardCreditCardScraper:
             self.driver.get(login_url)
 
             # Wait for page to load and establish session
-            time.sleep(2)
+            # Need to wait longer to ensure cookies and session are established
+            logger.debug("Waiting for session establishment...")
+            time.sleep(5)
 
             logger.info("Step 2/4: Validating credentials...")
 

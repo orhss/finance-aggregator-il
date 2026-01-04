@@ -495,9 +495,10 @@ def list_accounts(
 @app.command("add-account")
 def add_account(
     institution: str = typer.Argument(..., help="Institution: cal, max, isracard, migdal, phoenix"),
-    username: Optional[str] = typer.Option(None, "--username", "-u", help="Username (for credit cards)"),
+    username: Optional[str] = typer.Option(None, "--username", "-u", help="Username (for CAL/Max)"),
     password: Optional[str] = typer.Option(None, "--password", "-p", help="Password (for credit cards)"),
-    user_id: Optional[str] = typer.Option(None, "--user-id", help="User ID (for pensions)"),
+    user_id: Optional[str] = typer.Option(None, "--user-id", help="User ID (for Isracard/pensions)"),
+    card_6_digits: Optional[str] = typer.Option(None, "--card-6-digits", help="Last 6 digits of card (for Isracard)"),
     label: Optional[str] = typer.Option(None, "--label", "-l"),
     email_address: Optional[str] = typer.Option(None, "--email-address", help="Email for MFA (for pensions)"),
     email_password: Optional[str] = typer.Option(None, "--email-password", help="Email password (for pensions)"),
@@ -507,11 +508,33 @@ def add_account(
     Examples:
         fin-cli config add-account migdal --user-id 123456789 --label work \\
             --email-address work@gmail.com --email-password app_password
-        fin-cli config add-account isracard --username myuser --password mypass --label personal
+        fin-cli config add-account isracard --user-id 123456789 --card-6-digits 123456 --password mypass --label personal
+        fin-cli config add-account cal --username myuser --password mypass --label personal
     """
     try:
-        # Credit cards
-        if institution in ['cal', 'max', 'isracard']:
+        # Credit cards - Isracard (special handling)
+        if institution == 'isracard':
+            # Prompt for user_id and card_6_digits separately
+            if not user_id:
+                user_id = typer.prompt("Israeli ID number")
+            if not card_6_digits:
+                card_6_digits = typer.prompt("Last 6 digits of card")
+            if not password:
+                password = typer.prompt("Password", hide_input=True)
+            if not label:
+                label = typer.prompt("Label (optional, press Enter to skip)", default="") or None
+
+            # Validate card_6_digits
+            if not card_6_digits.isdigit() or len(card_6_digits) != 6:
+                print_error("Card digits must be exactly 6 numeric digits")
+                raise typer.Exit(code=1)
+
+            # Combine user_id:card_6_digits into username field
+            combined_username = f"{user_id}:{card_6_digits}"
+            manage_cc_account(institution, 'add', username=combined_username, password=password, label=label)
+
+        # Credit cards - CAL/Max
+        elif institution in ['cal', 'max']:
             if not username:
                 username = typer.prompt(f"{institution.upper()} username")
             if not password:
@@ -585,9 +608,10 @@ def remove_account(
 def update_account(
     institution: str = typer.Argument(..., help="Institution: cal, max, isracard, migdal, phoenix"),
     identifier: str = typer.Argument(..., help="Account index or label"),
-    username: Optional[str] = typer.Option(None, "--username", "-u", help="New username (credit cards only)"),
+    username: Optional[str] = typer.Option(None, "--username", "-u", help="New username (CAL/Max only)"),
     password: Optional[str] = typer.Option(None, "--password", "-p", help="New password (credit cards only)"),
-    user_id: Optional[str] = typer.Option(None, "--user-id", help="New user ID (pensions only)"),
+    user_id: Optional[str] = typer.Option(None, "--user-id", help="New user ID (Isracard/pensions only)"),
+    card_6_digits: Optional[str] = typer.Option(None, "--card-6-digits", help="New last 6 digits (Isracard only)"),
     label: Optional[str] = typer.Option(None, "--label", "-l", help="New label"),
     email_address: Optional[str] = typer.Option(None, "--email-address", help="Email for MFA (pensions only)"),
     email_password: Optional[str] = typer.Option(None, "--email-password", help="Email password (pensions only)"),
@@ -598,10 +622,62 @@ def update_account(
         fin-cli config update-account migdal 0 --email-address personal@gmail.com
         fin-cli config update-account phoenix work --email-password new_app_password
         fin-cli config update-account isracard 0 --password new_password
+        fin-cli config update-account isracard 0 --user-id 987654321 --card-6-digits 654321
     """
     try:
-        # Credit cards
-        if institution in ['cal', 'max', 'isracard']:
+        # Credit cards - Isracard (special handling)
+        if institution == 'isracard':
+            if not any([user_id, card_6_digits, password, label]):
+                print_error("At least one of --user-id, --card-6-digits, --password, or --label must be provided")
+                raise typer.Exit(code=1)
+
+            # If updating user_id or card_6_digits, we need to rebuild the combined username
+            if user_id or card_6_digits:
+                # Load existing account to get current values
+                _, accounts = manage_cc_account(institution, 'list')
+                idx = None
+                try:
+                    idx = int(identifier)
+                except ValueError:
+                    # Try as label
+                    for i, acc in enumerate(accounts):
+                        if acc.label == identifier:
+                            idx = i
+                            break
+
+                if idx is None or idx >= len(accounts):
+                    print_error(f"Account not found: {identifier}")
+                    raise typer.Exit(code=1)
+
+                current_account = accounts[idx]
+
+                # Parse current username (format: "user_id:card_6_digits")
+                current_user_id, current_card_6_digits = current_account.username.split(':', 1)
+
+                # Use new values if provided, otherwise keep current
+                new_user_id = user_id if user_id else current_user_id
+                new_card_6_digits = card_6_digits if card_6_digits else current_card_6_digits
+
+                # Validate card_6_digits if changed
+                if card_6_digits and (not card_6_digits.isdigit() or len(card_6_digits) != 6):
+                    print_error("Card digits must be exactly 6 numeric digits")
+                    raise typer.Exit(code=1)
+
+                # Combine into new username
+                combined_username = f"{new_user_id}:{new_card_6_digits}"
+            else:
+                combined_username = None
+
+            success, _ = manage_cc_account(
+                institution, 'update',
+                identifier=identifier,
+                username=combined_username,
+                password=password,
+                label=label
+            )
+
+        # Credit cards - CAL/Max
+        elif institution in ['cal', 'max']:
             if not any([username, password, label]):
                 print_error("At least one of --username, --password, or --label must be provided")
                 raise typer.Exit(code=1)

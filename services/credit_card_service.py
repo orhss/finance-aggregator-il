@@ -224,7 +224,12 @@ class CreditCardService(BaseSyncService):
                     password=password,
                     card_6_digits=card_6_digits
                 )
-                scraper = IsracardCreditCardScraper(credentials, headless=headless)
+                scraper = IsracardCreditCardScraper(
+                    credentials=credentials,
+                    base_url="https://digital.isracard.co.il",
+                    company_code="11",
+                    headless=headless
+                )
 
                 # Scrape transactions
                 card_accounts = scraper.scrape(months_back=months_back, months_forward=months_forward)

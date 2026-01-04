@@ -377,7 +377,16 @@ class MaxCreditCardScraper:
 
             transactions_by_card: Dict[str, List[Transaction]] = {}
 
-            if 'result' not in data or 'transactions' not in data['result']:
+            # Check if data is valid and has the expected structure
+            if not isinstance(data, dict):
+                logger.debug(f"Invalid or empty response for {month}/{year}")
+                return transactions_by_card
+
+            if 'result' not in data or not isinstance(data['result'], dict):
+                logger.debug(f"No result in response for {month}/{year}")
+                return transactions_by_card
+
+            if 'transactions' not in data['result']:
                 logger.debug(f"No transactions found for {month}/{year}")
                 return transactions_by_card
 
