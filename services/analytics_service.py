@@ -889,6 +889,50 @@ class AnalyticsService:
 
         return by_card
 
+    def get_unmapped_cards(self) -> List[Dict[str, Any]]:
+        """
+        Get credit cards that have transactions but no card holder mapping
+
+        Returns:
+            List of dicts with: last4, transaction_count, total_amount, latest_transaction_date
+        """
+        from config.settings import get_card_holders
+
+        # Get all card holders mapping
+        card_holders = get_card_holders()
+        mapped_cards = set(card_holders.keys())
+
+        # Query all credit card accounts with transactions
+        results = self.session.query(
+            Account.account_number,
+            func.count(Transaction.id).label('transaction_count'),
+            func.sum(func.abs(effective_amount_expr())).label('total_amount'),
+            func.max(Transaction.transaction_date).label('latest_date')
+        ).join(
+            Transaction, Account.id == Transaction.account_id
+        ).filter(
+            Account.account_type == 'credit_card'
+        ).group_by(
+            Account.account_number
+        ).all()
+
+        # Filter to only unmapped cards
+        unmapped = []
+        for r in results:
+            last4 = r.account_number
+            if last4 not in mapped_cards:
+                unmapped.append({
+                    'last4': last4,
+                    'transaction_count': r.transaction_count,
+                    'total_amount': float(r.total_amount or 0),
+                    'latest_transaction_date': r.latest_date
+                })
+
+        # Sort by latest transaction date (newest first)
+        unmapped.sort(key=lambda x: x['latest_transaction_date'], reverse=True)
+
+        return unmapped
+
     # ==================== Sync History Methods ====================
 
     def get_sync_history(

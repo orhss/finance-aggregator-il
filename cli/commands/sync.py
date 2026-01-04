@@ -46,6 +46,7 @@ def sync_all(
     # Credit cards now sync all configured accounts
     sync_cal(headless=headless, months_back=months_back, account=None)  # None = all accounts
     sync_max(headless=headless, months_back=months_back, account=None)  # None = all accounts
+    sync_isracard(headless=headless, months_back=months_back, account=None)  # None = all accounts
 
     console.print("\n[bold green]✓ Full synchronization complete![/bold green]")
 
@@ -303,11 +304,11 @@ def _sync_credit_card_multi_account(
     """
     Generic multi-account credit card sync (DRY)
 
-    Used by both sync_cal and sync_max to avoid code duplication.
+    Used by sync_cal, sync_max, and sync_isracard to avoid code duplication.
 
     Args:
-        institution: 'cal' or 'max'
-        service_method: 'sync_cal' or 'sync_max'
+        institution: 'cal', 'max', or 'isracard'
+        service_method: 'sync_cal', 'sync_max', or 'sync_isracard'
         account_filters: Account selection filters
         months_back, months_forward, headless: Sync parameters
     """
@@ -456,6 +457,38 @@ def sync_max(
     _sync_credit_card_multi_account(
         institution='max',
         service_method='sync_max',
+        account_filters=account,
+        months_back=months_back,
+        months_forward=months_forward,
+        headless=headless
+    )
+
+
+@app.command("isracard")
+def sync_isracard(
+    headless: bool = typer.Option(True, "--headless/--visible", help="Run browsers in headless mode"),
+    months_back: int = typer.Option(3, "--months-back", help="Number of months to fetch backwards"),
+    months_forward: int = typer.Option(1, "--months-forward", help="Number of months to fetch forward"),
+    account: Optional[List[str]] = typer.Option(None, "--account", "-a", help="Account index or label (default: all)"),
+):
+    """
+    Sync Isracard credit card data (supports multiple accounts)
+
+    Note: Username must be in format 'user_id:card_6_digits' (e.g., '123456789:123456')
+
+    Examples:
+        fin-cli sync isracard                    # Sync all accounts
+        fin-cli sync isracard --account 0        # Sync first account only
+        fin-cli sync isracard --account personal # Sync account labeled "personal"
+    """
+    if not check_database_exists():
+        console.print("[bold red]Error: Database not initialized. Run 'fin-cli init' first.[/bold red]")
+        raise typer.Exit(1)
+
+    # Call the generic helper function (DRY - no duplication!)
+    _sync_credit_card_multi_account(
+        institution='isracard',
+        service_method='sync_isracard',
         account_filters=account,
         months_back=months_back,
         months_forward=months_forward,

@@ -23,6 +23,11 @@ from scrapers.credit_cards.max_credit_card_client import (
     MaxCredentials,
     MaxScraperError
 )
+from scrapers.credit_cards.isracard_credit_card_client import (
+    IsracardCreditCardScraper,
+    IsracardCredentials,
+    IsracardScraperError
+)
 
 
 class CreditCardSyncResult:
@@ -156,6 +161,86 @@ class CreditCardService(BaseSyncService):
                         account_number=card_account.account_number,
                         account_name=f"Max Card {card_account.account_number}",
                         card_unique_id=None  # Max doesn't use card_unique_id
+                    )
+                    result.cards_synced += 1
+
+                    # Save transactions (no commit per transaction - handled by context)
+                    for transaction in card_account.transactions:
+                        if self._save_transaction(db_account, transaction):
+                            result.transactions_added += 1
+                        else:
+                            result.transactions_updated += 1
+
+                # Update sync record
+                sync_record.records_added = result.transactions_added
+                sync_record.records_updated = result.transactions_updated
+
+                result.success = True
+
+        except Exception as e:
+            result.error_message = str(e)
+
+        return result
+
+    def sync_isracard(
+        self,
+        username: str,
+        password: str,
+        months_back: int = 3,
+        months_forward: int = 1,
+        headless: bool = True
+    ) -> CreditCardSyncResult:
+        """
+        Sync Isracard credit card data.
+
+        Args:
+            username: Isracard username in format "user_id:card_6_digits"
+            password: Isracard password
+            months_back: Number of months to fetch backwards (default: 3)
+            months_forward: Number of months to fetch forward (default: 1)
+            headless: Run browser in headless mode (default: True)
+
+        Returns:
+            CreditCardSyncResult with sync operation details
+        """
+        result = CreditCardSyncResult()
+
+        try:
+            with self.sync_transaction(SyncType.CREDIT_CARD, Institution.ISRACARD) as sync_record:
+                result.sync_history_id = sync_record.id
+
+                # Parse username (format: "user_id:card_6_digits")
+                if ':' in username:
+                    user_id, card_6_digits = username.split(':', 1)
+                else:
+                    raise IsracardScraperError(
+                        "Invalid Isracard username format. Expected 'user_id:card_6_digits' "
+                        "(e.g., '123456789:123456')"
+                    )
+
+                # Create credentials and scraper
+                credentials = IsracardCredentials(
+                    user_id=user_id,
+                    password=password,
+                    card_6_digits=card_6_digits
+                )
+                scraper = IsracardCreditCardScraper(credentials, headless=headless)
+
+                # Scrape transactions
+                card_accounts = scraper.scrape(months_back=months_back, months_forward=months_forward)
+
+                if not card_accounts:
+                    raise IsracardScraperError("No card accounts found for Isracard")
+
+                # Process each card account
+                for card_account in card_accounts:
+                    # Get or create account in database (no commit - handled by context)
+                    db_account = self.get_or_create_account(
+                        account_type=AccountType.CREDIT_CARD,
+                        institution=Institution.ISRACARD,
+                        account_number=card_account.account_number,
+                        account_name=f"Isracard Card {card_account.account_number}",
+                        card_unique_id=None  # Isracard doesn't use card_unique_id
                     )
                     result.cards_synced += 1
 

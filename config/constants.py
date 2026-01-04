@@ -28,6 +28,7 @@ class Institution:
     # Credit Cards
     CAL = "cal"
     MAX = "max"
+    ISRACARD = "isracard"
 
     @classmethod
     def brokers(cls) -> list[str]:
@@ -39,7 +40,7 @@ class Institution:
 
     @classmethod
     def credit_cards(cls) -> list[str]:
-        return [cls.CAL, cls.MAX]
+        return [cls.CAL, cls.MAX, cls.ISRACARD]
 
     @classmethod
     def all(cls) -> list[str]:

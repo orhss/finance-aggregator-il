@@ -56,6 +56,7 @@ class Credentials(BaseModel):
     phoenix: List[PensionCredentials] = Field(default_factory=list)  # Multi-account support
     cal: List[CreditCardCredentials] = Field(default_factory=list)  # Multi-account support
     max: List[CreditCardCredentials] = Field(default_factory=list)  # Multi-account support
+    isracard: List[CreditCardCredentials] = Field(default_factory=list)  # Multi-account support
     email: EmailCredentials = Field(default_factory=EmailCredentials)
 
     def get_cc_accounts(self, institution: str) -> List[CreditCardCredentials]:
@@ -234,6 +235,7 @@ def _load_from_environment() -> Credentials:
     # Load multi-account credit cards
     cal_accounts = _load_numbered_accounts('CAL')
     max_accounts = _load_numbered_accounts('MAX')
+    isracard_accounts = _load_numbered_accounts('ISRACARD')
 
     email = EmailCredentials(
         address=os.getenv("USER_EMAIL"),
@@ -246,6 +248,7 @@ def _load_from_environment() -> Credentials:
         phoenix=phoenix_accounts,
         cal=cal_accounts,
         max=max_accounts,
+        isracard=isracard_accounts,
         email=email,
     )
 
@@ -505,7 +508,7 @@ def manage_cc_account(
     Generic function for all credit card account operations (DRY)
 
     Args:
-        institution: 'cal' or 'max'
+        institution: 'cal', 'max', or 'isracard'
         operation: 'list', 'add', 'remove', 'update'
         identifier: Account index or label (for remove/update)
         username, password, label: Account credentials (for add/update)
@@ -513,7 +516,7 @@ def manage_cc_account(
     Returns:
         (success, accounts_list) - accounts_list only for 'list' operation
     """
-    if institution not in ['cal', 'max']:
+    if institution not in ['cal', 'max', 'isracard']:
         raise ValueError(f"Invalid institution: {institution}")
 
     credentials = load_credentials()
@@ -560,7 +563,7 @@ def select_accounts_to_sync(
     Select accounts to sync (DRY helper)
 
     Args:
-        institution: 'cal' or 'max'
+        institution: 'cal', 'max', or 'isracard'
         filters: List of indices or labels (None = all)
 
     Returns:

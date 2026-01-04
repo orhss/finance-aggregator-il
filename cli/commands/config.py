@@ -115,6 +115,18 @@ def show(
             table.add_row("Max", "Username", "[dim]Not configured[/dim]")
             table.add_row("", "Password", "[dim]Not configured[/dim]")
 
+        # Isracard credit cards (multiple accounts)
+        if credentials.isracard:
+            for idx, account in enumerate(credentials.isracard):
+                label = f" ({account.label})" if account.label else ""
+                table.add_row(f"Isracard [{idx}]{label}", "Username (ID:Card6)", mask_value(account.username))
+                table.add_row("", "Password", mask_value(account.password))
+                if idx < len(credentials.isracard) - 1:  # Add separator between accounts
+                    table.add_row("", "", "")
+        else:
+            table.add_row("Isracard", "Username (ID:Card6)", "[dim]Not configured[/dim]")
+            table.add_row("", "Password", "[dim]Not configured[/dim]")
+
         # Email (for MFA)
         table.add_row("Email (MFA)", "Address", mask_value(credentials.email.address))
         table.add_row("", "Password", mask_value(credentials.email.password))
@@ -252,6 +264,20 @@ def setup():
                 label = typer.prompt("Label (optional)", default="") or None
                 credentials.max.append(CreditCardCredentials(username=username, password=password, label=label))
 
+        # Isracard credit card (multi-account)
+        rprint("\n[bold cyan]Isracard Credit Card[/bold cyan]")
+        if credentials.isracard:
+            print_info(f"Currently {len(credentials.isracard)} account(s) configured")
+            print_info("Use 'fin-cli config add-account isracard' to manage accounts")
+        else:
+            print_info("No accounts configured. Add one now? (or use 'fin-cli config add-account isracard')")
+            if typer.confirm("Add Isracard account"):
+                print_info("Username format: 'user_id:card_6_digits' (e.g., '123456789:123456')")
+                username = typer.prompt("Username (ID:Card6)")
+                password = typer.prompt("Password", hide_input=True)
+                label = typer.prompt("Label (optional)", default="") or None
+                credentials.isracard.append(CreditCardCredentials(username=username, password=password, label=label))
+
         # Email (for MFA)
         rprint("\n[bold cyan]Email (for MFA)[/bold cyan]")
         credentials.email.address = prompt_optional("Email address", credentials.email.address)
@@ -268,6 +294,7 @@ def setup():
         phoenix_status = f"{len(credentials.phoenix)} account(s)" if credentials.phoenix else "Not set"
         cal_status = f"{len(credentials.cal)} account(s)" if credentials.cal else "Not set"
         max_status = f"{len(credentials.max)} account(s)" if credentials.max else "Not set"
+        isracard_status = f"{len(credentials.isracard)} account(s)" if credentials.isracard else "Not set"
 
         summary = f"""
 [bold]Configuration Summary:[/bold]
@@ -277,6 +304,7 @@ def setup():
 ✓ Phoenix: {phoenix_status}
 ✓ CAL: {cal_status}
 ✓ Max: {max_status}
+✓ Isracard: {isracard_status}
 ✓ Email: {'Configured' if credentials.email.address else 'Not set'}
 
 [bold]Next Steps:[/bold]
@@ -372,16 +400,64 @@ def list_card_holders():
         raise typer.Exit(code=1)
 
 
+@app.command("unmapped-cards")
+def list_unmapped_cards():
+    """
+    List cards that have transactions but no card holder assigned
+
+    This helps you identify newly added cards that need to be tagged.
+    Use 'fin-cli config card-holder <last4> <name>' to assign them.
+    """
+    try:
+        from services.analytics_service import AnalyticsService
+
+        analytics = AnalyticsService()
+        unmapped = analytics.get_unmapped_cards()
+        analytics.close()
+
+        if not unmapped:
+            print_info("All cards with transactions have been assigned card holders!")
+            return
+
+        table = Table(
+            title="Cards Without Holder Assignment",
+            show_header=True,
+            header_style="bold yellow"
+        )
+        table.add_column("Card", width=10)
+        table.add_column("Transactions", justify="right", width=12)
+        table.add_column("Total Amount", justify="right", width=15)
+        table.add_column("Latest Transaction", width=16)
+
+        for card in unmapped:
+            table.add_row(
+                f"****{card['last4']}",
+                str(card['transaction_count']),
+                f"₪{card['total_amount']:,.0f}",
+                card['latest_transaction_date'].strftime("%Y-%m-%d") if card['latest_transaction_date'] else "N/A"
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]Found {len(unmapped)} unmapped card(s)[/dim]")
+        console.print("[dim]Use 'fin-cli config card-holder <last4> <name>' to assign a card holder[/dim]")
+
+    except Exception as e:
+        print_error(f"Failed to list unmapped cards: {e}")
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(code=1)
+
+
 # Multi-Account Credit Card Commands
 
 @app.command("list-accounts")
 def list_accounts(
-    institution: str = typer.Argument(..., help="Institution: cal, max, migdal, phoenix")
+    institution: str = typer.Argument(..., help="Institution: cal, max, isracard, migdal, phoenix")
 ):
     """List all configured accounts for an institution"""
     try:
         # Determine institution type
-        if institution in ['cal', 'max']:
+        if institution in ['cal', 'max', 'isracard']:
             success, accounts = manage_cc_account(institution, 'list')
             field_name = "Username"
             field_getter = lambda acc: acc.username
@@ -418,7 +494,7 @@ def list_accounts(
 
 @app.command("add-account")
 def add_account(
-    institution: str = typer.Argument(..., help="Institution: cal, max, migdal, phoenix"),
+    institution: str = typer.Argument(..., help="Institution: cal, max, isracard, migdal, phoenix"),
     username: Optional[str] = typer.Option(None, "--username", "-u", help="Username (for credit cards)"),
     password: Optional[str] = typer.Option(None, "--password", "-p", help="Password (for credit cards)"),
     user_id: Optional[str] = typer.Option(None, "--user-id", help="User ID (for pensions)"),
@@ -431,10 +507,11 @@ def add_account(
     Examples:
         fin-cli config add-account migdal --user-id 123456789 --label work \\
             --email-address work@gmail.com --email-password app_password
+        fin-cli config add-account isracard --username myuser --password mypass --label personal
     """
     try:
         # Credit cards
-        if institution in ['cal', 'max']:
+        if institution in ['cal', 'max', 'isracard']:
             if not username:
                 username = typer.prompt(f"{institution.upper()} username")
             if not password:
@@ -480,13 +557,13 @@ def add_account(
 
 @app.command("remove-account")
 def remove_account(
-    institution: str = typer.Argument(..., help="Institution: cal, max, migdal, phoenix"),
+    institution: str = typer.Argument(..., help="Institution: cal, max, isracard, migdal, phoenix"),
     identifier: str = typer.Argument(..., help="Account index or label"),
 ):
     """Remove an account by index or label"""
     try:
         # Route to appropriate function
-        if institution in ['cal', 'max']:
+        if institution in ['cal', 'max', 'isracard']:
             success, _ = manage_cc_account(institution, 'remove', identifier=identifier)
         elif institution in ['migdal', 'phoenix']:
             success, _ = manage_pension_account(institution, 'remove', identifier=identifier)
@@ -506,7 +583,7 @@ def remove_account(
 
 @app.command("update-account")
 def update_account(
-    institution: str = typer.Argument(..., help="Institution: cal, max, migdal, phoenix"),
+    institution: str = typer.Argument(..., help="Institution: cal, max, isracard, migdal, phoenix"),
     identifier: str = typer.Argument(..., help="Account index or label"),
     username: Optional[str] = typer.Option(None, "--username", "-u", help="New username (credit cards only)"),
     password: Optional[str] = typer.Option(None, "--password", "-p", help="New password (credit cards only)"),
@@ -520,10 +597,11 @@ def update_account(
     Examples:
         fin-cli config update-account migdal 0 --email-address personal@gmail.com
         fin-cli config update-account phoenix work --email-password new_app_password
+        fin-cli config update-account isracard 0 --password new_password
     """
     try:
         # Credit cards
-        if institution in ['cal', 'max']:
+        if institution in ['cal', 'max', 'isracard']:
             if not any([username, password, label]):
                 print_error("At least one of --username, --password, or --label must be provided")
                 raise typer.Exit(code=1)
