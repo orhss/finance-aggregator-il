@@ -128,6 +128,7 @@ def list_transactions(
         table.add_column("Date", width=12)
         table.add_column("Description", width=30)
         table.add_column("Amount", justify="right", width=15)
+        table.add_column("Category", width=15)
         table.add_column("Card", width=6)
         table.add_column("Tags", width=18)
         table.add_column("Account", width=10)
@@ -156,11 +157,21 @@ def list_transactions(
             account_str = f"{account.institution}" if account else "Unknown"
             card_str = account.account_number if account else ""
 
+            # Get effective category (user_category if set, else source category)
+            category_str = fix_rtl(txn.effective_category[:15]) if txn.effective_category else "[dim](none)[/dim]"
+
+            # Use processed_date for installments (when you actually pay), otherwise transaction_date
+            if txn.installment_number and txn.processed_date:
+                date_str = txn.processed_date.strftime("%Y-%m-%d")
+            else:
+                date_str = txn.transaction_date.strftime("%Y-%m-%d")
+
             table.add_row(
                 str(txn.id),
-                txn.transaction_date.strftime("%Y-%m-%d"),
+                date_str,
                 fix_rtl(txn.description[:30]),
                 amount_str,
+                category_str,
                 card_str,
                 tags_str,
                 account_str

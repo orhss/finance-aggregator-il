@@ -405,9 +405,15 @@ class TransactionBrowser(App):
             account = analytics.get_account_by_id(txn.account_id)
             card_str = account.account_number if account else ""
 
+            # Use processed_date for installments (when you actually pay), otherwise transaction_date
+            if txn.installment_number and txn.processed_date:
+                date_str = txn.processed_date.strftime("%Y-%m-%d")
+            else:
+                date_str = txn.transaction_date.strftime("%Y-%m-%d")
+
             row_key = table.add_row(
                 str(txn.id),
-                txn.transaction_date.strftime("%Y-%m-%d"),
+                date_str,
                 fix_rtl(txn.description[:30]) if txn.description else "",
                 amount_str,
                 card_str,

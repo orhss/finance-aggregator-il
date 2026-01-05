@@ -262,23 +262,26 @@ class RulesService:
 
         return False
 
-    def find_matching_rules(self, description: str) -> List[Rule]:
+    def find_matching_rules(self, description: str, rules: Optional[List[Rule]] = None) -> List[Rule]:
         """
         Find all rules that match a transaction description
 
         Args:
             description: Transaction description to match
+            rules: Optional list of rules to check (defaults to all rules)
 
         Returns:
             List of matching rules
         """
         self._ensure_loaded()
-        return [rule for rule in self._rules if rule.matches(description)]
+        rules_to_check = rules if rules is not None else self._rules
+        return [rule for rule in rules_to_check if rule.matches(description)]
 
     def apply_rules_to_transaction(
         self,
         transaction: Transaction,
-        dry_run: bool = False
+        dry_run: bool = False,
+        rules: Optional[List[Rule]] = None
     ) -> Dict[str, Any]:
         """
         Apply matching rules to a single transaction
@@ -286,11 +289,12 @@ class RulesService:
         Args:
             transaction: Transaction to process
             dry_run: If True, don't save changes
+            rules: Optional list of rules to apply (defaults to all rules)
 
         Returns:
             Dict with applied changes: {category: str, tags: [str], rules: [str]}
         """
-        matching_rules = self.find_matching_rules(transaction.description)
+        matching_rules = self.find_matching_rules(transaction.description, rules)
 
         if not matching_rules:
             return {"category": None, "tags": [], "remove_tags": [], "rules": []}
@@ -343,7 +347,8 @@ class RulesService:
         self,
         transaction_ids: Optional[List[int]] = None,
         only_uncategorized: bool = False,
-        dry_run: bool = False
+        dry_run: bool = False,
+        rule_indices: Optional[List[int]] = None
     ) -> Dict[str, Any]:
         """
         Apply rules to multiple transactions
@@ -352,6 +357,7 @@ class RulesService:
             transaction_ids: Specific transaction IDs to process (None = all)
             only_uncategorized: Only process transactions without user_category
             dry_run: If True, don't save changes
+            rule_indices: Specific rule indices (0-based) to apply (None = all rules)
 
         Returns:
             Summary: {processed: int, modified: int, details: [...]}
@@ -360,6 +366,12 @@ class RulesService:
 
         if not self._rules:
             return {"processed": 0, "modified": 0, "details": [], "message": "No rules defined"}
+
+        # Filter to specific rules if requested
+        if rule_indices is not None:
+            rules_to_apply = [self._rules[i] for i in rule_indices if i < len(self._rules)]
+        else:
+            rules_to_apply = self._rules
 
         # Build query
         query = self.session.query(Transaction)
@@ -381,7 +393,7 @@ class RulesService:
         for txn in transactions:
             results["processed"] += 1
 
-            changes = self.apply_rules_to_transaction(txn, dry_run=dry_run)
+            changes = self.apply_rules_to_transaction(txn, dry_run=dry_run, rules=rules_to_apply)
 
             if changes["category"] or changes["tags"] or changes["remove_tags"]:
                 results["modified"] += 1

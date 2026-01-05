@@ -99,33 +99,93 @@ def add_rule(
 
 @app.command("remove")
 def remove_rule(
-    pattern: str = typer.Argument(..., help="Pattern of the rule to remove"),
+    pattern_or_index: str = typer.Argument(..., help="Pattern or rule number (#) to remove"),
 ):
-    """Remove a rule by pattern"""
+    """Remove a rule by pattern or index number (from 'rules list')"""
     service = RulesService()
 
-    if service.remove_rule(pattern):
-        console.print(f"[green]Rule removed:[/green] {pattern}")
+    # Check if it's a number (index)
+    try:
+        index = int(pattern_or_index)
+        rules = service.get_rules()
+        if 1 <= index <= len(rules):
+            pattern = rules[index - 1].pattern
+            if service.remove_rule(pattern):
+                console.print(f"[green]Rule #{index} removed:[/green] {pattern}")
+            else:
+                console.print(f"[red]Failed to remove rule #{index}[/red]")
+        else:
+            console.print(f"[yellow]Invalid rule number: {index}. Use 'fin rules list' to see rule numbers.[/yellow]")
+        return
+    except ValueError:
+        pass  # Not a number, treat as pattern
+
+    if service.remove_rule(pattern_or_index):
+        console.print(f"[green]Rule removed:[/green] {pattern_or_index}")
     else:
-        console.print(f"[yellow]Rule not found:[/yellow] {pattern}")
+        console.print(f"[yellow]Rule not found:[/yellow] {pattern_or_index}")
+        console.print("[dim]Tip: Use rule number from 'fin rules list' instead, e.g. 'fin rules remove 3'[/dim]")
 
 
 @app.command("apply")
 def apply_rules(
+    rule: Optional[List[str]] = typer.Option(None, "--rule", "-r", help="Apply specific rule(s) by number or pattern (can repeat)"),
     dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show what would be changed without applying"),
     only_uncategorized: bool = typer.Option(False, "--uncategorized", "-u",
         help="Only apply to transactions without user_category"),
     transaction_id: Optional[int] = typer.Option(None, "--id", help="Apply to specific transaction ID"),
 ):
-    """Apply rules to transactions"""
-    service = RulesService()
-    rules = service.get_rules()
+    """Apply rules to transactions
 
-    if not rules:
+    Examples:
+        fin-cli rules apply                    # Apply all rules
+        fin-cli rules apply -r 3               # Apply only rule #3
+        fin-cli rules apply -r 3 -r 5          # Apply rules #3 and #5
+        fin-cli rules apply -r "סופר"          # Apply rule with pattern "סופר"
+        fin-cli rules apply -r 3 --dry-run     # Preview what rule #3 would change
+    """
+    service = RulesService()
+    all_rules = service.get_rules()
+
+    if not all_rules:
         console.print("[yellow]No rules defined. Run 'fin rules init' or add rules first.[/yellow]")
         return
 
-    console.print(f"[bold]Applying {len(rules)} rules...[/bold]")
+    # Filter to specific rules if requested
+    rule_indices = None
+    if rule:
+        rule_indices = []
+        for r in rule:
+            # Try as number first
+            try:
+                idx = int(r)
+                if 1 <= idx <= len(all_rules):
+                    rule_indices.append(idx - 1)  # Convert to 0-based
+                else:
+                    console.print(f"[yellow]Warning: Rule #{idx} doesn't exist (max: {len(all_rules)})[/yellow]")
+            except ValueError:
+                # Try as pattern
+                found = False
+                for i, existing_rule in enumerate(all_rules):
+                    if existing_rule.pattern.lower() == r.lower():
+                        rule_indices.append(i)
+                        found = True
+                        break
+                if not found:
+                    console.print(f"[yellow]Warning: Rule with pattern '{r}' not found[/yellow]")
+
+        if not rule_indices:
+            console.print("[red]No valid rules specified[/red]")
+            return
+
+        rules_to_apply = [all_rules[i] for i in rule_indices]
+        console.print(f"[bold]Applying {len(rules_to_apply)} selected rule(s):[/bold]")
+        for i in rule_indices:
+            console.print(f"  #{i+1}: {fix_rtl(all_rules[i].pattern)}")
+    else:
+        rules_to_apply = None  # Apply all
+        console.print(f"[bold]Applying {len(all_rules)} rules...[/bold]")
+
     if dry_run:
         console.print("[yellow](Dry run - no changes will be saved)[/yellow]")
 
@@ -135,6 +195,7 @@ def apply_rules(
         transaction_ids=transaction_ids,
         only_uncategorized=only_uncategorized,
         dry_run=dry_run,
+        rule_indices=rule_indices,
     )
 
     console.print(f"\nProcessed: {results['processed']} transactions")
