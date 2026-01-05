@@ -111,7 +111,7 @@ class IsracardCreditCardScraper:
     SHEKEL_CURRENCY = 'ILS'
 
     # Rate limiting
-    SLEEP_BETWEEN_REQUESTS = 1.0  # seconds
+    SLEEP_BETWEEN_REQUESTS = 2.0  # seconds
     TRANSACTIONS_BATCH_SIZE = 10
 
     def __init__(
@@ -175,13 +175,6 @@ class IsracardCreditCardScraper:
             '''
         })
 
-        # Block detector-dom.min.js (anti-bot detection script) using CDP
-        self.driver.execute_cdp_cmd('Network.enable', {})
-        self.driver.execute_cdp_cmd('Network.setBlockedURLs', {
-            'urls': ['*detector-dom.min.js*']
-        })
-        logger.debug("Blocked detector-dom.min.js requests")
-
         self.driver.implicitly_wait(10)
         # Set script timeout for async operations (API calls)
         self.driver.set_script_timeout(30)
@@ -234,6 +227,9 @@ class IsracardCreditCardScraper:
         if params:
             separator = '&' if '?' in url else '?'
             url += separator + '&'.join(f"{k}={v}" for k, v in params.items())
+
+        # Rate limit all API requests to avoid bot detection
+        time.sleep(self.SLEEP_BETWEEN_REQUESTS)
 
         # Execute fetch within the page context (like TypeScript fetchPostWithinPage/fetchGetWithinPage)
         # This ensures browser session tokens and CSRF tokens are included automatically
@@ -385,8 +381,9 @@ class IsracardCreditCardScraper:
             login_url = f"{self.base_url}/personalarea/Login"
             self.driver.get(login_url)
 
-            # Wait for page to load and session establishment
-            time.sleep(8)
+            # Wait for page to fully load and bot detection scripts to complete
+            # Longer wait helps avoid "Block Automation" responses
+            time.sleep(12)
 
             logger.info("Step 2/4: Validating credentials...")
 
@@ -646,9 +643,6 @@ class IsracardCreditCardScraper:
             'year': str(year),
             'requiredDate': 'N',
         }
-
-        # Rate limiting
-        time.sleep(self.SLEEP_BETWEEN_REQUESTS)
 
         logger.debug(f"Fetching transactions for {year}-{month:02d}...")
         data = self.api_request(self.services_url, params=params)
