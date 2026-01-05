@@ -3,15 +3,14 @@ Isracard Credit Card Scraper
 Automated transaction extraction for Israeli Isracard credit cards
 """
 
-import json
 import logging
+import re
 import time
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from enum import Enum
 
-import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException
@@ -142,7 +141,7 @@ class IsracardCreditCardScraper:
         self.services_url = f"{base_url}/services/ProxyRequestHandler.ashx"
 
     def setup_driver(self):
-        """Setup Chrome WebDriver"""
+        """Setup Chrome WebDriver with bot detection blocking"""
         logger.info("Setting up Chrome WebDriver...")
         options = Options()
         if self.headless:
@@ -155,11 +154,37 @@ class IsracardCreditCardScraper:
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
         options.add_argument('--window-size=1920,1080')
+
+        # Disable automation flags to avoid bot detection
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
+        options.add_argument('--disable-blink-features=AutomationControlled')
+
+        # Set a realistic user agent
         options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36')
 
         logger.debug("Initializing Chrome driver...")
         self.driver = webdriver.Chrome(options=options)
+
+        # Remove webdriver property to avoid detection
+        self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+            'source': '''
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+            '''
+        })
+
+        # Block detector-dom.min.js (anti-bot detection script) using CDP
+        self.driver.execute_cdp_cmd('Network.enable', {})
+        self.driver.execute_cdp_cmd('Network.setBlockedURLs', {
+            'urls': ['*detector-dom.min.js*']
+        })
+        logger.debug("Blocked detector-dom.min.js requests")
+
         self.driver.implicitly_wait(10)
+        # Set script timeout for async operations (API calls)
+        self.driver.set_script_timeout(30)
         logger.info("Chrome driver initialized successfully")
 
     def cleanup(self):
@@ -188,7 +213,7 @@ class IsracardCreditCardScraper:
         method: str = 'GET'
     ) -> Dict[str, Any]:
         """
-        Make API request with browser cookies.
+        Make API request within browser page context (critical for auth tokens).
 
         Args:
             endpoint: API endpoint path or full URL
@@ -204,31 +229,141 @@ class IsracardCreditCardScraper:
             url = endpoint
         else:
             url = f"{self.services_url}?{endpoint}" if '=' in endpoint else self.services_url
-            if params:
-                url += '&' + '&'.join(f"{k}={v}" for k, v in params.items())
 
-        cookies = self.get_cookies()
+        # Append query parameters for GET requests
+        if params:
+            separator = '&' if '?' in url else '?'
+            url += separator + '&'.join(f"{k}={v}" for k, v in params.items())
 
-        # Add headers to match browser requests
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Referer': f'{self.base_url}/personalarea/Login',
-            'Origin': self.base_url,
-            'Content-Type': 'application/json;charset=UTF-8',
-        }
-
+        # Execute fetch within the page context (like TypeScript fetchPostWithinPage/fetchGetWithinPage)
+        # This ensures browser session tokens and CSRF tokens are included automatically
+        # Use execute_async_script for proper async handling
         try:
             if method == 'POST':
-                response = requests.post(url, json=data, cookies=cookies, headers=headers, timeout=30)
+                # Execute POST request within browser context with better error handling
+                # Isracard API expects application/x-www-form-urlencoded format, not JSON
+                script = """
+                const callback = arguments[arguments.length - 1];
+                const url = arguments[0];
+                const data = arguments[1];
+
+                // Convert object to URL-encoded string (matching TypeScript fetchPostWithinPage behavior)
+                const formBody = Object.keys(data)
+                    .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(data[key]))
+                    .join('&');
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                        'Accept': 'application/json, text/plain, */*',
+                    },
+                    body: formBody,
+                    credentials: 'include'
+                })
+                .then(response => {
+                    return response.text().then(text => ({
+                        status: response.status,
+                        statusText: response.statusText,
+                        text: text
+                    }));
+                })
+                .then(result => {
+                    if (!result.text || result.text.trim() === '') {
+                        callback({
+                            _error: 'Empty response',
+                            _status: result.status,
+                            _statusText: result.statusText
+                        });
+                        return;
+                    }
+
+                    try {
+                        const json = JSON.parse(result.text);
+                        callback(json);
+                    } catch (e) {
+                        callback({
+                            _error: 'Invalid JSON',
+                            _status: result.status,
+                            _text: result.text.substring(0, 500)
+                        });
+                    }
+                })
+                .catch(error => {
+                    callback({
+                        _error: error.message,
+                        _type: 'fetch_error'
+                    });
+                });
+                """
+                result = self.driver.execute_async_script(script, url, data)
             else:
-                response = requests.get(url, cookies=cookies, headers=headers, timeout=30)
+                # Execute GET request within browser context with better error handling
+                script = """
+                const callback = arguments[arguments.length - 1];
+                const url = arguments[0];
 
-            response.raise_for_status()
-            return response.json()
+                fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json, text/plain, */*',
+                    },
+                    credentials: 'include'
+                })
+                .then(response => {
+                    return response.text().then(text => ({
+                        status: response.status,
+                        statusText: response.statusText,
+                        text: text
+                    }));
+                })
+                .then(result => {
+                    if (!result.text || result.text.trim() === '') {
+                        callback({
+                            _error: 'Empty response',
+                            _status: result.status,
+                            _statusText: result.statusText
+                        });
+                        return;
+                    }
 
-        except requests.RequestException as e:
+                    try {
+                        const json = JSON.parse(result.text);
+                        callback(json);
+                    } catch (e) {
+                        callback({
+                            _error: 'Invalid JSON',
+                            _status: result.status,
+                            _text: result.text.substring(0, 500)
+                        });
+                    }
+                })
+                .catch(error => {
+                    callback({
+                        _error: error.message,
+                        _type: 'fetch_error'
+                    });
+                });
+                """
+                result = self.driver.execute_async_script(script, url)
+
+            # Check for errors in the response
+            if isinstance(result, dict) and '_error' in result:
+                error_msg = f"Request to {url} failed: {result['_error']}"
+                if '_text' in result:
+                    logger.error(f"{error_msg}. Response text: {result['_text']}")
+                elif '_status' in result:
+                    logger.error(f"{error_msg}. Status: {result['_status']}")
+                else:
+                    logger.error(error_msg)
+                raise IsracardAPIError(error_msg)
+
+            return result
+
+        except IsracardAPIError:
+            raise
+        except Exception as e:
+            logger.error(f"API request failed for {url}: {e}")
             raise IsracardAPIError(f"API request failed: {e}")
 
     def login(self) -> bool:
@@ -250,17 +385,12 @@ class IsracardCreditCardScraper:
             login_url = f"{self.base_url}/personalarea/Login"
             self.driver.get(login_url)
 
-            # Wait for page to load and establish session
-            # Need to wait longer to ensure cookies and session are established
-            logger.debug("Waiting for session establishment...")
-            time.sleep(5)
+            # Wait for page to load and session establishment
+            time.sleep(8)
 
             logger.info("Step 2/4: Validating credentials...")
 
-            # Step 1: Validate ID and card suffix
-            validate_params = {
-                'reqName': 'ValidateIdData'
-            }
+            # Step 1: Validate ID and card suffix (matching TypeScript implementation)
             validate_data = {
                 'id': self.credentials.user_id,
                 'cardSuffix': self.credentials.card_6_digits,
@@ -270,7 +400,6 @@ class IsracardCreditCardScraper:
                 'companyCode': self.company_code,
             }
 
-            logger.debug("Sending validation request...")
             validate_result = self.api_request(
                 'reqName=ValidateIdData',
                 data=validate_data,
@@ -287,8 +416,6 @@ class IsracardCreditCardScraper:
             validate_bean = validate_result['ValidateIdDataBean']
             return_code = validate_bean.get('returnCode')
 
-            logger.debug(f"Validation return code: {return_code}")
-
             if return_code == '4':
                 raise IsracardChangePasswordError("Password change required")
 
@@ -297,9 +424,8 @@ class IsracardCreditCardScraper:
 
             # Step 2: Perform login
             logger.info("Step 3/4: Logging in...")
-            user_name = validate_bean.get('userName')
-            if not user_name:
-                raise IsracardLoginError("No userName in validation response")
+            # userName may be empty string - that's OK, the API accepts it
+            user_name = validate_bean.get('userName', '')
 
             login_data = {
                 'KodMishtamesh': user_name,
@@ -310,14 +436,11 @@ class IsracardCreditCardScraper:
                 'idType': self.ID_TYPE,
             }
 
-            logger.debug("Sending login request...")
             login_result = self.api_request(
                 'reqName=performLogonI',
                 data=login_data,
                 method='POST'
             )
-
-            logger.debug(f"Login response status: {login_result.get('status')}")
 
             if not login_result:
                 raise IsracardLoginError("No response from login request")
@@ -352,7 +475,6 @@ class IsracardCreditCardScraper:
         if not more_info or self.INSTALLMENTS_KEYWORD not in more_info:
             return None
 
-        import re
         matches = re.findall(r'\d+', more_info)
         if len(matches) >= 2:
             return Installments(
@@ -379,7 +501,9 @@ class IsracardCreditCardScraper:
         Returns:
             Transaction object
         """
-        is_outbound = txn.get('dealSumOutbound', False)
+        # Check if this is an outbound transaction (has outbound data)
+        # In TypeScript: const isOutbound = txn.dealSumOutbound; (truthy check)
+        is_outbound = bool(txn.get('dealSumOutbound'))
 
         # Get transaction date
         txn_date_str = txn.get('fullPurchaseDateOutbound') if is_outbound else txn.get('fullPurchaseDate')
@@ -394,9 +518,11 @@ class IsracardCreditCardScraper:
         else:
             current_processed_date = processed_date
 
-        # Get amounts
-        original_amount = txn.get('dealSumOutbound') if is_outbound else txn.get('dealSum', 0)
-        charged_amount = txn.get('paymentSumOutbound') if is_outbound else txn.get('paymentSum', 0)
+        # Get amounts (API may return strings, so convert to float)
+        original_amount_raw = txn.get('dealSumOutbound') if is_outbound else txn.get('dealSum', 0)
+        charged_amount_raw = txn.get('paymentSumOutbound') if is_outbound else txn.get('paymentSum', 0)
+        original_amount = float(original_amount_raw) if original_amount_raw else 0.0
+        charged_amount = float(charged_amount_raw) if charged_amount_raw else 0.0
 
         # Get currencies
         original_currency = self.convert_currency(
