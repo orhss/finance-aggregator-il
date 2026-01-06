@@ -407,16 +407,21 @@ class TransactionBrowser(App):
         transactions_to_add = new_transactions if append else self.transactions
 
         for txn in transactions_to_add:
-            # Apply search filter
+            # Get tags for this transaction (needed for both filtering and display)
+            txn_tags = tag_service.get_transaction_tags(txn.id)
+            tag_names = [t.name.lower() for t in txn_tags]
+
+            # Apply search filter - search in description, category, user_category, and tags
             if self.search_text:
                 search_lower = self.search_text.lower()
-                if (search_lower not in (txn.description or '').lower() and
-                    search_lower not in (txn.category or '').lower() and
-                    search_lower not in (txn.user_category or '').lower()):
+                matches_description = search_lower in (txn.description or '').lower()
+                matches_category = search_lower in (txn.category or '').lower()
+                matches_user_category = search_lower in (txn.user_category or '').lower()
+                matches_tags = any(search_lower in tag for tag in tag_names)
+
+                if not (matches_description or matches_category or matches_user_category or matches_tags):
                     continue
 
-            # Get tags for this transaction
-            txn_tags = tag_service.get_transaction_tags(txn.id)
             tags_str = ", ".join([fix_rtl(t.name) for t in txn_tags[:4]]) if txn_tags else ""
             if len(txn_tags) > 4:
                 tags_str += f" +{len(txn_tags) - 4}"
