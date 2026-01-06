@@ -693,7 +693,8 @@ class AnalyticsService:
         self,
         months: int = 6,
         tag: Optional[str] = None,
-        card_last4: Optional[str] = None
+        card_last4: Optional[str] = None,
+        include_current: bool = False
     ) -> List[Dict[str, Any]]:
         """
         Get monthly spending totals for trend analysis
@@ -702,6 +703,7 @@ class AnalyticsService:
             months: Number of months to include (default 6)
             tag: Optional tag filter
             card_last4: Optional filter by card last 4 digits (account_number)
+            include_current: Include current (incomplete) month (default False)
 
         Returns:
             List of dicts with: year, month, total_amount, transaction_count
@@ -711,8 +713,16 @@ class AnalyticsService:
 
         # Calculate date range
         today = date.today()
-        # Start from beginning of (months-1) months ago to include current month
-        start_date = date(today.year, today.month, 1) - relativedelta(months=months - 1)
+        current_month_start = date(today.year, today.month, 1)
+
+        if include_current:
+            # Include current month - start from (months-1) months ago
+            start_date = current_month_start - relativedelta(months=months - 1)
+            end_date = None  # No end date limit
+        else:
+            # Exclude current month - start from (months) months ago, end at last day of previous month
+            start_date = current_month_start - relativedelta(months=months)
+            end_date = current_month_start - relativedelta(days=1)  # Last day of previous month
 
         # Build query - use effective_amount_expr for proper installment handling
         query = self.session.query(
@@ -723,6 +733,10 @@ class AnalyticsService:
         ).filter(
             Transaction.transaction_date >= start_date
         )
+
+        # Apply end date filter if excluding current month
+        if end_date:
+            query = query.filter(Transaction.transaction_date <= end_date)
 
         # Apply tag filter
         if tag:

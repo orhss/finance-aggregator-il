@@ -315,7 +315,10 @@ class TransactionBrowser(App):
         Binding("enter", "edit", "Edit"),
         Binding("r", "refresh", "Refresh"),
         Binding("/", "focus_search", "Search"),
+        Binding("m", "load_more", "More"),
     ]
+
+    PAGE_SIZE = 500  # Number of transactions per page
 
     def __init__(
         self,
@@ -334,6 +337,8 @@ class TransactionBrowser(App):
         self.transactions: List[Any] = []
         self.transaction_map: Dict[str, int] = {}  # row_key -> transaction_id
         self.search_text = ""
+        self.current_offset = 0
+        self.has_more = True  # Whether there are more transactions to load
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -360,25 +365,48 @@ class TransactionBrowser(App):
 
         self.load_transactions()
 
-    def load_transactions(self) -> None:
-        """Load transactions from database"""
+    def load_transactions(self, append: bool = False) -> None:
+        """Load transactions from database
+
+        Args:
+            append: If True, append to existing transactions instead of replacing
+        """
         analytics = AnalyticsService()
         tag_service = TagService()
 
-        self.transactions = analytics.get_transactions(
+        if not append:
+            # Reset pagination when doing a fresh load
+            self.current_offset = 0
+            self.transactions = []
+
+        new_transactions = analytics.get_transactions(
             from_date=self.filter_from_date,
             to_date=self.filter_to_date,
             tags=self.filter_tags,
             untagged_only=self.filter_untagged,
             institution=self.filter_institution,
-            limit=500  # Reasonable limit for TUI
+            limit=self.PAGE_SIZE,
+            offset=self.current_offset
         )
 
-        table = self.query_one("#transactions-table", DataTable)
-        table.clear()
-        self.transaction_map.clear()
+        # Check if there are more transactions to load
+        self.has_more = len(new_transactions) == self.PAGE_SIZE
 
-        for txn in self.transactions:
+        if append:
+            self.transactions.extend(new_transactions)
+        else:
+            self.transactions = new_transactions
+
+        table = self.query_one("#transactions-table", DataTable)
+
+        if not append:
+            table.clear()
+            self.transaction_map.clear()
+
+        # Only add the new transactions to the table
+        transactions_to_add = new_transactions if append else self.transactions
+
+        for txn in transactions_to_add:
             # Apply search filter
             if self.search_text:
                 search_lower = self.search_text.lower()
@@ -437,7 +465,8 @@ class TransactionBrowser(App):
             filter_info.append(f"inst:{self.filter_institution}")
 
         filter_str = f" | Filters: {' '.join(filter_info)}" if filter_info else ""
-        status.update(f"Showing {table.row_count} transactions{filter_str}")
+        more_str = " | [m] Load more" if self.has_more else ""
+        status.update(f"Showing {table.row_count} transactions{filter_str}{more_str}")
 
         analytics.close()
 
@@ -515,6 +544,15 @@ class TransactionBrowser(App):
     def action_refresh(self) -> None:
         """Reload transactions"""
         self.load_transactions()
+
+    def action_load_more(self) -> None:
+        """Load the next page of transactions"""
+        if not self.has_more:
+            return
+
+        # Update offset and load more
+        self.current_offset += self.PAGE_SIZE
+        self.load_transactions(append=True)
 
     def action_focus_search(self) -> None:
         """Focus the search input"""

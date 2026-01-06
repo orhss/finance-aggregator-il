@@ -742,14 +742,18 @@ def spending_trends(
     tag: Optional[str] = typer.Option(None, "--tag", "-t", help="Filter by tag"),
     card: Optional[str] = typer.Option(None, "--card", "-c", help="Filter by card last 4 digits"),
     show_categories: bool = typer.Option(True, "--categories/--no-categories", help="Show category trends"),
-    show_cards: bool = typer.Option(True, "--cards/--no-cards", help="Show card holder breakdown")
+    show_cards: bool = typer.Option(True, "--cards/--no-cards", help="Show card holder breakdown"),
+    include_current: bool = typer.Option(False, "--include-current", help="Include current (incomplete) month")
 ):
     """
     Show spending trends over time with visualizations
 
+    By default, excludes the current month since it's incomplete and would skew the data.
+
     Examples:
-        fin-cli reports trends                    # Last 6 months overview
-        fin-cli reports trends --months 12        # Last 12 months
+        fin-cli reports trends                    # Last 6 complete months
+        fin-cli reports trends --months 12        # Last 12 complete months
+        fin-cli reports trends --include-current  # Include current month
         fin-cli reports trends --tag groceries    # Trends for specific tag
         fin-cli reports trends --card 1234        # Trends for specific card
     """
@@ -760,7 +764,8 @@ def spending_trends(
         monthly_data = analytics.get_monthly_spending_trends(
             months=months,
             tag=tag,
-            card_last4=card
+            card_last4=card,
+            include_current=include_current
         )
 
         if not monthly_data:
