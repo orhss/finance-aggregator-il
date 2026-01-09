@@ -564,11 +564,95 @@ class TransactionBrowser(App):
         search_input = self.query_one("#search-input", Input)
         search_input.focus()
 
+    def refresh_display(self) -> None:
+        """Re-render the table with current transactions and search filter.
+
+        Unlike load_transactions(), this does not reset pagination or query the database.
+        It only re-applies the client-side search filter to already-loaded transactions.
+        """
+        table = self.query_one("#transactions-table", DataTable)
+        table.clear()
+        self.transaction_map.clear()
+
+        tag_service = TagService()
+        analytics = AnalyticsService()
+
+        for txn in self.transactions:
+            # Get tags for this transaction (needed for both filtering and display)
+            txn_tags = tag_service.get_transaction_tags(txn.id)
+            tag_names = [t.name.lower() for t in txn_tags]
+
+            # Apply search filter - search in description, category, user_category, and tags
+            if self.search_text:
+                search_lower = self.search_text.lower()
+                matches_description = search_lower in (txn.description or '').lower()
+                matches_category = search_lower in (txn.category or '').lower()
+                matches_user_category = search_lower in (txn.user_category or '').lower()
+                matches_tags = any(search_lower in tag for tag in tag_names)
+
+                if not (matches_description or matches_category or matches_user_category or matches_tags):
+                    continue
+
+            tags_str = ", ".join([fix_rtl(t.name) for t in txn_tags[:4]]) if txn_tags else ""
+            if len(txn_tags) > 4:
+                tags_str += f" +{len(txn_tags) - 4}"
+
+            # Format amount - use charged_amount (actual payment) if available
+            amount = txn.charged_amount if txn.charged_amount is not None else txn.original_amount
+            currency = txn.charged_currency or txn.original_currency
+            amount_str = f"{amount:,.2f} {currency}"
+
+            # Get effective category
+            category = txn.user_category or txn.category or ""
+
+            # Get card info from account
+            account = analytics.get_account_by_id(txn.account_id)
+            card_str = account.account_number if account else ""
+
+            # Use processed_date for installments (when you actually pay), otherwise transaction_date
+            if txn.installment_number and txn.processed_date:
+                date_str = txn.processed_date.strftime("%Y-%m-%d")
+            else:
+                date_str = txn.transaction_date.strftime("%Y-%m-%d")
+
+            row_key = table.add_row(
+                str(txn.id),
+                date_str,
+                fix_rtl(txn.description[:30]) if txn.description else "",
+                amount_str,
+                card_str,
+                fix_rtl(category[:18]) if category else "",
+                tags_str,
+            )
+            self.transaction_map[row_key] = txn.id
+
+        analytics.close()
+
+        # Update status bar
+        status = self.query_one("#status-bar", Static)
+        filter_info = []
+        if self.filter_from_date:
+            filter_info.append(f"from:{self.filter_from_date}")
+        if self.filter_to_date:
+            filter_info.append(f"to:{self.filter_to_date}")
+        if self.filter_tags:
+            filter_info.append(f"tags:{','.join(self.filter_tags)}")
+        if self.filter_untagged:
+            filter_info.append("untagged")
+        if self.filter_institution:
+            filter_info.append(f"inst:{self.filter_institution}")
+        if self.search_text:
+            filter_info.append(f"search:\"{self.search_text}\"")
+
+        filter_str = f" | Filters: {' '.join(filter_info)}" if filter_info else ""
+        more_str = " | [m] Load more" if self.has_more else ""
+        status.update(f"Showing {table.row_count} transactions{filter_str}{more_str}")
+
     @on(Input.Changed, "#search-input")
     def on_search_changed(self, event: Input.Changed) -> None:
         """Filter transactions based on search input"""
         self.search_text = event.value
-        self.load_transactions()
+        self.refresh_display()
 
 
 def run_browser(
