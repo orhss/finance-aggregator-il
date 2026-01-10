@@ -52,6 +52,7 @@ class EmailCredentials(BaseModel):
 class Credentials(BaseModel):
     """All credentials for different institutions"""
     excellence: BrokerCredentials = Field(default_factory=BrokerCredentials)
+    meitav: BrokerCredentials = Field(default_factory=BrokerCredentials)  # Meitav Dash broker
     migdal: List[PensionCredentials] = Field(default_factory=list)  # Multi-account support
     phoenix: List[PensionCredentials] = Field(default_factory=list)  # Multi-account support
     cal: List[CreditCardCredentials] = Field(default_factory=list)  # Multi-account support
@@ -222,10 +223,15 @@ def load_credentials() -> Credentials:
 def _load_from_environment() -> Credentials:
     """Load credentials from environment variables"""
 
-    # Load single-account broker
+    # Load single-account brokers
     excellence = BrokerCredentials(
         username=os.getenv("EXCELLENCE_USERNAME"),
         password=os.getenv("EXCELLENCE_PASSWORD"),
+    )
+
+    meitav = BrokerCredentials(
+        username=os.getenv("MEITAV_USERNAME"),
+        password=os.getenv("MEITAV_PASSWORD"),
     )
 
     # Load multi-account pensions
@@ -244,6 +250,7 @@ def _load_from_environment() -> Credentials:
 
     return Credentials(
         excellence=excellence,
+        meitav=meitav,
         migdal=migdal_accounts,
         phoenix=phoenix_accounts,
         cal=cal_accounts,

@@ -84,11 +84,14 @@ class BrokerAPIClient(ABC):
 
 # HTTP Client
 class RequestsHTTPClient:
-    """HTTP client using requests library"""
+    """HTTP client using requests library with session support"""
+
+    def __init__(self):
+        self.session = requests.Session()
 
     def post(self, url: str, headers: Dict[str, str], data: str) -> Dict[str, Any]:
         try:
-            response = requests.post(url, headers=headers, data=data)
+            response = self.session.post(url, headers=headers, data=data)
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
@@ -96,7 +99,7 @@ class RequestsHTTPClient:
 
     def get(self, url: str, headers: Dict[str, str], params: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         try:
-            response = requests.get(url, headers=headers, params=params)
+            response = self.session.get(url, headers=headers, params=params)
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:

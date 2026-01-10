@@ -20,6 +20,7 @@ class Institution:
     """Financial institution constants"""
     # Brokers
     EXCELLENCE = "excellence"
+    MEITAV = "meitav"
 
     # Pension Funds
     MIGDAL = "migdal"
@@ -32,7 +33,7 @@ class Institution:
 
     @classmethod
     def brokers(cls) -> list[str]:
-        return [cls.EXCELLENCE]
+        return [cls.EXCELLENCE, cls.MEITAV]
 
     @classmethod
     def pensions(cls) -> list[str]:

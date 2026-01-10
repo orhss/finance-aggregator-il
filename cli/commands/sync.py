@@ -40,6 +40,7 @@ def sync_all(
 
     # Sync each source
     sync_excellence(headless=headless)
+    sync_meitav(headless=headless)
     # Pensions now sync all configured accounts
     sync_migdal(headless=headless, account=None)  # None = all accounts
     sync_phoenix(headless=headless, account=None)  # None = all accounts
@@ -98,6 +99,64 @@ def sync_excellence(
             console.print(f"[green]✓ Success![/green]")
             console.print(f"  Accounts synced: {result.accounts_synced}")
             console.print(f"  Balances added: {result.balances_added}")
+        else:
+            console.print(f"[red]✗ Failed: {result.error_message}[/red]")
+            raise typer.Exit(1)
+
+    finally:
+        db.close()
+
+
+@app.command("meitav")
+def sync_meitav(
+    headless: bool = typer.Option(True, "--headless/--visible", help="Run browsers in headless mode"),
+):
+    """
+    Sync Meitav broker data
+    """
+    console.print("[bold cyan]Syncing Meitav broker...[/bold cyan]")
+
+    # Check database
+    if not check_database_exists():
+        console.print("[bold red]Error: Database not initialized. Run 'fin-cli init' first.[/bold red]")
+        raise typer.Exit(1)
+
+    # Load credentials
+    credentials = load_credentials()
+
+    if not credentials.meitav.username or not credentials.meitav.password:
+        console.print("[bold red]Error: Meitav credentials not configured.[/bold red]")
+        console.print("Run 'fin-cli config setup' to set up credentials.")
+        raise typer.Exit(1)
+
+    # Create database session
+    db = SessionLocal()
+
+    try:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Syncing Meitav (may take a while)...", total=None)
+
+            # Create service and sync
+            service = BrokerService(db)
+            result = service.sync_meitav(
+                username=credentials.meitav.username,
+                password=credentials.meitav.password,
+                headless=headless
+            )
+
+            progress.update(task, completed=True)
+
+        # Display results
+        if result.success:
+            console.print(f"[green]✓ Success![/green]")
+            console.print(f"  Accounts synced: {result.accounts_synced}")
+            console.print(f"  Balances added: {result.balances_added}")
+            if result.balances_updated:
+                console.print(f"  Balances updated: {result.balances_updated}")
         else:
             console.print(f"[red]✗ Failed: {result.error_message}[/red]")
             raise typer.Exit(1)

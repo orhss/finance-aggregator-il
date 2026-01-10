@@ -11,6 +11,11 @@ from config.constants import AccountType, Institution, SyncType
 from services.base_service import BaseSyncService
 from scrapers.brokers.excellence_broker_client import BrokerClientFactory
 from scrapers.base.broker_base import LoginCredentials, BrokerAPIError
+from scrapers.brokers.meitav_broker_client import (
+    MeitavBrokerScraper,
+    MeitavCredentials,
+    MeitavScraperError
+)
 
 
 class BrokerSyncResult:
@@ -107,6 +112,77 @@ class BrokerService(BaseSyncService):
 
                 result.success = True
 
+        except Exception as e:
+            result.error_message = str(e)
+
+        return result
+
+    def sync_meitav(
+        self,
+        username: str,
+        password: str,
+        headless: bool = True,
+        currency: str = "ILS"
+    ) -> BrokerSyncResult:
+        """
+        Sync Meitav broker data.
+
+        Args:
+            username: Meitav card number
+            password: Meitav password
+            headless: Run browser in headless mode
+            currency: Currency for balance retrieval (default: ILS)
+
+        Returns:
+            BrokerSyncResult with sync operation details
+        """
+        result = BrokerSyncResult()
+
+        try:
+            with self.sync_transaction(SyncType.BROKER, Institution.MEITAV) as sync_record:
+                result.sync_history_id = sync_record.id
+
+                # Create credentials and scraper
+                credentials = MeitavCredentials(username=username, password=password)
+                scraper = MeitavBrokerScraper(credentials, headless=headless)
+
+                # Scrape account data
+                account_data = scraper.scrape()
+
+                # Get or create account in database
+                db_account = self.get_or_create_account(
+                    account_type=AccountType.BROKER,
+                    institution=Institution.MEITAV,
+                    account_number=account_data.account_number,
+                    account_name=f"Meitav {account_data.account_number}"
+                )
+                result.accounts_synced = 1
+
+                # Save balance to database
+                is_new = self.save_balance(
+                    account=db_account,
+                    total_amount=account_data.balance.total_value,
+                    available=account_data.balance.cash_balance,
+                    used=None,
+                    blocked=None,
+                    profit_loss=account_data.balance.change_from_cost,
+                    profit_loss_percentage=account_data.balance.change_from_cost_percent,
+                    currency=currency
+                )
+
+                if is_new:
+                    result.balances_added = 1
+                else:
+                    result.balances_updated = 1
+
+                # Update sync record
+                sync_record.records_added = result.balances_added
+                sync_record.records_updated = result.balances_updated
+
+                result.success = True
+
+        except MeitavScraperError as e:
+            result.error_message = str(e)
         except Exception as e:
             result.error_message = str(e)
 
