@@ -40,6 +40,7 @@ class BrokerService(BaseSyncService):
         self,
         username: str,
         password: str,
+        headless: bool = True,
         currency: str = "ILS"
     ) -> BrokerSyncResult:
         """
@@ -48,12 +49,14 @@ class BrokerService(BaseSyncService):
         Args:
             username: Excellence username
             password: Excellence password
+            headless: Run browser in headless mode (default: True)
             currency: Currency for balance retrieval (default: ILS)
 
         Returns:
             BrokerSyncResult with sync operation details
         """
         result = BrokerSyncResult()
+        client = None
 
         try:
             with self.sync_transaction(SyncType.BROKER, Institution.EXCELLENCE) as sync_record:
@@ -61,7 +64,8 @@ class BrokerService(BaseSyncService):
 
                 # Create credentials and client
                 credentials = LoginCredentials(user=username, password=password)
-                client = BrokerClientFactory.create_client("extradepro", credentials)
+                from scrapers.brokers.excellence_broker_client import ExtraDeProAPIClient
+                client = ExtraDeProAPIClient(credentials, headless=headless)
 
                 # Login
                 client.login()
@@ -114,6 +118,13 @@ class BrokerService(BaseSyncService):
 
         except Exception as e:
             result.error_message = str(e)
+        finally:
+            # Ensure browser is closed even on error
+            if client:
+                try:
+                    client.cleanup()
+                except Exception:
+                    pass
 
         return result
 

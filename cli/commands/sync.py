@@ -89,7 +89,8 @@ def sync_excellence(
             service = BrokerService(db)
             result = service.sync_excellence(
                 username=credentials.excellence.username,
-                password=credentials.excellence.password
+                password=credentials.excellence.password,
+                headless=headless
             )
 
             progress.update(task, completed=True)
@@ -241,7 +242,7 @@ def _sync_pension_multi_account(
 
                     if result.success:
                         console.print(f"  [green]✓ Success![/green]")
-                        console.print(f"    Holdings synced: {result.holdings_count or 0}")
+                        console.print(f"    Balances synced: {result.balances_added + result.balances_updated}")
                         succeeded += 1
                     else:
                         console.print(f"  [red]✗ Failed: {result.error_message}[/red]")

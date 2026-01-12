@@ -145,7 +145,8 @@ def show(
 @app.command()
 def set(
     key: str = typer.Argument(..., help="Credential key in format 'institution.field' (e.g., 'cal.username')"),
-    value: str = typer.Argument(..., help="Credential value"),
+    value: str = typer.Argument(None, help="Credential value (omit for interactive prompt)"),
+    prompt: bool = typer.Option(False, "--prompt", "-p", help="Prompt for value interactively (useful for passwords with special characters)"),
 ):
     """
     Set a specific credential
@@ -155,7 +156,13 @@ def set(
         fin-cli config set cal.password "mypass"
         fin-cli config set excellence.username "broker_user"
         fin-cli config set email.address "user@gmail.com"
+
+        # Interactive prompt (avoids shell escaping issues with special characters):
+        fin-cli config set excellence.password --prompt
+        fin-cli config set excellence.password -p
     """
+    import getpass
+
     try:
         # Parse key (format: institution.field)
         parts = key.split(".", 1)
@@ -166,10 +173,21 @@ def set(
         institution, field = parts
 
         # Valid institutions
-        valid_institutions = ["excellence", "migdal", "phoenix", "cal", "max", "email"]
+        valid_institutions = ["excellence", "migdal", "phoenix", "cal", "max", "email", "meitav", "isracard"]
         if institution not in valid_institutions:
             print_error(f"Invalid institution. Must be one of: {', '.join(valid_institutions)}")
             raise typer.Exit(code=1)
+
+        # Get value interactively if --prompt flag or no value provided
+        if prompt or value is None:
+            if field == "password":
+                value = getpass.getpass(f"Enter {institution}.{field}: ")
+            else:
+                value = input(f"Enter {institution}.{field}: ")
+
+            if not value:
+                print_error("Value cannot be empty")
+                raise typer.Exit(code=1)
 
         # Update credential
         update_credential(institution, field, value)

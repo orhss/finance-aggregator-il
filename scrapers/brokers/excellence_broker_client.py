@@ -1,11 +1,23 @@
-from typing import List
+from typing import List, Optional
 import json
+import logging
 import os
+import random
+import time
 from dotenv import load_dotenv
 
-from scrapers.base.broker_base import AccountInfo, BalanceInfo, LoginCredentials, BrokerAPIClient, RequestsHTTPClient
+import requests
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
+
+from scrapers.base.broker_base import AccountInfo, BalanceInfo, LoginCredentials, BrokerAPIClient
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 # Exceptions
 class BrokerAPIError(Exception):
@@ -28,47 +40,288 @@ class BalanceError(BrokerAPIError):
     pass
 
 
-# Concrete Implementation for ExtradeProAPI
+# Concrete Implementation for ExtradeProAPI using Selenium
 class ExtraDeProAPIClient(BrokerAPIClient):
-    """Concrete implementation for ExtradePro broker API"""
+    """
+    Concrete implementation for ExtradePro broker API.
+    Uses Selenium for login (to handle popups) and API calls for data.
+    """
 
-    BASE_URL = "https://extradepro.xnes.co.il/api/v2/json2"
+    BASE_URL = "https://extradepro.xnes.co.il"
+    API_URL = "https://extradepro.xnes.co.il/api/v2/json2"
 
-    def __init__(self, credentials: LoginCredentials):
+    def __init__(self, credentials: LoginCredentials, headless: bool = True):
         super().__init__(credentials)
-        self.http_client = RequestsHTTPClient()
+        self.headless = headless
+        self.driver: Optional[webdriver.Chrome] = None
+        self.api_session = requests.Session()
         self._headers = {
             'accept': 'application/json, text/plain, */*',
-            'content-type': 'application/json; charset=UTF-8'
+            'content-type': 'application/json; charset=UTF-8',
+            'csession': str(random.random()),
+            'origin': self.BASE_URL,
+            'referer': f'{self.BASE_URL}/login',
+            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
         }
 
+    def setup_driver(self):
+        """Setup Chrome WebDriver with performance logging to capture network requests"""
+        logger.info("Setting up Chrome WebDriver...")
+        options = Options()
+        if self.headless:
+            options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--window-size=1920,1080')
+        options.add_argument(f'--user-agent={self._headers["user-agent"]}')
+
+        # Enable performance logging to capture network requests
+        options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
+
+        self.driver = webdriver.Chrome(options=options)
+        self.driver.implicitly_wait(10)
+        logger.info("Chrome driver initialized")
+
+    def cleanup(self):
+        """Clean up resources"""
+        if self.driver:
+            self.driver.quit()
+            self.driver = None
+        self.session_key = None
+        self.accounts = []
+
+    def _human_delay(self, min_sec: float = 1.0, max_sec: float = 2.0) -> None:
+        """Add a randomized delay to mimic human behavior"""
+        time.sleep(random.uniform(min_sec, max_sec))
+
+    def _dismiss_popups(self, max_attempts: int = 5):
+        """
+        Dismiss any popups like 'בואו נתחיל!' (Let's start!), release notes, etc.
+        Tries multiple times since popups may appear at different moments.
+        """
+        for attempt in range(max_attempts):
+            try:
+                popup_found = False
+
+                # Method 1: Find any button containing the Hebrew text "בואו נתחיל"
+                try:
+                    buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(), 'בואו נתחיל')]")
+                    for btn in buttons:
+                        if btn.is_displayed():
+                            logger.debug(f"Found popup button with Hebrew text, dismissing...")
+                            btn.click()
+                            popup_found = True
+                            self._human_delay(0.5, 1.0)
+                            break
+                except Exception:
+                    pass
+
+                # Method 2: Try CSS selectors if XPath didn't work
+                if not popup_found:
+                    popup_selectors = [
+                        "button.close-button",
+                        "button.app-button.close-button",
+                        ".release-notes-body button",
+                    ]
+                    for selector in popup_selectors:
+                        try:
+                            buttons = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                            for btn in buttons:
+                                if btn.is_displayed() and btn.is_enabled():
+                                    logger.debug(f"Found popup with selector '{selector}', dismissing...")
+                                    btn.click()
+                                    popup_found = True
+                                    self._human_delay(0.5, 1.0)
+                                    break
+                            if popup_found:
+                                break
+                        except Exception:
+                            continue
+
+                if not popup_found:
+                    # No popup found, we're done
+                    logger.debug("No more popups found")
+                    break
+
+            except Exception as e:
+                logger.debug(f"Popup dismiss attempt {attempt + 1} failed: {e}")
+                break
+
     def login(self) -> str:
-        """Authenticate with ExtradePro API"""
-        url = f"{self.BASE_URL}/login"
-        payload = json.dumps({
-            "Login": {
-                "User": self.credentials.user,
-                "Password": self.credentials.password
-            }
-        })
+        """
+        Authenticate with ExtradePro using Selenium.
+        Handles popups and extracts session key.
+        """
+        try:
+            if not self.driver:
+                self.setup_driver()
 
-        response_data = self.http_client.post(url, self._headers, payload)
+            logger.info(f"Navigating to {self.BASE_URL}/login...")
+            self.driver.get(f"{self.BASE_URL}/login")
+            self._human_delay(1.0, 2.0)
 
-        session_key = response_data.get("Login", {}).get("SessionKey")
-        if not session_key:
-            raise AuthenticationError("Failed to obtain session key")
+            # Wait for username field
+            logger.debug("Waiting for login form...")
+            username_field = WebDriverWait(self.driver, 15).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "input[formcontrolname='username'], input[name='username'], input#username, input[type='text']"))
+            )
 
-        self.session_key = session_key
-        self._headers["session"] = session_key
-        return session_key
+            # Enter username with human-like typing
+            logger.info("Entering credentials...")
+            username_field.clear()
+            for char in self.credentials.user:
+                username_field.send_keys(char)
+                time.sleep(random.uniform(0.05, 0.15))
+
+            self._human_delay(0.3, 0.6)
+
+            # Find and fill password field
+            password_field = self.driver.find_element(By.CSS_SELECTOR, "input[formcontrolname='password'], input[name='password'], input#password, input[type='password']")
+            password_field.clear()
+            for char in self.credentials.password:
+                password_field.send_keys(char)
+                time.sleep(random.uniform(0.05, 0.15))
+
+            self._human_delay(0.5, 1.0)
+
+            # Click login button
+            logger.info("Submitting login...")
+            login_btn = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit'], button.login-button")
+            login_btn.click()
+
+            # Wait for login to complete - wait for URL to change or dashboard element
+            logger.debug("Waiting for login to complete...")
+            try:
+                WebDriverWait(self.driver, 15).until(
+                    lambda d: "/login" not in d.current_url or "dashboard" in d.current_url or "main" in d.current_url
+                )
+            except TimeoutException:
+                logger.warning("Timeout waiting for dashboard, continuing anyway...")
+
+            self._human_delay(2.0, 3.0)
+
+            # Dismiss any post-login popups
+            self._dismiss_popups()
+
+            # Wait for page to fully load after popup dismissed
+            self._human_delay(2.0, 3.0)
+
+            # Extract session key from localStorage or sessionStorage
+            logger.info("Extracting session data...")
+            session_key = self._extract_session_key()
+
+            # Log what we found for debugging
+            if session_key:
+                display_key = f"{session_key[:20]}..." if len(session_key) > 20 else session_key
+                logger.info(f"Session key found: {display_key}")
+
+            if not session_key:
+                # Log all storage for debugging
+                all_local = self.driver.execute_script("return JSON.stringify(localStorage);")
+                all_session = self.driver.execute_script("return JSON.stringify(sessionStorage);")
+                logger.error(f"localStorage: {all_local}")
+                logger.error(f"sessionStorage: {all_session}")
+                raise AuthenticationError("Failed to obtain session key after login")
+
+            self.session_key = session_key
+            self._headers["session"] = session_key
+
+            # Transfer cookies from Selenium to requests session
+            self._transfer_cookies()
+
+            logger.info("Login successful!")
+            return session_key
+
+        except TimeoutException as e:
+            raise AuthenticationError(f"Timeout during login: {e}")
+        except Exception as e:
+            raise AuthenticationError(f"Login failed: {e}")
+
+    def _extract_session_key(self) -> Optional[str]:
+        """Extract session key from network logs (login API response)"""
+        import json as json_module
+
+        # Get performance logs and look for login response
+        try:
+            logs = self.driver.get_log('performance')
+            for log in logs:
+                try:
+                    message = json_module.loads(log['message'])
+                    method = message.get('message', {}).get('method', '')
+
+                    # Look for Network.responseReceived for login endpoint
+                    if method == 'Network.responseReceived':
+                        params = message.get('message', {}).get('params', {})
+                        response = params.get('response', {})
+                        url = response.get('url', '')
+
+                        if '/api/v2/json2/login' in url:
+                            request_id = params.get('requestId')
+                            # Get the response body
+                            try:
+                                body = self.driver.execute_cdp_cmd(
+                                    'Network.getResponseBody',
+                                    {'requestId': request_id}
+                                )
+                                response_text = body.get('body', '')
+                                response_json = json_module.loads(response_text)
+                                session_key = response_json.get('Login', {}).get('SessionKey')
+                                if session_key:
+                                    logger.debug(f"Found session key from login API response")
+                                    return session_key
+                            except Exception as e:
+                                logger.debug(f"Could not get response body: {e}")
+                                continue
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.debug(f"Could not get performance logs: {e}")
+
+        # Fallback: Try localStorage/sessionStorage
+        try:
+            session_data = self.driver.execute_script(
+                "return localStorage.getItem('session') || localStorage.getItem('sessionKey');"
+            )
+            if session_data:
+                return session_data
+        except Exception:
+            pass
+
+        try:
+            session_data = self.driver.execute_script(
+                "return sessionStorage.getItem('session') || sessionStorage.getItem('sessionKey');"
+            )
+            if session_data:
+                return session_data
+        except Exception:
+            pass
+
+        return None
+
+    def _transfer_cookies(self):
+        """Transfer cookies from Selenium to requests session"""
+        if self.driver:
+            for cookie in self.driver.get_cookies():
+                self.api_session.cookies.set(
+                    cookie['name'],
+                    cookie['value'],
+                    domain=cookie.get('domain', ''),
+                    path=cookie.get('path', '/')
+                )
 
     def get_accounts(self) -> List[AccountInfo]:
         """Retrieve user accounts from ExtradePro API"""
         if not self.session_key:
             raise AuthenticationError("Must login first")
 
-        url = f"{self.BASE_URL}/accounts"
-        response_data = self.http_client.get(url, self._headers)
+        self._human_delay(1.0, 2.0)
+
+        url = f"{self.API_URL}/accounts"
+        params = {"key": self.session_key}  # Session key required as query parameter
+        response = self.api_session.get(url, headers=self._headers, params=params)
+        response.raise_for_status()
+        response_data = response.json()
 
         user_accounts = response_data.get("UserAccounts", {}).get("UserAccount", [])
         if not user_accounts:
@@ -86,14 +339,25 @@ class ExtraDeProAPIClient(BrokerAPIClient):
         if not self.session_key:
             raise AuthenticationError("Must login first")
 
-        url = f"{self.BASE_URL}/account/view/balances"
+        # API requires at least 1000ms between requests
+        self._human_delay(1.2, 1.5)
+
+        url = f"{self.API_URL}/account/view/balances"
         params = {
             "account": account.key,
             "fields": "Balance,Available,Used,Blocked,IsBlocked,IsMargin,IsShorting,IsForeign",
-            "currency": currency
+            "currency": currency,
+            "key": self.session_key  # Session key required as query parameter
         }
 
-        response_data = self.http_client.get(url, self._headers, params)
+        response = self.api_session.get(url, headers=self._headers, params=params)
+
+        # Log response for debugging
+        logger.debug(f"Balance API response status: {response.status_code}")
+        logger.debug(f"Balance API response: {response.text[:500] if response.text else 'empty'}")
+
+        response.raise_for_status()
+        response_data = response.json()
 
         view_data = response_data.get("View", {}).get("Account", {})
         if not view_data:
@@ -111,13 +375,8 @@ class ExtraDeProAPIClient(BrokerAPIClient):
         )
 
     def logout(self) -> bool:
-        """Logout from ExtradePro API"""
-        # Implementation would depend on API specification
-        # For now, just clear session data
-        self.session_key = None
-        if "session" in self._headers:
-            del self._headers["session"]
-        self.accounts = []
+        """Logout and cleanup"""
+        self.cleanup()
         return True
 
 
