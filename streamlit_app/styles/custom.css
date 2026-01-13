@@ -1,0 +1,87 @@
+/* Custom CSS for Financial Data Aggregator Streamlit App */
+
+/* Main content styling */
+.main .block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+/* Metric cards styling */
+[data-testid="stMetricValue"] {
+    font-size: 28px;
+}
+
+/* Chart container styling */
+.plotly-graph-div {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Table styling */
+.dataframe {
+    font-size: 14px;
+}
+
+/* Button styling */
+.stButton>button {
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+/* Sidebar styling */
+section[data-testid="stSidebar"] {
+    background-color: #f0f2f6;
+}
+
+/* Sidebar content - make background lighter */
+section[data-testid="stSidebar"] > div {
+    background-color: #f0f2f6;
+}
+
+/* Navigation links - dark text for visibility */
+section[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] a,
+section[data-testid="stSidebar"] a {
+    color: #262730 !important;
+    font-weight: 500 !important;
+}
+
+/* Navigation link spans (the actual text) */
+section[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] span {
+    color: #262730 !important;
+}
+
+/* Hover state */
+section[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:hover,
+section[data-testid="stSidebar"] a:hover {
+    color: #0068c9 !important;
+    background-color: #e1e4e8 !important;
+}
+
+/* Active/selected page */
+section[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"][aria-current="page"],
+section[data-testid="stSidebar"] li[class*="selected"] a {
+    background-color: #0068c9 !important;
+    color: white !important;
+}
+
+/* Active page spans */
+section[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"][aria-current="page"] span {
+    color: white !important;
+}
+
+/* Navigation list */
+section[data-testid="stSidebar"] nav ul {
+    background-color: transparent;
+}
+
+/* Individual navigation items */
+section[data-testid="stSidebar"] nav li {
+    border-radius: 6px;
+    margin: 4px 0;
+}
+
+/* RTL text support */
+.rtl {
+    direction: rtl;
+    text-align: right;
+}

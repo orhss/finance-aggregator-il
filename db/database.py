@@ -125,6 +125,19 @@ def SessionLocal(db_path: Path = DEFAULT_DB_PATH) -> Session:
     return factory()
 
 
+def get_session(db_path: Path = DEFAULT_DB_PATH) -> Session:
+    """
+    Get a new database session (alias for SessionLocal for convenience)
+
+    Args:
+        db_path: Path to SQLite database file
+
+    Returns:
+        SQLAlchemy Session instance
+    """
+    return SessionLocal(db_path)
+
+
 def get_db(db_path: Path = DEFAULT_DB_PATH) -> Generator[Session, None, None]:
     """
     Dependency for getting database session (for use with FastAPI/CLI)

@@ -1,0 +1,24 @@
+[theme]
+# Primary theme color (for interactive elements)
+primaryColor = "#0068c9"
+
+# Background color for the main content area
+backgroundColor = "#ffffff"
+
+# Background color for sidebar and other background elements
+secondaryBackgroundColor = "#f0f2f6"
+
+# Text color (THIS IS KEY - dark text instead of white)
+textColor = "#262730"
+
+# Font family
+font = "sans serif"
+
+[server]
+# Enable CORS for development
+enableCORS = false
+enableXsrfProtection = true
+
+[browser]
+# Disable usage stats collection
+gatherUsageStats = false
