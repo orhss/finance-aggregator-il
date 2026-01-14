@@ -1,5 +1,5 @@
 """
-Sync Management Page - View sync status and history (read-only for Phase 2)
+Sync Management Page - Trigger sync and view sync status
 """
 
 import streamlit as st
@@ -7,6 +7,9 @@ import pandas as pd
 from datetime import datetime, timedelta, date
 import sys
 from pathlib import Path
+import subprocess
+import threading
+import queue
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -42,12 +45,79 @@ try:
 
     session = get_session()
 
+    # Initialize sync state
+    if 'sync_running' not in st.session_state:
+        st.session_state.sync_running = False
+    if 'sync_output' not in st.session_state:
+        st.session_state.sync_output = []
+    if 'sync_status' not in st.session_state:
+        st.session_state.sync_status = None
+
+    # Helper function to run sync command
+    def run_sync_command(institution: str = "all", headless: bool = True, months_back: int = 3, months_forward: int = 1):
+        """Run sync command in subprocess and capture output"""
+        st.session_state.sync_running = True
+        st.session_state.sync_output = []
+        st.session_state.sync_status = "running"
+
+        # Build command
+        cmd = ["fin-cli", "sync", institution]
+        if headless:
+            cmd.append("--headless")
+        if months_back:
+            cmd.extend(["--months-back", str(months_back)])
+        if months_forward:
+            cmd.extend(["--months-forward", str(months_forward)])
+
+        try:
+            # Run command and capture output
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True
+            )
+
+            # Read output line by line
+            for line in process.stdout:
+                st.session_state.sync_output.append(line)
+
+            # Wait for completion
+            return_code = process.wait()
+
+            if return_code == 0:
+                st.session_state.sync_status = "success"
+            else:
+                st.session_state.sync_status = "failed"
+
+        except Exception as e:
+            st.session_state.sync_output.append(f"Error: {str(e)}")
+            st.session_state.sync_status = "error"
+        finally:
+            st.session_state.sync_running = False
+
+    # ============================================================================
+    # SYNC EXECUTION SECTION
+    # ============================================================================
+    if st.session_state.sync_running:
+        st.warning("🔄 Sync in progress... Please wait.")
+
+        # Display sync output
+        if st.session_state.sync_output:
+            with st.expander("📋 Sync Output", expanded=True):
+                for line in st.session_state.sync_output:
+                    st.text(line.strip())
+
+        # Auto-refresh while sync is running
+        if st.button("🔄 Refresh Status"):
+            st.rerun()
+
     # ============================================================================
     # SYNC STATUS OVERVIEW
     # ============================================================================
     st.subheader("📊 Sync Status Overview")
-
-    st.info("💡 **Note**: Sync execution from UI will be available in Phase 5. For now, use the CLI: `fin-cli sync all`")
 
     # Get all accounts and their last sync info
     accounts = session.query(Account).all()
@@ -128,14 +198,34 @@ try:
                     if latest_txn_date:
                         st.caption(f"Latest txn: {format_datetime(latest_txn_date, '%Y-%m-%d')}")
 
-                    # Sync button (disabled for now)
-                    st.button(
+                    # Sync button
+                    if st.button(
                         f"🔄 Sync {institution}",
                         key=f"sync_{institution}",
-                        disabled=True,
+                        disabled=st.session_state.sync_running,
                         use_container_width=True,
-                        help="Sync execution will be available in Phase 5"
-                    )
+                        help="Click to sync this institution"
+                    ):
+                        # Map institution names to CLI sync targets
+                        institution_map = {
+                            'cal': 'cal',
+                            'CAL': 'cal',
+                            'max': 'max',
+                            'Max': 'max',
+                            'isracard': 'isracard',
+                            'Isracard': 'isracard',
+                            'excellence': 'excellence',
+                            'Excellence': 'excellence',
+                            'meitav': 'meitav',
+                            'Meitav': 'meitav',
+                            'migdal': 'migdal',
+                            'Migdal': 'migdal',
+                            'phoenix': 'phoenix',
+                            'Phoenix': 'phoenix'
+                        }
+                        sync_target = institution_map.get(institution, institution.lower())
+                        run_sync_command(sync_target)
+                        st.rerun()
 
                     st.markdown("---")
 
@@ -270,24 +360,38 @@ try:
         st.dataframe(df_recent_txn, use_container_width=True, hide_index=True)
 
     # ============================================================================
-    # SYNC OPTIONS (Preview - will be functional in Phase 5)
+    # SYNC OPTIONS
     # ============================================================================
     st.markdown("---")
-    st.subheader("⚙️ Sync Options (Preview)")
-
-    st.info("These options will be functional in Phase 5 when sync execution is enabled")
+    st.subheader("⚙️ Sync Options")
 
     col1, col2 = st.columns(2)
 
     with col1:
         st.markdown("**General Options**")
-        headless_mode = st.checkbox("Headless Mode", value=True, disabled=True)
-        st.caption("Run browser in background without UI")
+        headless_mode = st.checkbox(
+            "Headless Mode",
+            value=True,
+            disabled=st.session_state.sync_running,
+            help="Run browser in background without UI"
+        )
 
     with col2:
         st.markdown("**Date Range**")
-        months_back = st.slider("Months Back", min_value=1, max_value=24, value=3, disabled=True)
-        months_forward = st.slider("Months Forward", min_value=0, max_value=6, value=1, disabled=True)
+        months_back = st.slider(
+            "Months Back",
+            min_value=1,
+            max_value=24,
+            value=3,
+            disabled=st.session_state.sync_running
+        )
+        months_forward = st.slider(
+            "Months Forward",
+            min_value=0,
+            max_value=6,
+            value=1,
+            disabled=st.session_state.sync_running
+        )
 
     st.markdown("**Select Institutions to Sync**")
 
@@ -295,40 +399,67 @@ try:
 
     with col1:
         st.markdown("**Brokers**")
-        st.checkbox("Excellence", disabled=True)
-        st.checkbox("Meitav", disabled=True)
+        sync_excellence = st.checkbox("Excellence", disabled=st.session_state.sync_running, key="sync_opt_excellence")
+        sync_meitav = st.checkbox("Meitav", disabled=st.session_state.sync_running, key="sync_opt_meitav")
 
     with col2:
         st.markdown("**Pensions**")
-        st.checkbox("Migdal", disabled=True)
-        st.checkbox("Phoenix", disabled=True)
+        sync_migdal = st.checkbox("Migdal", disabled=st.session_state.sync_running, key="sync_opt_migdal")
+        sync_phoenix = st.checkbox("Phoenix", disabled=st.session_state.sync_running, key="sync_opt_phoenix")
 
     with col3:
         st.markdown("**Credit Cards**")
-        st.checkbox("CAL", disabled=True)
-        st.checkbox("Max", disabled=True)
-        st.checkbox("Isracard", disabled=True)
+        sync_cal = st.checkbox("CAL", disabled=st.session_state.sync_running, key="sync_opt_cal")
+        sync_max = st.checkbox("Max", disabled=st.session_state.sync_running, key="sync_opt_max")
+        sync_isracard = st.checkbox("Isracard", disabled=st.session_state.sync_running, key="sync_opt_isracard")
 
     st.markdown("---")
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.button(
+        if st.button(
             "🔄 Sync Selected",
             type="primary",
-            disabled=True,
+            disabled=st.session_state.sync_running,
             use_container_width=True,
-            help="Will be enabled in Phase 5"
-        )
+            help="Sync only selected institutions"
+        ):
+            # Collect selected institutions
+            selected = []
+            if sync_excellence:
+                selected.append("excellence")
+            if sync_meitav:
+                selected.append("meitav")
+            if sync_migdal:
+                selected.append("migdal")
+            if sync_phoenix:
+                selected.append("phoenix")
+            if sync_cal:
+                selected.append("cal")
+            if sync_max:
+                selected.append("max")
+            if sync_isracard:
+                selected.append("isracard")
+
+            if selected:
+                # Sync each institution sequentially
+                for inst in selected:
+                    run_sync_command(inst, headless_mode, months_back, months_forward)
+                st.success(f"✅ Queued sync for {len(selected)} institutions")
+                st.rerun()
+            else:
+                st.warning("Please select at least one institution")
 
     with col2:
-        st.button(
+        if st.button(
             "🔄 Sync All",
-            disabled=True,
+            disabled=st.session_state.sync_running,
             use_container_width=True,
-            help="Will be enabled in Phase 5"
-        )
+            help="Sync all configured institutions"
+        ):
+            run_sync_command("all", headless_mode, months_back, months_forward)
+            st.rerun()
 
     # ============================================================================
     # CLI INSTRUCTIONS
@@ -336,8 +467,9 @@ try:
     st.markdown("---")
     st.subheader("💻 CLI Sync Instructions")
 
+    st.info("💡 You can now sync from the UI above, or use the CLI directly:")
+
     st.markdown("""
-    For now, please use the CLI to sync your financial data:
 
     **Sync all institutions:**
     ```bash
