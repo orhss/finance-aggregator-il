@@ -16,6 +16,8 @@ sys.path.insert(0, str(project_root))
 from streamlit_app.utils.session import init_session_state, get_db_session
 from streamlit_app.utils.formatters import format_currency, format_number, format_datetime
 from streamlit_app.utils.rtl import fix_rtl, has_hebrew
+from streamlit_app.utils.cache import get_transactions_cached, invalidate_transaction_cache
+from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, show_success, show_warning
 from streamlit_app.components.sidebar import render_minimal_sidebar
 
 # Page config
@@ -207,12 +209,13 @@ try:
     # ============================================================================
     # BUILD QUERY WITH FILTERS
     # ============================================================================
-    query = session.query(Transaction).filter(
-        and_(
-            Transaction.transaction_date >= start_date,
-            Transaction.transaction_date <= end_date
+    with st.spinner("Loading transactions..."):
+        query = session.query(Transaction).filter(
+            and_(
+                Transaction.transaction_date >= start_date,
+                Transaction.transaction_date <= end_date
+            )
         )
-    )
 
     # Apply account filter
     if selected_accounts:

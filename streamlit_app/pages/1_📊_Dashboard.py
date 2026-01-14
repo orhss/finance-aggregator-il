@@ -14,6 +14,8 @@ sys.path.insert(0, str(project_root))
 
 from streamlit_app.utils.session import init_session_state, get_db_session
 from streamlit_app.utils.formatters import format_currency, format_number, format_datetime
+from streamlit_app.utils.cache import get_dashboard_stats, get_transactions_cached, get_accounts_cached
+from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary
 from streamlit_app.components.sidebar import render_full_sidebar
 from streamlit_app.components.charts import (
     spending_donut,
@@ -40,19 +42,18 @@ st.title("📊 Dashboard")
 st.markdown("High-level overview of your financial status")
 st.markdown("---")
 
-# Get database session
-try:
-    from db.database import get_session
-    from db.models import Account, Transaction, Balance
-    from sqlalchemy import func, and_, desc
+# Load dashboard data with caching and error handling
+with ErrorBoundary("Failed to load dashboard data"):
+    # Get dashboard statistics (cached for 1 minute, default 3 months for performance)
+    stats = safe_call_with_spinner(
+        get_dashboard_stats,
+        spinner_text="Loading dashboard statistics...",
+        error_message="Failed to load dashboard stats",
+        default_return=None,
+        months_back=3
+    )
 
-    session = get_session()
-
-    # Check if database has data
-    account_count = session.query(func.count(Account.id)).scalar()
-    transaction_count = session.query(func.count(Transaction.id)).scalar()
-
-    if not account_count or account_count == 0:
+    if not stats or stats['account_count'] == 0:
         st.warning("⚠️ No data available. Please sync your financial data first.")
         st.info("Go to the **Sync** page to synchronize your accounts.")
 
@@ -69,67 +70,32 @@ try:
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        # Total Portfolio Value - get latest balance for each account
-        latest_balances = session.query(
-            Balance.account_id,
-            func.max(Balance.balance_date).label('max_date')
-        ).group_by(Balance.account_id).subquery()
-
-        total_balance = session.query(
-            func.sum(Balance.total_amount)
-        ).join(
-            latest_balances,
-            and_(
-                Balance.account_id == latest_balances.c.account_id,
-                Balance.balance_date == latest_balances.c.max_date
-            )
-        ).scalar() or 0
-
         st.metric(
             label="Total Portfolio Value",
-            value=format_currency(total_balance),
+            value=format_currency(stats['total_balance']),
             help="Sum of all account balances"
         )
 
     with col2:
-        # Monthly Spending (current month)
-        first_of_month = date.today().replace(day=1)
-        monthly_spending = session.query(func.sum(Transaction.original_amount)).filter(
-            and_(
-                Transaction.transaction_date >= first_of_month,
-                Transaction.original_amount < 0
-            )
-        ).scalar() or 0
         st.metric(
             label="Monthly Spending",
-            value=format_currency(abs(monthly_spending)),
+            value=format_currency(stats['monthly_spending']),
             help="Total spending this month"
         )
 
     with col3:
-        # Pending Transactions
-        pending_count = session.query(func.count(Transaction.id)).filter(
-            Transaction.status == 'pending'
-        ).scalar() or 0
-
-        pending_amount = session.query(func.sum(Transaction.original_amount)).filter(
-            Transaction.status == 'pending'
-        ).scalar() or 0
-
         st.metric(
             label="Pending Transactions",
-            value=format_number(pending_count),
-            delta=format_currency(pending_amount) if pending_amount else None,
+            value=format_number(stats['pending_count']),
+            delta=format_currency(stats['pending_amount']) if stats['pending_amount'] else None,
             help="Transactions awaiting completion"
         )
 
     with col4:
-        # Last Sync Status
-        # For now, show transaction count as proxy
         st.metric(
             label="Total Transactions",
-            value=format_number(transaction_count),
-            help="Total number of synced transactions"
+            value=format_number(stats['transaction_count']),
+            help=f"Total transactions ({stats['period_start']} to {stats['period_end']})"
         )
 
     st.markdown("---")
@@ -137,29 +103,31 @@ try:
     # Quick Charts Section
     st.subheader("📊 Quick Insights")
 
-    # Fetch transaction data for charts
-    # Get last 6 months of data
-    six_months_ago = date.today() - timedelta(days=180)
+    # Fetch transaction data for charts (cached for 5 minutes)
+    six_months_ago = stats['period_start']
+    end_date = stats['period_end']
 
-    transactions_query = session.query(Transaction).filter(
-        and_(
-            Transaction.transaction_date >= six_months_ago,
-            Transaction.original_amount < 0  # Only expenses
-        )
+    transactions_data = safe_call_with_spinner(
+        get_transactions_cached,
+        spinner_text="Loading transaction data for charts...",
+        error_message="Failed to load transaction data",
+        default_return=[],
+        start_date=six_months_ago,
+        end_date=end_date
     )
 
-    # Convert to DataFrame
-    transactions_data = []
-    for txn in transactions_query.all():
-        transactions_data.append({
-            'date': txn.transaction_date,
-            'amount': txn.original_amount,
-            'category': txn.effective_category or 'Uncategorized',
-            'description': txn.description,
-            'status': txn.status
-        })
-
-    df_transactions = pd.DataFrame(transactions_data)
+    # Filter expenses only and convert to DataFrame
+    df_transactions = pd.DataFrame([
+        {
+            'date': txn['transaction_date'],
+            'amount': txn['original_amount'],
+            'category': txn['effective_category'] or 'Uncategorized',
+            'description': txn['description'],
+            'status': txn['status']
+        }
+        for txn in transactions_data
+        if txn['original_amount'] < 0  # Only expenses
+    ])
 
     # Row 1: Spending by Category and Monthly Trend
     if not df_transactions.empty:
@@ -191,32 +159,24 @@ try:
         col1, col2 = st.columns(2)
 
         with col1:
-            # Balance Distribution by Account Type
-            # Get latest balance for each account
-            accounts_with_balance = session.query(
-                Account.account_type,
-                Account.institution,
-                Balance.total_amount
-            ).join(
-                Balance,
-                Balance.account_id == Account.id
-            ).join(
-                latest_balances,
-                and_(
-                    Balance.account_id == latest_balances.c.account_id,
-                    Balance.balance_date == latest_balances.c.max_date
-                )
-            ).filter(Balance.total_amount > 0).all()
+            # Balance Distribution by Account Type (cached)
+            accounts_data = safe_call_with_spinner(
+                get_accounts_cached,
+                spinner_text="Loading account balances...",
+                error_message="Failed to load account data",
+                default_return=[]
+            )
 
-            accounts_data = []
-            for acc_type, institution, balance in accounts_with_balance:
-                accounts_data.append({
-                    'balance': balance,
-                    'account_type': acc_type or 'Other',
-                    'institution': institution
-                })
-
-            df_accounts = pd.DataFrame(accounts_data)
+            # Filter accounts with positive balance
+            df_accounts = pd.DataFrame([
+                {
+                    'balance': acc['latest_balance'],
+                    'account_type': acc['account_type'] or 'Other',
+                    'institution': acc['institution']
+                }
+                for acc in accounts_data
+                if acc['latest_balance'] > 0
+            ])
 
             if not df_accounts.empty:
                 fig_balance = balance_distribution(
@@ -253,19 +213,19 @@ try:
     with col1:
         st.markdown("#### Last 10 Transactions")
 
-        # Get last 10 transactions
-        recent_txns = session.query(Transaction).order_by(
-            Transaction.transaction_date.desc()
-        ).limit(10).all()
+        # Get recent transactions from cached data (already loaded)
+        if transactions_data:
+            # Sort by date and take last 10
+            sorted_txns = sorted(transactions_data, key=lambda x: x['transaction_date'], reverse=True)[:10]
 
-        if recent_txns:
             txn_data = []
-            for txn in recent_txns:
+            for txn in sorted_txns:
+                desc = txn['description']
                 txn_data.append({
-                    'Date': format_datetime(txn.transaction_date, '%Y-%m-%d'),
-                    'Description': txn.description[:40] + '...' if len(txn.description) > 40 else txn.description,
-                    'Amount': format_currency(txn.original_amount),
-                    'Category': txn.effective_category or '-'
+                    'Date': format_datetime(txn['transaction_date'], '%Y-%m-%d'),
+                    'Description': desc[:40] + '...' if len(desc) > 40 else desc,
+                    'Amount': format_currency(txn['original_amount']),
+                    'Category': txn['effective_category'] or '-'
                 })
 
             df_recent = pd.DataFrame(txn_data)
@@ -276,28 +236,14 @@ try:
     with col2:
         st.markdown("#### Account Summary")
 
-        # Get all accounts with their latest balance
-        accounts_with_balances = session.query(
-            Account.institution,
-            Account.account_type,
-            Balance.total_amount
-        ).outerjoin(
-            Balance,
-            Balance.account_id == Account.id
-        ).outerjoin(
-            latest_balances,
-            and_(
-                Balance.account_id == latest_balances.c.account_id,
-                Balance.balance_date == latest_balances.c.max_date
-            )
-        ).all()
-
-        if accounts_with_balances:
+        # Use cached accounts data (already loaded)
+        if accounts_data:
             acc_data = []
-            for institution, acc_type, balance in accounts_with_balances:
+            for acc in accounts_data:
+                balance = acc['latest_balance']
                 acc_data.append({
-                    'Institution': institution,
-                    'Type': acc_type or '-',
+                    'Institution': acc['institution'],
+                    'Type': acc['account_type'] or '-',
                     'Balance': format_currency(balance) if balance else 'N/A',
                     'Status': '✅' if balance and balance > 0 else '⭕'
                 })
@@ -325,8 +271,3 @@ try:
     with col3:
         if st.button("📈 View Analytics", use_container_width=True):
             st.switch_page("pages/4_📈_Analytics.py")
-
-except Exception as e:
-    st.error(f"Error loading dashboard: {str(e)}")
-    st.exception(e)
-    st.info("💡 Make sure the database is initialized with `fin-cli init`")

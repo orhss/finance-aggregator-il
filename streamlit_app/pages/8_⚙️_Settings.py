@@ -39,7 +39,7 @@ st.markdown("---")
 try:
     from db.database import get_session
     from db.models import Account, Transaction, Balance, Tag
-    from config.settings import CONFIG_DIR, get_credentials_path
+    from config.settings import CONFIG_DIR, CREDENTIALS_FILE
     from sqlalchemy import func
     import json
 
@@ -53,7 +53,7 @@ try:
     st.info("💡 **Security Note**: Credentials are encrypted and stored in `~/.fin/credentials.enc`. Use the CLI to manage credentials: `fin-cli config setup`")
 
     # Check if credentials file exists
-    creds_path = get_credentials_path()
+    creds_path = CREDENTIALS_FILE
     creds_exist = creds_path.exists()
 
     if creds_exist:

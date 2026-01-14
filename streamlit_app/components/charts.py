@@ -26,6 +26,12 @@ COLORS = {
     'info': '#16a085',
     'purple': '#9b59b6',
     'gray': '#95a5a6',
+    # Transparent versions for fills
+    'primary_light': 'rgba(52, 152, 219, 0.1)',
+    'success_light': 'rgba(39, 174, 96, 0.1)',
+    'danger_light': 'rgba(231, 76, 60, 0.1)',
+    'warning_light': 'rgba(243, 156, 18, 0.1)',
+    'info_light': 'rgba(22, 160, 133, 0.1)',
 }
 
 CATEGORY_COLORS = px.colors.qualitative.Set3
@@ -121,7 +127,7 @@ def trend_line(
             line=dict(color=COLORS['primary'], width=2),
             marker=dict(size=6),
             fill='tozeroy',
-            fillcolor='rgba(52, 152, 219, 0.1)',
+            fillcolor=COLORS['primary_light'],
             hovertemplate='%{x}<br>%{y:,.2f}₪<extra></extra>'
         )])
 
@@ -357,7 +363,7 @@ def _empty_chart(title: str) -> go.Figure:
         x=0.5,
         y=0.5,
         showarrow=False,
-        font=dict(size=16, color="gray")
+        font=dict(size=16, color=COLORS['gray'])
     )
 
     fig.update_layout(

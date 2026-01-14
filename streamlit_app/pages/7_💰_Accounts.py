@@ -71,10 +71,8 @@ try:
         Balance.balance_date
     ).outerjoin(
         Balance,
-        Balance.account_id == Account.id
-    ).outerjoin(
-        latest_balances,
         and_(
+            Balance.account_id == Account.id,
             Balance.account_id == latest_balances.c.account_id,
             Balance.balance_date == latest_balances.c.max_date
         )
@@ -249,9 +247,9 @@ try:
 
             # Balance History Chart
             st.markdown("---")
-            st.markdown("**Balance History (Last 6 Months)**")
+            st.markdown("**Balance History (Last 3 Months)**")
 
-            six_months_ago = date.today() - timedelta(days=180)
+            three_months_ago = date.today() - timedelta(days=90)
 
             balance_history_query = session.query(
                 Balance.balance_date,
@@ -259,7 +257,7 @@ try:
             ).filter(
                 and_(
                     Balance.account_id == account_id,
-                    Balance.balance_date >= six_months_ago
+                    Balance.balance_date >= three_months_ago
                 )
             ).order_by(Balance.balance_date).all()
 

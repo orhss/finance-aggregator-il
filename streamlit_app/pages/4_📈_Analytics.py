@@ -18,6 +18,14 @@ sys.path.insert(0, str(project_root))
 
 from streamlit_app.utils.session import init_session_state, get_db_session
 from streamlit_app.utils.formatters import format_currency, format_number, format_datetime
+from streamlit_app.utils.cache import (
+    get_transactions_cached,
+    get_category_spending_cached,
+    get_monthly_trend_cached,
+    get_accounts_cached,
+    get_tags_cached
+)
+from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, show_info
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.charts import (
     spending_donut,
@@ -29,6 +37,7 @@ from streamlit_app.components.charts import (
     COLORS,
     CATEGORY_COLORS
 )
+from streamlit_app.components.heatmap import calendar_heatmap, monthly_heatmap
 
 # Page config
 st.set_page_config(
@@ -120,16 +129,16 @@ def time_range_selector() -> Tuple[date, date]:
         return st.session_state.date_range[1], st.session_state.date_range[2]
 
 
-# Get database session
-try:
+# Load analytics data with caching and error handling
+with ErrorBoundary("Failed to load analytics data"):
     from db.database import get_session
     from db.models import Account, Transaction, Balance, Tag, TransactionTag
     from sqlalchemy import func, and_, desc, extract
 
+    # Check if database has data (quick check)
     session = get_session()
-
-    # Check if database has data
     transaction_count = session.query(func.count(Transaction.id)).scalar()
+    session.close()
 
     if not transaction_count or transaction_count == 0:
         st.warning("⚠️ No transaction data available. Please sync your financial data first.")
@@ -143,27 +152,30 @@ try:
     st.info(f"Showing data from **{start_date}** to **{end_date}**")
     st.markdown("---")
 
-    # Fetch transactions for selected period
-    transactions_query = session.query(Transaction).filter(
-        and_(
-            Transaction.transaction_date >= start_date,
-            Transaction.transaction_date <= end_date
-        )
+    # Fetch transactions for selected period (cached for 5 minutes)
+    transactions_list = safe_call_with_spinner(
+        get_transactions_cached,
+        spinner_text="Loading transactions for analysis...",
+        error_message="Failed to load transaction data",
+        default_return=[],
+        start_date=start_date,
+        end_date=end_date
     )
 
     # Convert to DataFrame
     transactions_data = []
-    for txn in transactions_query.all():
+    for txn in transactions_list:
+        txn_date = txn['transaction_date']
         transactions_data.append({
-            'id': txn.id,
-            'date': txn.transaction_date,
-            'amount': txn.original_amount,
-            'category': txn.effective_category or 'Uncategorized',
-            'description': txn.description,
-            'status': txn.status,
-            'account_id': txn.account_id,
-            'is_expense': txn.original_amount < 0,
-            'day_of_week': txn.transaction_date.strftime('%A') if txn.transaction_date else 'Unknown'
+            'id': txn['id'],
+            'date': txn_date,
+            'amount': txn['original_amount'],
+            'category': txn['effective_category'] or 'Uncategorized',
+            'description': txn['description'],
+            'status': txn['status'],
+            'account_id': txn['account_id'],
+            'is_expense': txn['original_amount'] < 0,
+            'day_of_week': txn_date.strftime('%A') if txn_date else 'Unknown'
         })
 
     df_all = pd.DataFrame(transactions_data)
@@ -172,8 +184,13 @@ try:
         st.warning("No transactions found in the selected date range.")
         st.stop()
 
+    # Convert date column to datetime for proper .dt accessor usage
+    df_all['date'] = pd.to_datetime(df_all['date'])
+
     # Filter for expenses only (for most charts)
     df_expenses = df_all[df_all['is_expense']].copy()
+    # Ensure date column is datetime in df_expenses as well
+    df_expenses['date'] = pd.to_datetime(df_expenses['date'])
 
     # Create tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -274,6 +291,58 @@ try:
                 num_days = (end_date - start_date).days + 1
                 daily_avg = abs(total_spent) / num_days
                 st.metric("Average Daily Spending", format_currency(daily_avg))
+
+            # Calendar Heatmap
+            st.markdown("---")
+            st.subheader("📅 Daily Spending Calendar")
+
+            # Year selector for heatmap
+            col_year1, col_year2 = st.columns([1, 3])
+            with col_year1:
+                available_years = sorted(df_all['date'].dt.year.unique(), reverse=True)
+                if available_years:
+                    selected_year = st.selectbox(
+                        "Select Year",
+                        options=available_years,
+                        index=0,
+                        key="heatmap_year"
+                    )
+                else:
+                    selected_year = date.today().year
+
+            with col_year2:
+                st.caption("Hover over cells to see daily spending. Darker colors indicate higher spending.")
+
+            # Filter data for selected year
+            df_year = df_expenses[df_expenses['date'].dt.year == selected_year].copy()
+
+            if not df_year.empty:
+                fig_heatmap = calendar_heatmap(
+                    df_year,
+                    date_col='date',
+                    value_col='amount',
+                    year=selected_year,
+                    title=f"Daily Spending Heatmap - {selected_year}",
+                    colorscale='Reds'
+                )
+                st.plotly_chart(fig_heatmap, use_container_width=True)
+
+                # Quick stats for the year
+                col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+                with col_s1:
+                    year_total = df_year['amount'].sum()
+                    st.metric("Year Total", format_currency(abs(year_total)))
+                with col_s2:
+                    year_avg = df_year['amount'].mean()
+                    st.metric("Avg Transaction", format_currency(abs(year_avg)))
+                with col_s3:
+                    days_with_spending = df_year['date'].dt.date.nunique()
+                    st.metric("Days with Spending", f"{days_with_spending} days")
+                with col_s4:
+                    max_day = df_year.groupby(df_year['date'].dt.date)['amount'].sum().abs().max()
+                    st.metric("Highest Day", format_currency(max_day))
+            else:
+                st.info(f"No spending data available for {selected_year}")
 
     # ============================================================================
     # TAB 2: TRENDS
@@ -399,40 +468,28 @@ try:
         with col1:
             st.subheader("Portfolio Composition")
 
-            # Get latest balance for each account
-            latest_balances = session.query(
-                Balance.account_id,
-                func.max(Balance.balance_date).label('max_date')
-            ).group_by(Balance.account_id).subquery()
+            # Get accounts with balances (cached for 5 minutes)
+            accounts_list = safe_call_with_spinner(
+                get_accounts_cached,
+                spinner_text="Loading account balances...",
+                error_message="Failed to load account data",
+                default_return=[]
+            )
 
-            accounts_with_balance = session.query(
-                Account.account_type,
-                Account.institution,
-                Balance.total_amount,
-                Account.id
-            ).join(
-                Balance,
-                Balance.account_id == Account.id
-            ).join(
-                latest_balances,
-                and_(
-                    Balance.account_id == latest_balances.c.account_id,
-                    Balance.balance_date == latest_balances.c.max_date
-                )
-            ).filter(Balance.total_amount > 0).all()
-
-            if accounts_with_balance:
-                accounts_data = []
-                for acc_type, institution, balance, acc_id in accounts_with_balance:
+            # Filter accounts with positive balance
+            accounts_data = []
+            for acc in accounts_list:
+                if acc['latest_balance'] > 0:
                     accounts_data.append({
-                        'balance': balance,
-                        'account_type': acc_type or 'Other',
-                        'institution': institution,
-                        'account_id': acc_id
+                        'balance': acc['latest_balance'],
+                        'account_type': acc['account_type'] or 'Other',
+                        'institution': acc['institution'],
+                        'account_id': acc['id']
                     })
 
-                df_accounts = pd.DataFrame(accounts_data)
+            df_accounts = pd.DataFrame(accounts_data)
 
+            if not df_accounts.empty:
                 fig_portfolio = balance_distribution(
                     df_accounts,
                     title="Balance by Account Type",
@@ -446,7 +503,7 @@ try:
         with col2:
             st.subheader("Balance by Institution")
 
-            if accounts_with_balance:
+            if not df_accounts.empty:
                 fig_inst = balance_distribution(
                     df_accounts,
                     title="Balance by Institution",
@@ -454,23 +511,30 @@ try:
                     label_col="institution"
                 )
                 st.plotly_chart(fig_inst, use_container_width=True)
+            else:
+                st.info("No balance data available")
 
         # Balance History
         st.subheader("Balance History Over Time")
 
-        balance_history_query = session.query(
-            Balance.balance_date,
-            Balance.total_amount,
-            Account.institution
-        ).join(
-            Account,
-            Account.id == Balance.account_id
-        ).filter(
-            and_(
-                Balance.balance_date >= start_date,
-                Balance.balance_date <= end_date
-            )
-        ).order_by(Balance.balance_date).all()
+        with st.spinner("Loading balance history..."):
+            session = get_session()
+            try:
+                balance_history_query = session.query(
+                    Balance.balance_date,
+                    Balance.total_amount,
+                    Account.institution
+                ).join(
+                    Account,
+                    Account.id == Balance.account_id
+                ).filter(
+                    and_(
+                        Balance.balance_date >= start_date,
+                        Balance.balance_date <= end_date
+                    )
+                ).order_by(Balance.balance_date).all()
+            finally:
+                session.close()
 
         if balance_history_query:
             balance_data = []
@@ -497,27 +561,27 @@ try:
         # Account Summary Table
         st.subheader("Account Summary")
 
-        if accounts_with_balance:
-            summary_data = []
-            for acc_type, institution, balance, acc_id in accounts_with_balance:
-                # Get transaction count for this account
-                txn_count = session.query(func.count(Transaction.id)).filter(
-                    and_(
-                        Transaction.account_id == acc_id,
-                        Transaction.transaction_date >= start_date,
-                        Transaction.transaction_date <= end_date
-                    )
-                ).scalar()
+        if not df_accounts.empty:
+            with st.spinner("Calculating account summaries..."):
+                summary_data = []
+                session = get_session()
+                try:
+                    for _, row in df_accounts.iterrows():
+                        acc_id = row['account_id']
+                        # Get transaction count for this account from cached data
+                        txn_count = len([t for t in transactions_list if t['account_id'] == acc_id])
 
-                summary_data.append({
-                    'Type': acc_type or 'Other',
-                    'Institution': institution,
-                    'Balance': format_currency(balance),
-                    'Transactions': txn_count or 0
-                })
+                        summary_data.append({
+                            'Type': row['account_type'],
+                            'Institution': row['institution'],
+                            'Balance': format_currency(row['balance']),
+                            'Transactions': txn_count
+                        })
+                finally:
+                    session.close()
 
-            df_summary = pd.DataFrame(summary_data)
-            st.dataframe(df_summary, use_container_width=True, hide_index=True)
+                df_summary = pd.DataFrame(summary_data)
+                st.dataframe(df_summary, use_container_width=True, hide_index=True)
 
     # ============================================================================
     # TAB 4: TAGS ANALYSIS
@@ -526,23 +590,28 @@ try:
         st.header("Tags Analysis")
 
         # Get all tags with transaction data
-        tags_query = session.query(
-            Tag.name,
-            func.count(TransactionTag.transaction_id).label('count'),
-            func.sum(Transaction.original_amount).label('total_amount')
-        ).join(
-            TransactionTag,
-            TransactionTag.tag_id == Tag.id
-        ).join(
-            Transaction,
-            Transaction.id == TransactionTag.transaction_id
-        ).filter(
-            and_(
-                Transaction.transaction_date >= start_date,
-                Transaction.transaction_date <= end_date,
-                Transaction.original_amount < 0  # Only expenses
-            )
-        ).group_by(Tag.name).all()
+        with st.spinner("Loading tag data..."):
+            session = get_session()
+            try:
+                tags_query = session.query(
+                    Tag.name,
+                    func.count(TransactionTag.transaction_id).label('count'),
+                    func.sum(Transaction.original_amount).label('total_amount')
+                ).join(
+                    TransactionTag,
+                    TransactionTag.tag_id == Tag.id
+                ).join(
+                    Transaction,
+                    Transaction.id == TransactionTag.transaction_id
+                ).filter(
+                    and_(
+                        Transaction.transaction_date >= start_date,
+                        Transaction.transaction_date <= end_date,
+                        Transaction.original_amount < 0  # Only expenses
+                    )
+                ).group_by(Tag.name).all()
+            finally:
+                session.close()
 
         if tags_query and len(tags_query) > 0:
             # Spending by Tag
@@ -593,24 +662,29 @@ try:
             top_tags = df_tags.nlargest(5, 'amount')['tag'].tolist()
 
             # Get transaction data for these tags
-            tag_trend_query = session.query(
-                Tag.name,
-                Transaction.transaction_date,
-                Transaction.original_amount
-            ).join(
-                TransactionTag,
-                TransactionTag.tag_id == Tag.id
-            ).join(
-                Transaction,
-                Transaction.id == TransactionTag.transaction_id
-            ).filter(
-                and_(
-                    Tag.name.in_(top_tags),
-                    Transaction.transaction_date >= start_date,
-                    Transaction.transaction_date <= end_date,
-                    Transaction.original_amount < 0
-                )
-            ).all()
+            with st.spinner("Loading tag trends..."):
+                session = get_session()
+                try:
+                    tag_trend_query = session.query(
+                        Tag.name,
+                        Transaction.transaction_date,
+                        Transaction.original_amount
+                    ).join(
+                        TransactionTag,
+                        TransactionTag.tag_id == Tag.id
+                    ).join(
+                        Transaction,
+                        Transaction.id == TransactionTag.transaction_id
+                    ).filter(
+                        and_(
+                            Tag.name.in_(top_tags),
+                            Transaction.transaction_date >= start_date,
+                            Transaction.transaction_date <= end_date,
+                            Transaction.original_amount < 0
+                        )
+                    ).all()
+                finally:
+                    session.close()
 
             if tag_trend_query:
                 tag_trend_data = []
@@ -655,27 +729,32 @@ try:
         # Untagged transactions summary
         st.subheader("Untagged Transactions")
 
-        untagged_count = session.query(func.count(Transaction.id)).filter(
-            and_(
-                Transaction.transaction_date >= start_date,
-                Transaction.transaction_date <= end_date,
-                Transaction.original_amount < 0,
-                ~Transaction.id.in_(
-                    session.query(TransactionTag.transaction_id)
-                )
-            )
-        ).scalar()
+        with st.spinner("Calculating untagged transactions..."):
+            session = get_session()
+            try:
+                untagged_count = session.query(func.count(Transaction.id)).filter(
+                    and_(
+                        Transaction.transaction_date >= start_date,
+                        Transaction.transaction_date <= end_date,
+                        Transaction.original_amount < 0,
+                        ~Transaction.id.in_(
+                            session.query(TransactionTag.transaction_id)
+                        )
+                    )
+                ).scalar()
 
-        untagged_amount = session.query(func.sum(Transaction.original_amount)).filter(
-            and_(
-                Transaction.transaction_date >= start_date,
-                Transaction.transaction_date <= end_date,
-                Transaction.original_amount < 0,
-                ~Transaction.id.in_(
-                    session.query(TransactionTag.transaction_id)
-                )
-            )
-        ).scalar() or 0
+                untagged_amount = session.query(func.sum(Transaction.original_amount)).filter(
+                    and_(
+                        Transaction.transaction_date >= start_date,
+                        Transaction.transaction_date <= end_date,
+                        Transaction.original_amount < 0,
+                        ~Transaction.id.in_(
+                            session.query(TransactionTag.transaction_id)
+                        )
+                    )
+                ).scalar() or 0
+            finally:
+                session.close()
 
         col1, col2 = st.columns(2)
         with col1:
@@ -844,12 +923,16 @@ try:
         account_spending = df_expenses.groupby('account_id')['amount'].sum().abs().sort_values(ascending=False)
 
         if len(account_spending) > 0:
-            # Get account names
+            # Get account names from cached data
+            accounts_cached = safe_call_with_spinner(
+                get_accounts_cached,
+                spinner_text="Loading account details...",
+                error_message="Failed to load accounts",
+                default_return=[]
+            )
             account_names = {}
-            for acc_id in account_spending.index:
-                acc = session.query(Account).filter(Account.id == acc_id).first()
-                if acc:
-                    account_names[acc_id] = f"{acc.institution} - {acc.account_type or 'Account'}"
+            for acc in accounts_cached:
+                account_names[acc['id']] = f"{acc['institution']} - {acc['account_type'] or 'Account'}"
 
             # Create comparison chart
             fig_acc_comp = go.Figure(data=[go.Bar(
@@ -901,8 +984,3 @@ try:
                 mime="text/csv",
                 use_container_width=True
             )
-
-except Exception as e:
-    st.error(f"Error loading analytics: {str(e)}")
-    st.exception(e)
-    st.info("💡 Make sure the database is initialized with `fin-cli init`")
