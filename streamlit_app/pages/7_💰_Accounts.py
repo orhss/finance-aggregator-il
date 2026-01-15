@@ -59,24 +59,27 @@ try:
     # ============================================================================
     st.subheader("📊 Accounts Overview")
 
-    # Get latest balance for each account
-    latest_balances = session.query(
-        Balance.account_id,
-        func.max(Balance.balance_date).label('max_date')
-    ).group_by(Balance.account_id).subquery()
+    # Get latest balance for each account using analytics service
+    from services.analytics_service import AnalyticsService
+    analytics = AnalyticsService(session)
 
-    accounts_with_balance = session.query(
-        Account,
-        Balance.total_amount,
-        Balance.balance_date
-    ).outerjoin(
-        Balance,
-        and_(
-            Balance.account_id == Account.id,
-            Balance.account_id == latest_balances.c.account_id,
-            Balance.balance_date == latest_balances.c.max_date
-        )
+    # Get accounts with their latest balances
+    latest_balances_data = analytics.get_latest_balances()
+
+    # Also get accounts without balances (not returned by get_latest_balances)
+    accounts_with_balances_ids = [acc.id for acc, _ in latest_balances_data]
+    accounts_without_balances = session.query(Account).filter(
+        ~Account.id.in_(accounts_with_balances_ids) if accounts_with_balances_ids else True
     ).all()
+
+    # Combine into format expected by rest of page: (Account, balance_amount, balance_date)
+    accounts_with_balance = []
+    for account, balance in latest_balances_data:
+        accounts_with_balance.append((account, balance.total_amount, balance.balance_date))
+
+    # Add accounts without balances
+    for account in accounts_without_balances:
+        accounts_with_balance.append((account, None, None))
 
     # Group by account type
     account_types = {}
