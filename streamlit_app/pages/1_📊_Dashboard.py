@@ -19,6 +19,7 @@ from streamlit_app.utils.formatters import (
 )
 from streamlit_app.utils.cache import get_dashboard_stats, get_transactions_cached, get_accounts_cached
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary
+from streamlit_app.utils.insights import generate_spending_insight, generate_pending_insight
 from streamlit_app.components.sidebar import render_full_sidebar
 from streamlit_app.components.charts import (
     spending_donut,
@@ -65,45 +66,69 @@ with ErrorBoundary("Failed to load dashboard data"):
         empty_dashboard_state()
         st.stop()
 
-    # Summary Cards Row
-    st.subheader("📈 Summary")
+    # ========================================================================
+    # HERO METRICS (Most Important - 2 key numbers)
+    # ========================================================================
+    st.markdown("## 💰 Your Financial Snapshot")
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns(2)
 
     with col1:
-        st.metric(
-            label="Total Portfolio Value",
-            value=format_currency(stats['total_balance']),
-            help="Sum of all account balances"
-        )
+        # Net Worth / Total Balance (Primary Hero)
+        balance_color = "#00897b" if stats['total_balance'] >= 0 else "#c62828"
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <p style="margin: 0; font-size: 0.9rem; color: #666; font-weight: 500;">Net Worth</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 2rem; font-weight: 700; color: {balance_color}; font-family: 'SF Mono', monospace;">
+                {format_currency(stats['total_balance'])}
+            </p>
+            <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #888;">
+                Across {stats['account_count']} account{'s' if stats['account_count'] > 1 else ''}
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
     with col2:
-        st.metric(
-            label="Monthly Spending",
-            value=format_currency(stats['monthly_spending']),
-            help="Total spending this month"
-        )
+        # Monthly Spending (Secondary Hero)
+        monthly_spending = abs(stats['monthly_spending']) if stats['monthly_spending'] else 0
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #fff5f5 0%, #fecaca 100%); padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <p style="margin: 0; font-size: 0.9rem; color: #666; font-weight: 500;">This Month's Spending</p>
+            <p style="margin: 0.5rem 0 0 0; font-size: 2rem; font-weight: 700; color: #c62828; font-family: 'SF Mono', monospace;">
+                ₪{monthly_spending:,.2f}
+            </p>
+            <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #888;">
+                {format_number(stats['transaction_count'])} transactions total
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
-    with col3:
-        st.metric(
-            label="Pending Transactions",
-            value=format_number(stats['pending_count']),
-            delta=format_currency(stats['pending_amount']) if stats['pending_amount'] else None,
-            help="Transactions awaiting completion"
-        )
+    # ========================================================================
+    # CONTEXTUAL INSIGHT
+    # ========================================================================
+    # Build insight data
+    insight_data = {
+        'monthly_spending': abs(stats['monthly_spending']) if stats['monthly_spending'] else 0,
+        'monthly_avg_spending': stats.get('monthly_avg_spending'),
+        'transaction_count': stats['transaction_count'],
+        'pending_count': stats['pending_count'],
+        'pending_amount': stats['pending_amount']
+    }
 
-    with col4:
-        st.metric(
-            label="Total Transactions",
-            value=format_number(stats['transaction_count']),
-            help=f"Total transactions ({stats['period_start']} to {stats['period_end']})"
-        )
+    spending_insight = generate_spending_insight(insight_data)
+    pending_insight = generate_pending_insight(insight_data)
+
+    if spending_insight:
+        st.info(f"💡 **Insight:** {spending_insight}")
+
+    if pending_insight:
+        st.warning(f"⏳ {pending_insight}")
 
     st.markdown("---")
 
-    # Quick Charts Section
-    st.subheader("📊 Quick Insights")
-
+    # ========================================================================
+    # PROGRESSIVE DISCLOSURE WITH TABS
+    # ========================================================================
     # Fetch transaction data for charts (cached for 5 minutes)
     six_months_ago = stats['period_start']
     end_date = stats['period_end']
@@ -130,45 +155,60 @@ with ErrorBoundary("Failed to load dashboard data"):
         if txn['original_amount'] < 0  # Only expenses
     ])
 
-    # Row 1: Spending by Category and Monthly Trend
-    if not df_transactions.empty:
-        col1, col2 = st.columns(2)
+    # Load accounts data once
+    accounts_data = safe_call_with_spinner(
+        get_accounts_cached,
+        spinner_text="Loading account balances...",
+        error_message="Failed to load account data",
+        default_return=[]
+    )
 
-        with col1:
-            # Spending by Category (Donut)
-            fig_donut = spending_donut(
-                df_transactions,
-                title="Spending by Category (Top 10)",
-                value_col="amount",
-                label_col="category",
-                top_n=10
-            )
-            st.plotly_chart(fig_donut, use_container_width=True)
+    # Organize content into tabs for progressive disclosure
+    tab_overview, tab_trends, tab_categories = st.tabs(["📊 Overview", "📈 Trends", "🎯 Categories"])
 
-        with col2:
+    with tab_overview:
+        # Quick overview - 2 charts max
+        if not df_transactions.empty:
+            col1, col2 = st.columns(2)
+
+            with col1:
+                # Spending by Category (Donut) - Most useful at a glance
+                fig_donut = spending_donut(
+                    df_transactions,
+                    title="Where Your Money Goes",
+                    value_col="amount",
+                    label_col="category",
+                    top_n=8
+                )
+                st.plotly_chart(fig_donut, use_container_width=True)
+
+            with col2:
+                # Recent Spending by Day (Last 14 days)
+                fig_daily = spending_by_day(
+                    df_transactions,
+                    title="Recent Daily Spending",
+                    date_col="date",
+                    amount_col="amount",
+                    days=14
+                )
+                st.plotly_chart(fig_daily, use_container_width=True)
+        else:
+            st.info("No transaction data available for charts. Sync your accounts to see insights.")
+
+    with tab_trends:
+        # Detailed trends
+        if not df_transactions.empty:
             # Monthly Spending Trend
             fig_monthly = monthly_trend(
                 df_transactions,
-                title="Monthly Spending Trend (Last 6 Months)",
+                title="Monthly Spending Trend",
                 date_col="date",
                 amount_col="amount",
                 months=6
             )
             st.plotly_chart(fig_monthly, use_container_width=True)
 
-        # Row 2: Balance Distribution and Recent Spending
-        col1, col2 = st.columns(2)
-
-        with col1:
-            # Balance Distribution by Account Type (cached)
-            accounts_data = safe_call_with_spinner(
-                get_accounts_cached,
-                spinner_text="Loading account balances...",
-                error_message="Failed to load account data",
-                default_return=[]
-            )
-
-            # Filter accounts with positive balance
+            # Balance Distribution by Account Type
             df_accounts = pd.DataFrame([
                 {
                     'balance': acc['latest_balance'],
@@ -187,22 +227,31 @@ with ErrorBoundary("Failed to load dashboard data"):
                     label_col="account_type"
                 )
                 st.plotly_chart(fig_balance, use_container_width=True)
-            else:
-                st.info("No account balance data available")
+        else:
+            st.info("No trend data available. Sync your accounts to see trends.")
 
-        with col2:
-            # Recent Spending by Day (Last 14 days)
-            fig_daily = spending_by_day(
-                df_transactions,
-                title="Daily Spending (Last 14 Days)",
-                date_col="date",
-                amount_col="amount",
-                days=14
-            )
-            st.plotly_chart(fig_daily, use_container_width=True)
+    with tab_categories:
+        # Category breakdown
+        if not df_transactions.empty:
+            # Aggregate by category
+            category_totals = df_transactions.groupby('category')['amount'].sum().abs().sort_values(ascending=False)
 
-    else:
-        st.info("No transaction data available for charts. Sync your accounts to see insights.")
+            st.markdown("#### Spending by Category")
+
+            # Show top categories as a table with progress bars
+            total_spending = category_totals.sum()
+
+            for category, amount in category_totals.head(10).items():
+                pct = (amount / total_spending) * 100 if total_spending > 0 else 0
+                col1, col2, col3 = st.columns([3, 1, 1])
+                with col1:
+                    st.progress(pct / 100, text=category)
+                with col2:
+                    st.markdown(f"**₪{amount:,.0f}**")
+                with col3:
+                    st.markdown(f"*{pct:.1f}%*")
+        else:
+            st.info("No category data available. Sync your accounts to see category breakdown.")
 
     st.markdown("---")
 
