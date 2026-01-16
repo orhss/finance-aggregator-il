@@ -23,6 +23,7 @@ from streamlit_app.utils.cache import get_transactions_cached, invalidate_transa
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, show_success, show_warning
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.empty_states import empty_transactions_state
+from streamlit_app.components.filters import date_range_filter_with_presets
 
 # Page config
 st.set_page_config(
@@ -99,33 +100,28 @@ try:
         empty_transactions_state()
         st.stop()
 
+    # Get earliest and latest transaction dates for data coverage info
+    earliest_date = session.query(func.min(Transaction.transaction_date)).scalar()
+    latest_date = session.query(func.max(Transaction.transaction_date)).scalar()
+
     # ============================================================================
     # FILTER PANEL
     # ============================================================================
     with st.expander("🔍 Filters", expanded=True):
+        # Date Range with Quick Presets (full width)
+        st.markdown("**Date Range**")
+        start_date, end_date = date_range_filter_with_presets(
+            key_prefix="txn_filter",
+            default_months_back=3,
+            data_start=earliest_date,
+            data_end=latest_date
+        )
+
+        st.markdown("---")
+
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            # Date Range Filter
-            st.markdown("**Date Range**")
-            default_start = date.today() - timedelta(days=90)
-            default_end = date.today()
-
-            start_date = st.date_input(
-                "From",
-                value=default_start,
-                max_value=date.today(),
-                key="filter_start_date"
-            )
-            end_date = st.date_input(
-                "To",
-                value=default_end,
-                max_value=date.today(),
-                min_value=start_date,
-                key="filter_end_date"
-            )
-
-        with col2:
             # Account and Institution Filter
             st.markdown("**Account / Institution**")
 
@@ -149,7 +145,7 @@ try:
                 key="filter_institutions"
             )
 
-        with col3:
+        with col2:
             # Status and Category Filter
             st.markdown("**Status / Category**")
 
@@ -180,10 +176,7 @@ try:
                 key="filter_categories"
             )
 
-        # Second row of filters
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
+        with col3:
             # Tags Filter
             st.markdown("**Tags**")
 
@@ -199,7 +192,10 @@ try:
 
             untagged_only = st.checkbox("Untagged Only", key="filter_untagged")
 
-        with col2:
+        # Second row of filters
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
             # Amount Range Filter
             st.markdown("**Amount Range**")
 
@@ -217,7 +213,7 @@ try:
                 key="filter_amount_max"
             )
 
-        with col3:
+        with col2:
             # Search Filter
             st.markdown("**Search**")
 
@@ -227,11 +223,16 @@ try:
                 key="filter_search"
             )
 
+        with col3:
+            # Transaction Type Filter
+            st.markdown("**Transaction Type**")
+
             transaction_type = st.radio(
                 "Transaction Type",
                 options=["All", "Expenses", "Income"],
                 key="filter_type",
-                horizontal=True
+                horizontal=True,
+                label_visibility="collapsed"
             )
 
         # Action buttons

@@ -309,3 +309,96 @@ def quick_date_buttons(key_prefix: str) -> Optional[Tuple[date, date]]:
             return start, today
 
     return None
+
+
+def date_range_filter_with_presets(
+    key_prefix: str = "",
+    default_months_back: int = 3,
+    data_start: Optional[date] = None,
+    data_end: Optional[date] = None
+) -> Tuple[date, date]:
+    """
+    Date range filter with quick preset buttons and data coverage info.
+
+    Args:
+        key_prefix: Unique prefix for widget keys
+        default_months_back: Default months to go back from today
+        data_start: Earliest date with data (for showing coverage info)
+        data_end: Latest date with data (for showing coverage info)
+
+    Returns:
+        Tuple of (start_date, end_date)
+    """
+    today = date.today()
+
+    # Show data coverage info if available
+    if data_start and data_end:
+        st.caption(f"📊 Data available: {data_start.strftime('%b %d, %Y')} to {data_end.strftime('%b %d, %Y')}")
+
+    st.markdown("**Quick Ranges:**")
+
+    # Quick preset buttons in a single row
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    # Initialize session state for dates if not set
+    if f"{key_prefix}_start" not in st.session_state:
+        st.session_state[f"{key_prefix}_start"] = today - timedelta(days=30 * default_months_back)
+    if f"{key_prefix}_end" not in st.session_state:
+        st.session_state[f"{key_prefix}_end"] = today
+
+    with col1:
+        if st.button("📅 This Month", key=f"{key_prefix}_btn_this_month", use_container_width=True):
+            st.session_state[f"{key_prefix}_start"] = today.replace(day=1)
+            st.session_state[f"{key_prefix}_end"] = today
+            st.rerun()
+
+    with col2:
+        if st.button("📅 Last Month", key=f"{key_prefix}_btn_last_month", use_container_width=True):
+            last_month = today.replace(day=1) - timedelta(days=1)
+            st.session_state[f"{key_prefix}_start"] = last_month.replace(day=1)
+            st.session_state[f"{key_prefix}_end"] = last_month
+            st.rerun()
+
+    with col3:
+        if st.button("📅 Last 3 Months", key=f"{key_prefix}_btn_3months", use_container_width=True):
+            st.session_state[f"{key_prefix}_start"] = today - timedelta(days=90)
+            st.session_state[f"{key_prefix}_end"] = today
+            st.rerun()
+
+    with col4:
+        if st.button("📅 This Year", key=f"{key_prefix}_btn_this_year", use_container_width=True):
+            st.session_state[f"{key_prefix}_start"] = today.replace(month=1, day=1)
+            st.session_state[f"{key_prefix}_end"] = today
+            st.rerun()
+
+    with col5:
+        if st.button("📅 Last Year", key=f"{key_prefix}_btn_last_year", use_container_width=True):
+            last_year = today.year - 1
+            st.session_state[f"{key_prefix}_start"] = date(last_year, 1, 1)
+            st.session_state[f"{key_prefix}_end"] = date(last_year, 12, 31)
+            st.rerun()
+
+    # Manual date pickers
+    col1, col2 = st.columns(2)
+    with col1:
+        start_date = st.date_input(
+            "From",
+            value=st.session_state.get(f"{key_prefix}_start", today - timedelta(days=90)),
+            max_value=today,
+            key=f"{key_prefix}_date_start_input"
+        )
+        # Update session state
+        st.session_state[f"{key_prefix}_start"] = start_date
+
+    with col2:
+        end_date = st.date_input(
+            "To",
+            value=st.session_state.get(f"{key_prefix}_end", today),
+            max_value=today,
+            min_value=start_date,
+            key=f"{key_prefix}_date_end_input"
+        )
+        # Update session state
+        st.session_state[f"{key_prefix}_end"] = end_date
+
+    return start_date, end_date
