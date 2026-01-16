@@ -40,6 +40,10 @@ def init_session_state():
         # UI state
         'current_page': 'Home',
         'show_welcome': True,
+
+        # Privacy settings
+        'mask_account_numbers': True,  # Mask account/card numbers by default
+        'mask_balances': False,  # Don't mask balances by default (users can toggle)
     }
 
     for key, default in defaults.items():

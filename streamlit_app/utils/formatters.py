@@ -136,24 +136,79 @@ def format_duration(seconds: Optional[float]) -> str:
         return f"{hours:.0f}h {minutes:.0f}m"
 
 
-def format_account_number(account_num: Optional[str]) -> str:
+def format_account_number(account_num: Optional[str], show_last: int = 4, masked: bool = True) -> str:
     """
     Format account number with masking for security
 
     Args:
         account_num: Account number
+        show_last: Number of digits to show at the end
+        masked: If True, mask the account number. If False, show full number
 
     Returns:
-        Masked account number (e.g., "****1234")
+        Masked account number (e.g., "••••1234") or full number
     """
     if not account_num:
         return "N/A"
 
-    # Show only last 4 digits
-    if len(account_num) > 4:
-        return f"****{account_num[-4:]}"
+    # If not masked, return full number
+    if not masked:
+        return account_num
+
+    # Show only last N digits with bullet points
+    if len(account_num) > show_last:
+        return f"{'•' * (len(account_num) - show_last)}{account_num[-show_last:]}"
     else:
         return account_num
+
+
+def mask_card_number(card_num: Optional[str], masked: bool = True) -> str:
+    """
+    Mask credit card number (show last 4 digits only)
+
+    Args:
+        card_num: Credit card number
+        masked: If True, mask the card number. If False, show full number
+
+    Returns:
+        Masked card number (e.g., "•••• •••• •••• 5678") or full number
+    """
+    if not card_num:
+        return "N/A"
+
+    # If not masked, return full number
+    if not masked:
+        return card_num
+
+    # Remove spaces/dashes for processing
+    clean = card_num.replace(' ', '').replace('-', '')
+
+    if len(clean) < 4:
+        return clean
+
+    # Format as card number with spaces
+    return f"•••• •••• •••• {clean[-4:]}"
+
+
+def format_balance(amount: Optional[float], masked: bool = False, currency: str = "₪") -> str:
+    """
+    Format balance with optional masking
+
+    Args:
+        amount: Balance amount
+        masked: If True, show bullets instead of amount
+        currency: Currency symbol
+
+    Returns:
+        Formatted balance or masked string
+    """
+    if amount is None:
+        return "N/A"
+
+    if masked:
+        return "••••••"
+
+    return format_currency(amount, currency)
 
 
 def format_status(status: str) -> str:

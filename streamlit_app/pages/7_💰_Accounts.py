@@ -14,7 +14,10 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from streamlit_app.utils.session import init_session_state
-from streamlit_app.utils.formatters import format_currency, format_number, format_datetime
+from streamlit_app.utils.formatters import (
+    format_currency, format_number, format_datetime,
+    format_account_number, format_balance
+)
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.charts import balance_history, COLORS
 
@@ -149,9 +152,11 @@ try:
                     else:
                         st.info("No balance data")
 
-                    # Account details
+                    # Account details (masked by default for privacy)
                     if account.account_number:
-                        st.caption(f"Account: {account.account_number}")
+                        masked = st.session_state.get('mask_account_numbers', True)
+                        account_display = format_account_number(account.account_number, masked=masked)
+                        st.caption(f"Account: {account_display}")
 
                     # Transaction count
                     txn_count = session.query(func.count(Transaction.id)).filter(
@@ -171,6 +176,9 @@ try:
     # ============================================================================
     st.subheader("📋 Account List (Table View)")
 
+    # Get masking preference
+    masked = st.session_state.get('mask_account_numbers', True)
+
     table_data = []
     for account, balance, balance_date in accounts_with_balance:
         # Get transaction count
@@ -187,7 +195,7 @@ try:
             'ID': account.id,
             'Type': account.account_type or 'Other',
             'Institution': account.institution,
-            'Account Number': account.account_number or 'N/A',
+            'Account Number': format_account_number(account.account_number, masked=masked) if account.account_number else 'N/A',
             'Balance': format_currency(balance) if balance else 'N/A',
             'Last Updated': format_datetime(balance_date, '%Y-%m-%d') if balance_date else 'Never',
             'Transactions': txn_count or 0,
@@ -220,7 +228,9 @@ try:
                 st.markdown(f"### {account.institution}")
                 st.markdown(f"**Type:** {account.account_type or 'N/A'}")
                 if account.account_number:
-                    st.markdown(f"**Account Number:** {account.account_number}")
+                    masked = st.session_state.get('mask_account_numbers', True)
+                    account_display = format_account_number(account.account_number, masked=masked)
+                    st.markdown(f"**Account Number:** {account_display}")
 
             with col2:
                 if st.button("❌ Close Details", use_container_width=True):

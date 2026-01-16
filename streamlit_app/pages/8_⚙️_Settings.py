@@ -212,6 +212,58 @@ try:
     st.markdown("---")
 
     # ============================================================================
+    # PRIVACY SETTINGS
+    # ============================================================================
+    st.subheader("🔒 Privacy & Security Settings")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("**Sensitive Data Masking**")
+
+        mask_accounts = st.toggle(
+            "Mask Account Numbers",
+            value=st.session_state.get('mask_account_numbers', True),
+            key="mask_account_numbers_toggle",
+            help="Show account/card numbers as ••••1234"
+        )
+
+        if mask_accounts != st.session_state.get('mask_account_numbers', True):
+            st.session_state.mask_account_numbers = mask_accounts
+            st.success("✅ Account masking preference updated")
+            st.info("💡 Changes will apply on next page load")
+
+        st.caption("📋 Account numbers show as ••••1234")
+
+    with col2:
+        st.markdown("**Balance Visibility**")
+
+        mask_balances = st.toggle(
+            "Hide All Balances",
+            value=st.session_state.get('mask_balances', False),
+            key="mask_balances_toggle",
+            help="Hide all financial amounts for privacy (shows ••••••)"
+        )
+
+        if mask_balances != st.session_state.get('mask_balances', False):
+            st.session_state.mask_balances = mask_balances
+            st.success("✅ Balance visibility preference updated")
+            st.info("💡 Changes will apply on next page load")
+
+        st.caption("🔒 Useful when sharing screen or in public")
+
+    # Security reminder
+    st.info("""
+    🛡️ **Security Best Practices:**
+    - Use account number masking when presenting or sharing screenshots
+    - Enable balance hiding in public spaces or during video calls
+    - Your credentials are always encrypted - these settings only affect display
+    - All data stays local on your device
+    """)
+
+    st.markdown("---")
+
+    # ============================================================================
     # DISPLAY SETTINGS
     # ============================================================================
     st.subheader("🎨 Display Settings")
