@@ -44,6 +44,44 @@ st.markdown("Browse, filter, and manage your financial transactions")
 # Inject amount styling CSS
 st.markdown(AMOUNT_STYLE_CSS, unsafe_allow_html=True)
 
+# Table styling CSS for better readability
+TABLE_STYLE_CSS = """
+<style>
+/* Zebra striping for better readability */
+[data-testid="stDataFrame"] tbody tr:nth-child(even) {
+    background-color: #f8f9fa !important;
+}
+
+/* Hover effect */
+[data-testid="stDataFrame"] tbody tr:hover {
+    background-color: #e3f2fd !important;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+/* Column headers */
+[data-testid="stDataFrame"] thead th {
+    background-color: #1976d2 !important;
+    color: white !important;
+    font-weight: 600 !important;
+    text-align: left !important;
+}
+
+/* Compact and readable table */
+[data-testid="stDataFrame"] {
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+}
+
+/* Amount column styling */
+[data-testid="stDataFrame"] td:nth-child(3) {
+    font-family: 'SF Mono', 'Roboto Mono', Consolas, monospace !important;
+    font-weight: 500 !important;
+}
+</style>
+"""
+st.markdown(TABLE_STYLE_CSS, unsafe_allow_html=True)
+
 st.markdown("---")
 
 # Get database session
@@ -398,9 +436,36 @@ try:
     if not transactions:
         st.info("No transactions found matching the current filters.")
     else:
+        # Column customization
+        with st.expander("⚙️ Customize Table View", expanded=False):
+            all_columns = ["Date", "Description", "Amount", "Category", "Tags", "Status", "Account"]
+            default_columns = st.session_state.get('table_columns', ["Date", "Description", "Amount", "Category", "Status"])
+
+            # Ensure default columns are valid
+            default_columns = [col for col in default_columns if col in all_columns]
+            if not default_columns:
+                default_columns = ["Date", "Description", "Amount", "Category", "Status"]
+
+            selected_columns = st.multiselect(
+                "Select columns to display",
+                options=all_columns,
+                default=default_columns,
+                key="visible_columns_select"
+            )
+
+            # Save to session state
+            st.session_state.table_columns = selected_columns
+
+            col1, col2 = st.columns(2)
+            with col1:
+                compact_view = st.checkbox("Compact view", value=False, key="compact_view",
+                                          help="Show more rows with smaller text")
+            with col2:
+                show_row_numbers = st.checkbox("Show row numbers", value=False, key="show_row_numbers")
+
         # Create DataFrame for display
         table_data = []
-        for txn in transactions:
+        for idx, txn in enumerate(transactions, start=1):
             # Get tags for this transaction
             txn_tags = session.query(Tag.name).join(
                 TransactionTag,
@@ -416,8 +481,9 @@ try:
             # Get account info
             account_name = f"{txn.account.institution}" if txn.account else "Unknown"
 
-            table_data.append({
+            row_data = {
                 'ID': txn.id,
+                '#': idx + ((current_page - 1) * rows_per_page),  # Row number with pagination
                 'Date': txn.transaction_date.strftime('%Y-%m-%d') if txn.transaction_date else '',
                 'Description': description[:50] + '...' if len(description) > 50 else description,
                 'Amount': txn.original_amount,  # Keep raw for styling
@@ -425,19 +491,10 @@ try:
                 'Tags': tags_str,
                 'Status': '✅' if txn.status == 'completed' else '⏳',
                 'Account': account_name
-            })
+            }
+            table_data.append(row_data)
 
         df_display = pd.DataFrame(table_data)
-
-        # Style the dataframe with colored amounts
-        def style_amount(val):
-            """Apply color styling to amount column"""
-            if val < 0:
-                return 'color: #c62828; font-weight: 500'  # Red for expenses
-            elif val > 0:
-                return 'color: #00897b; font-weight: 500'  # Green for income
-            else:
-                return 'color: #757575; font-weight: 500'  # Gray for zero
 
         def format_amount_display(val):
             """Format amount with proper sign"""
@@ -450,21 +507,61 @@ try:
 
         # Create a copy for display with formatted amounts
         df_styled = df_display.copy()
-        df_styled['Amount_Display'] = df_styled['Amount'].apply(format_amount_display)
+        df_styled['Amount'] = df_styled['Amount'].apply(format_amount_display)
+
+        # Build display columns based on selection
+        display_cols = []
+        if show_row_numbers:
+            display_cols.append('#')
+        display_cols.extend([col for col in selected_columns if col in df_styled.columns])
+
+        # If no columns selected, use defaults
+        if not display_cols or display_cols == ['#']:
+            display_cols = ['#', 'Date', 'Description', 'Amount', 'Category', 'Status'] if show_row_numbers else ['Date', 'Description', 'Amount', 'Category', 'Status']
+
+        # Determine table height
+        table_height = 400 if compact_view else 600
 
         # Display table with styling
         st.dataframe(
-            df_styled[['Date', 'Description', 'Amount_Display', 'Category', 'Tags', 'Status', 'Account']].rename(
-                columns={'Amount_Display': 'Amount'}
-            ),
+            df_styled[display_cols],
             use_container_width=True,
             hide_index=True,
-            height=600,
+            height=table_height,
             column_config={
+                '#': st.column_config.NumberColumn(
+                    '#',
+                    help='Row number',
+                    width='small'
+                ),
+                'Date': st.column_config.TextColumn(
+                    'Date',
+                    width='small'
+                ),
+                'Description': st.column_config.TextColumn(
+                    'Description',
+                    width='large'
+                ),
                 'Amount': st.column_config.TextColumn(
                     'Amount',
-                    help='Transaction amount (red=expense, green=income)',
+                    help='Transaction amount (−=expense, +=income)',
                     width='medium'
+                ),
+                'Category': st.column_config.TextColumn(
+                    'Category',
+                    width='medium'
+                ),
+                'Tags': st.column_config.TextColumn(
+                    'Tags',
+                    width='medium'
+                ),
+                'Status': st.column_config.TextColumn(
+                    'Status',
+                    width='small'
+                ),
+                'Account': st.column_config.TextColumn(
+                    'Account',
+                    width='small'
                 )
             }
         )

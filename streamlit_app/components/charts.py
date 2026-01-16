@@ -19,19 +19,19 @@ from streamlit_app.utils.formatters import format_currency
 
 # Color palette for charts
 COLORS = {
-    'primary': '#3498db',
-    'success': '#27ae60',
-    'danger': '#e74c3c',
-    'warning': '#f39c12',
-    'info': '#16a085',
-    'purple': '#9b59b6',
-    'gray': '#95a5a6',
+    'primary': '#1976d2',      # Material Blue 700
+    'success': '#00897b',      # Material Teal 600 (income)
+    'danger': '#c62828',       # Material Red 800 (expense)
+    'warning': '#f57c00',      # Material Orange 700
+    'info': '#0097a7',         # Material Cyan 700
+    'purple': '#7b1fa2',       # Material Purple 700
+    'gray': '#757575',         # Material Gray 600
     # Transparent versions for fills
-    'primary_light': 'rgba(52, 152, 219, 0.1)',
-    'success_light': 'rgba(39, 174, 96, 0.1)',
-    'danger_light': 'rgba(231, 76, 60, 0.1)',
-    'warning_light': 'rgba(243, 156, 18, 0.1)',
-    'info_light': 'rgba(22, 160, 133, 0.1)',
+    'primary_light': 'rgba(25, 118, 210, 0.1)',
+    'success_light': 'rgba(0, 137, 123, 0.1)',
+    'danger_light': 'rgba(198, 40, 40, 0.1)',
+    'warning_light': 'rgba(245, 124, 0, 0.1)',
+    'info_light': 'rgba(0, 151, 167, 0.1)',
 }
 
 CATEGORY_COLORS = px.colors.qualitative.Set3
