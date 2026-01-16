@@ -290,8 +290,114 @@ def color_for_amount(amount: float) -> str:
         Color code
     """
     if amount < 0:
-        return "#e74c3c"  # Red for expenses
+        return "#c62828"  # Red for expenses
     elif amount > 0:
-        return "#27ae60"  # Green for income
+        return "#00897b"  # Green for income (teal)
     else:
-        return "#95a5a6"  # Gray for zero
+        return "#757575"  # Gray for zero
+
+
+def format_transaction_amount(
+    amount: Optional[float],
+    show_sign: bool = True,
+    colored: bool = True,
+    currency: str = "₪"
+) -> str:
+    """
+    Format transaction amount with proper sign and optional color.
+
+    Best practices:
+    - Use minus sign (−) not hyphen (-) for negative numbers
+    - Always show currency symbol (₪)
+    - Color code: red for expenses, green for income, gray for zero
+
+    Args:
+        amount: Amount to format
+        show_sign: If True, show +/- sign
+        colored: If True, return HTML with color styling
+        currency: Currency symbol
+
+    Returns:
+        Formatted amount string (HTML if colored=True)
+    """
+    if amount is None:
+        return "N/A"
+
+    abs_amount = abs(amount)
+    formatted = f"{currency}{abs_amount:,.2f}"
+
+    if amount == 0:
+        if colored:
+            return f"<span style='color:#757575; font-family:\"SF Mono\",\"Roboto Mono\",Consolas,monospace; font-weight:500'>{formatted}</span>"
+        return formatted
+
+    # Determine sign and color
+    if amount < 0:  # Expense
+        sign = "−" if show_sign else ""  # Proper minus sign (U+2212)
+        color = "#c62828"  # Material Red 800
+    else:  # Income
+        sign = "+" if show_sign else ""
+        color = "#00897b"  # Material Teal 600
+
+    final_text = f"{sign}{formatted}"
+
+    if colored:
+        return f"<span style='color:{color}; font-family:\"SF Mono\",\"Roboto Mono\",Consolas,monospace; font-weight:500'>{final_text}</span>"
+    else:
+        return final_text
+
+
+def format_amount_delta(
+    current: Optional[float],
+    previous: Optional[float],
+    currency: str = "₪"
+) -> tuple[str, str]:
+    """
+    Format amount change with delta indicator.
+
+    Args:
+        current: Current amount
+        previous: Previous amount for comparison
+        currency: Currency symbol
+
+    Returns:
+        Tuple of (formatted_current, delta_text)
+    """
+    if current is None:
+        return "N/A", ""
+
+    formatted_current = format_currency(current, currency)
+
+    if previous is None or previous == 0:
+        return formatted_current, ""
+
+    delta = current - previous
+    delta_pct = (delta / abs(previous)) * 100
+
+    if abs(delta_pct) < 0.1:
+        return formatted_current, "No change"
+
+    direction = "↑" if delta > 0 else "↓"
+    return formatted_current, f"{direction} {abs(delta_pct):.1f}%"
+
+
+# CSS for monospace amount styling (use in Streamlit pages)
+AMOUNT_STYLE_CSS = """
+<style>
+.financial-amount {
+    font-family: 'SF Mono', 'Roboto Mono', 'Consolas', monospace;
+    font-size: 1rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+}
+.amount-positive {
+    color: #00897b;
+}
+.amount-negative {
+    color: #c62828;
+}
+.amount-zero {
+    color: #757575;
+}
+</style>
+"""

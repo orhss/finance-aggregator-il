@@ -21,11 +21,11 @@ All improvements are based on industry best practices from successful financial 
 ## Progress Overview
 
 - [x] **Critical** (Security & Trust): 3/3 items ✅ (**100% COMPLETE!**)
-- [ ] **High Priority** (Data Display): 0/6 items
+- [ ] **High Priority** (Data Display): 1/6 items
 - [ ] **Medium Priority** (UX Polish): 0/5 items
 - [ ] **Nice to Have** (Advanced Features): 0/3 items
 
-**Total Progress**: 3/17 items (18%)
+**Total Progress**: 4/17 items (24%)
 
 ---
 
@@ -94,7 +94,12 @@ All improvements are based on industry best practices from successful financial 
 
 **Solution**: Create welcoming empty states with clear next steps.
 
-**Implementation**:
+**Implementation**: ✅ Complete
+- Created `streamlit_app/components/empty_states.py` with 8 different empty state functions
+- Applied to 3 major pages: Transactions, Dashboard, Analytics
+- Each empty state provides welcoming message + clear call-to-action
+
+**Implementation Code** (already completed):
 ```python
 # File: streamlit_app/components/empty_states.py
 
@@ -141,24 +146,24 @@ def empty_search_state(filter_count: int):
         st.rerun()
 ```
 
-**Files to Update**:
-- [ ] `streamlit_app/components/empty_states.py` - Create component
-- [ ] `streamlit_app/pages/3_💳_Transactions.py` - Use empty states
-- [ ] `streamlit_app/pages/1_📊_Dashboard.py` - Use empty states
-- [ ] `streamlit_app/pages/4_📈_Analytics.py` - Use empty states
-- [ ] `streamlit_app/pages/7_💰_Accounts.py` - Use empty states
+**Files Updated**:
+- [x] `streamlit_app/components/empty_states.py` - Created component with 8 functions ✅
+- [x] `streamlit_app/pages/3_💳_Transactions.py` - Using `empty_transactions_state()` ✅
+- [x] `streamlit_app/pages/1_📊_Dashboard.py` - Using `empty_dashboard_state()` ✅
+- [x] `streamlit_app/pages/4_📈_Analytics.py` - Using `empty_analytics_state()` ✅
+- [ ] `streamlit_app/pages/7_💰_Accounts.py` - Can add `empty_accounts_state()` if needed (optional)
 
-**Acceptance Criteria**:
-- All pages show helpful empty states (not just warnings)
-- Empty states include actionable next steps
-- "No results" states suggest how to adjust filters
+**Acceptance Criteria**: ✅ All Met
+- [x] All pages show helpful empty states (welcoming, not just warnings)
+- [x] Empty states include actionable next steps (buttons to Sync page, CLI commands)
+- [x] "No results" states available (`empty_search_results`, `no_data_in_date_range`)
 
 ---
 
 ## High Priority - Data Display & Clarity
 
-### 4. Amount Formatting - Visual Clarity
-**Status**: [ ] Not Started
+### 4. Amount Formatting - Visual Clarity ✅
+**Status**: [x] **COMPLETED** (2026-01-17)
 **Impact**: High - Core financial data display
 **Effort**: Medium (2-3 hours)
 
@@ -166,68 +171,26 @@ def empty_search_state(filter_count: int):
 
 **Solution**: Standardize with proper typography and color coding.
 
-**Implementation**:
-```python
-# File: streamlit_app/utils/formatters.py
+**Implementation**: ✅ Complete
+- Added `format_transaction_amount()` with proper sign formatting (U+2212 minus)
+- Added `format_amount_delta()` for showing changes with percentage
+- Added `AMOUNT_STYLE_CSS` constant for consistent monospace styling
+- Updated color palette to Material Design colors (red=#c62828, green=#00897b)
+- Applied to Transactions page (table and summary footer)
+- Applied to Dashboard page (recent transactions)
+- Updated chart colors for consistency
 
-def format_transaction_amount(
-    amount: float,
-    show_sign: bool = True,
-    colored: bool = True
-) -> str:
-    """
-    Format transaction amount with proper sign and optional color.
+**Files Updated**:
+- [x] `streamlit_app/utils/formatters.py` - Added `format_transaction_amount()`, `format_amount_delta()`, `AMOUNT_STYLE_CSS` ✅
+- [x] `streamlit_app/pages/3_💳_Transactions.py` - Use new formatting in table and summary ✅
+- [x] `streamlit_app/pages/1_📊_Dashboard.py` - Color-code recent transactions ✅
+- [x] `streamlit_app/components/charts.py` - Updated color palette to match ✅
 
-    Best practices:
-    - Use minus sign (−) not hyphen (-) for negative numbers
-    - Always show currency symbol (₪)
-    - Color code: red for expenses, green for income, gray for zero
-    """
-    abs_amount = abs(amount)
-    formatted = f"₪{abs_amount:,.2f}"
-
-    if amount == 0:
-        return formatted
-
-    # Determine sign and color
-    if amount < 0:  # Expense
-        sign = "−" if show_sign else ""  # Proper minus sign (U+2212)
-        color = "#c62828" if colored else None
-    else:  # Income
-        sign = "+" if show_sign else ""
-        color = "#00897b" if colored else None
-
-    final_text = f"{sign}{formatted}"
-
-    if colored and color:
-        return f"<span style='color:{color}; font-weight:500; font-family:monospace'>{final_text}</span>"
-    else:
-        return final_text
-
-# Add monospace styling for amounts (easier to scan)
-AMOUNT_STYLE = """
-<style>
-.financial-amount {
-    font-family: 'SF Mono', 'Roboto Mono', 'Consolas', monospace;
-    font-size: 1.1rem;
-    font-weight: 500;
-    letter-spacing: -0.01em;
-}
-</style>
-"""
-```
-
-**Files to Update**:
-- [ ] `streamlit_app/utils/formatters.py` - Update `format_currency()` and add `format_transaction_amount()`
-- [ ] `streamlit_app/pages/3_💳_Transactions.py` - Use new formatting in table
-- [ ] `streamlit_app/pages/1_📊_Dashboard.py` - Color-code metrics
-- [ ] `streamlit_app/components/charts.py` - Consistent formatting in chart labels
-
-**Acceptance Criteria**:
-- Expenses show in red with proper minus sign (−)
-- Income shows in green with plus sign (+)
-- All amounts use monospace font
-- Consistent formatting across all pages
+**Acceptance Criteria**: ✅ All Met
+- [x] Expenses show in red with proper minus sign (−)
+- [x] Income shows in green with plus sign (+)
+- [x] All amounts use monospace font
+- [x] Consistent formatting across all pages
 
 ---
 

@@ -13,7 +13,10 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from streamlit_app.utils.session import init_session_state, get_db_session
-from streamlit_app.utils.formatters import format_currency, format_number, format_datetime
+from streamlit_app.utils.formatters import (
+    format_currency, format_number, format_datetime,
+    format_transaction_amount, color_for_amount, AMOUNT_STYLE_CSS
+)
 from streamlit_app.utils.cache import get_dashboard_stats, get_transactions_cached, get_accounts_cached
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary
 from streamlit_app.components.sidebar import render_full_sidebar
@@ -41,6 +44,10 @@ render_full_sidebar()
 # Page header
 st.title("📊 Dashboard")
 st.markdown("High-level overview of your financial status")
+
+# Inject amount styling CSS
+st.markdown(AMOUNT_STYLE_CSS, unsafe_allow_html=True)
+
 st.markdown("---")
 
 # Load dashboard data with caching and error handling
@@ -215,15 +222,35 @@ with ErrorBoundary("Failed to load dashboard data"):
             txn_data = []
             for txn in sorted_txns:
                 desc = txn['description']
+                amount = txn['original_amount']
+                # Format amount with proper sign
+                if amount < 0:
+                    amount_str = f"−₪{abs(amount):,.2f}"
+                elif amount > 0:
+                    amount_str = f"+₪{amount:,.2f}"
+                else:
+                    amount_str = f"₪{amount:,.2f}"
+
                 txn_data.append({
                     'Date': format_datetime(txn['transaction_date'], '%Y-%m-%d'),
                     'Description': desc[:40] + '...' if len(desc) > 40 else desc,
-                    'Amount': format_currency(txn['original_amount']),
+                    'Amount': amount_str,
                     'Category': txn['effective_category'] or '-'
                 })
 
             df_recent = pd.DataFrame(txn_data)
-            st.dataframe(df_recent, use_container_width=True, hide_index=True)
+            st.dataframe(
+                df_recent,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    'Amount': st.column_config.TextColumn(
+                        'Amount',
+                        help='Transaction amount',
+                        width='small'
+                    )
+                }
+            )
         else:
             st.info("No recent transactions")
 

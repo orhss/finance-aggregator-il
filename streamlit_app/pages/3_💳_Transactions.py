@@ -14,7 +14,10 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from streamlit_app.utils.session import init_session_state, get_db_session
-from streamlit_app.utils.formatters import format_currency, format_number, format_datetime
+from streamlit_app.utils.formatters import (
+    format_currency, format_number, format_datetime,
+    format_transaction_amount, color_for_amount, AMOUNT_STYLE_CSS
+)
 from streamlit_app.utils.rtl import fix_rtl, has_hebrew
 from streamlit_app.utils.cache import get_transactions_cached, invalidate_transaction_cache
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, show_success, show_warning
@@ -37,6 +40,10 @@ render_minimal_sidebar()
 # Page header
 st.title("💳 Transactions Browser")
 st.markdown("Browse, filter, and manage your financial transactions")
+
+# Inject amount styling CSS
+st.markdown(AMOUNT_STYLE_CSS, unsafe_allow_html=True)
+
 st.markdown("---")
 
 # Get database session
@@ -413,7 +420,7 @@ try:
                 'ID': txn.id,
                 'Date': txn.transaction_date.strftime('%Y-%m-%d') if txn.transaction_date else '',
                 'Description': description[:50] + '...' if len(description) > 50 else description,
-                'Amount': format_currency(txn.original_amount),
+                'Amount': txn.original_amount,  # Keep raw for styling
                 'Category': txn.effective_category or 'Uncategorized',
                 'Tags': tags_str,
                 'Status': '✅' if txn.status == 'completed' else '⏳',
@@ -422,12 +429,44 @@ try:
 
         df_display = pd.DataFrame(table_data)
 
-        # Display table
+        # Style the dataframe with colored amounts
+        def style_amount(val):
+            """Apply color styling to amount column"""
+            if val < 0:
+                return 'color: #c62828; font-weight: 500'  # Red for expenses
+            elif val > 0:
+                return 'color: #00897b; font-weight: 500'  # Green for income
+            else:
+                return 'color: #757575; font-weight: 500'  # Gray for zero
+
+        def format_amount_display(val):
+            """Format amount with proper sign"""
+            if val < 0:
+                return f"−₪{abs(val):,.2f}"  # Proper minus sign
+            elif val > 0:
+                return f"+₪{val:,.2f}"
+            else:
+                return f"₪{val:,.2f}"
+
+        # Create a copy for display with formatted amounts
+        df_styled = df_display.copy()
+        df_styled['Amount_Display'] = df_styled['Amount'].apply(format_amount_display)
+
+        # Display table with styling
         st.dataframe(
-            df_display[['Date', 'Description', 'Amount', 'Category', 'Tags', 'Status', 'Account']],
+            df_styled[['Date', 'Description', 'Amount_Display', 'Category', 'Tags', 'Status', 'Account']].rename(
+                columns={'Amount_Display': 'Amount'}
+            ),
             use_container_width=True,
             hide_index=True,
-            height=600
+            height=600,
+            column_config={
+                'Amount': st.column_config.TextColumn(
+                    'Amount',
+                    help='Transaction amount (red=expense, green=income)',
+                    width='medium'
+                )
+            }
         )
 
         # ============================================================================
@@ -667,13 +706,39 @@ try:
             st.metric("Total Transactions", format_number(total_transactions))
 
         with col2:
-            st.metric("Total Income", format_currency(income))
+            # Income in green
+            st.markdown(f"""
+            <div style="padding: 10px 0;">
+                <p style="margin: 0; font-size: 0.875rem; color: #666;">Total Income</p>
+                <p style="margin: 0; font-size: 1.5rem; font-weight: 600; color: #00897b; font-family: 'SF Mono', monospace;">
+                    +₪{income:,.2f}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
 
         with col3:
-            st.metric("Total Expenses", format_currency(abs(expenses)))
+            # Expenses in red
+            st.markdown(f"""
+            <div style="padding: 10px 0;">
+                <p style="margin: 0; font-size: 0.875rem; color: #666;">Total Expenses</p>
+                <p style="margin: 0; font-size: 1.5rem; font-weight: 600; color: #c62828; font-family: 'SF Mono', monospace;">
+                    −₪{abs(expenses):,.2f}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
 
         with col4:
-            st.metric("Average Transaction", format_currency(avg_transaction))
+            # Net amount with appropriate color
+            net_color = "#00897b" if total_amount >= 0 else "#c62828"
+            net_sign = "+" if total_amount >= 0 else "−"
+            st.markdown(f"""
+            <div style="padding: 10px 0;">
+                <p style="margin: 0; font-size: 0.875rem; color: #666;">Net Amount</p>
+                <p style="margin: 0; font-size: 1.5rem; font-weight: 600; color: {net_color}; font-family: 'SF Mono', monospace;">
+                    {net_sign}₪{abs(total_amount):,.2f}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
 
 except Exception as e:
     st.error(f"Error loading transactions: {str(e)}")
