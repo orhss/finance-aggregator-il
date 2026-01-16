@@ -23,6 +23,7 @@ from streamlit_app.components.charts import (
     balance_distribution,
     spending_by_day
 )
+from streamlit_app.components.empty_states import empty_dashboard_state
 
 # Page config
 st.set_page_config(
@@ -54,14 +55,7 @@ with ErrorBoundary("Failed to load dashboard data"):
     )
 
     if not stats or stats['account_count'] == 0:
-        st.warning("⚠️ No data available. Please sync your financial data first.")
-        st.info("Go to the **Sync** page to synchronize your accounts.")
-
-        col1, col2 = st.columns([1, 3])
-        with col1:
-            if st.button("🔄 Go to Sync Page", type="primary"):
-                st.switch_page("pages/2_🔄_Sync.py")
-
+        empty_dashboard_state()
         st.stop()
 
     # Summary Cards Row

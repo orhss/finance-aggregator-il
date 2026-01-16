@@ -19,6 +19,7 @@ from streamlit_app.utils.rtl import fix_rtl, has_hebrew
 from streamlit_app.utils.cache import get_transactions_cached, invalidate_transaction_cache
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, show_success, show_warning
 from streamlit_app.components.sidebar import render_minimal_sidebar
+from streamlit_app.components.empty_states import empty_transactions_state
 
 # Page config
 st.set_page_config(
@@ -50,10 +51,7 @@ try:
     transaction_count = session.query(func.count(Transaction.id)).scalar()
 
     if not transaction_count or transaction_count == 0:
-        st.warning("⚠️ No transaction data available. Please sync your financial data first.")
-        st.info("Go to the **Sync** page to synchronize your accounts.")
-        if st.button("🔄 Go to Sync Page", type="primary"):
-            st.switch_page("pages/2_🔄_Sync.py")
+        empty_transactions_state()
         st.stop()
 
     # ============================================================================

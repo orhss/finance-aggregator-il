@@ -27,6 +27,7 @@ from streamlit_app.utils.cache import (
 )
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, show_info
 from streamlit_app.components.sidebar import render_minimal_sidebar
+from streamlit_app.components.empty_states import empty_analytics_state
 from streamlit_app.components.charts import (
     spending_donut,
     trend_line,
@@ -141,10 +142,7 @@ with ErrorBoundary("Failed to load analytics data"):
     session.close()
 
     if not transaction_count or transaction_count == 0:
-        st.warning("⚠️ No transaction data available. Please sync your financial data first.")
-        st.info("Go to the **Sync** page to synchronize your accounts.")
-        if st.button("🔄 Go to Sync Page", type="primary"):
-            st.switch_page("pages/2_🔄_Sync.py")
+        empty_analytics_state()
         st.stop()
 
     # Time range selector
