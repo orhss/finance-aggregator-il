@@ -42,136 +42,23 @@ fin-cli reports stats     # View statistics
 
 ## Architecture
 
-### Base Class Hierarchy
+### Architecture Patterns
 
-**Broker API Pattern** (`broker_base.py`):
-- `BrokerAPIClient` (ABC): Base for REST API-based brokers
-- DTOs: `LoginCredentials`, `AccountInfo`, `BalanceInfo`
-- `RequestsHTTPClient`: HTTP wrapper for API calls
-- Concrete implementation: `ExtraDeProAPIClient` (excellence_broker_client.py)
+**Broker API Pattern**: REST API-based broker clients using `BrokerAPIClient` base class. See @ scrapers/brokers/broker_base.py for details.
 
-**Credit Card Scrapers** (Hybrid Selenium + API Pattern):
-All credit card scrapers follow a two-phase approach: Selenium login → API-based data fetching
+**Credit Card Scrapers (Hybrid Selenium + API)**:
+- Two-phase approach: Selenium login/token extraction → Direct API calls for data
+- Implementations: CAL, Max, Isracard (see @ scrapers/credit_cards/)
+- Key quirk: Login forms may be in iframes, tokens extracted from network logs or session storage
+- See @ plans/MULTI_ACCOUNT_PLAN.md for multi-account support details
 
-- **CAL** (`cal_credit_card_client.py`):
-  - `CALCreditCardScraper` - Visa CAL credit cards
-  - Extracts authorization token from browser session/network logs
-  - API endpoints: `/getClearanceRequests`, `/getCardTransactionsDetails`
+**Pension MFA Automation**:
+- Modular components: `EmailMFARetriever` (IMAP), `MFAHandler` (code entry), `SmartWait` (timing)
+- Institution-specific flows: Migdal (6-field MFA), Phoenix (single-field MFA)
+- See @ scrapers/base/ and @ plans/SCRAPER_REFACTORING_PLAN.md for implementation details
 
-- **Max** (`max_credit_card_client.py`):
-  - `MaxCreditCardScraper` - Max credit cards
-  - Similar hybrid approach with token extraction
-  - Handles multiple transaction plan types (regular, immediate charge, installments)
+**Services Layer**: Business logic separated from scrapers. Database operations, orchestration, tagging, analytics. See @ plans/SERVICE_REFACTORING_PLAN.md for architecture.
 
-- **Isracard** (`isracard_credit_card_client.py`):
-  - `IsracardCreditCardScraper` - Isracard credit cards
-  - Uses card last 6 digits + user ID for authentication
-  - Handles password change prompts
-
-- **Common Features**:
-  - DTOs: `Transaction`, `CardAccount`, `Installments`
-  - Handles installment payments (splits into monthly records)
-  - Fetches both pending and completed transactions
-  - Supports multiple cards per account
-  - **Multi-account support**: Multiple credentials per institution (see `plans/MULTI_ACCOUNT_PLAN.md`)
-
-**Pension Automation Pattern** (NEW modular architecture):
-- **New Base Classes** (recommended):
-  - `scrapers/base/email_retriever.py`: `EmailMFARetriever` - Email/IMAP operations with context manager support
-  - `scrapers/base/mfa_handler.py`: `MFAHandler` - MFA code entry with single/individual field patterns
-  - `scrapers/utils/wait_conditions.py`: `SmartWait` - Condition-based waits replacing time.sleep()
-  - `scrapers/utils/retry.py`: `retry_with_backoff` - Exponential backoff decorator
-  - `scrapers/exceptions.py`: Structured exception hierarchy
-  - `scrapers/config/logging_config.py`: Centralized logging configuration
-- **Legacy Base Classes** (`pension_base.py` - DEPRECATED):
-  - `EmailMFARetrieverBase` (ABC): DEPRECATED - use `EmailMFARetriever` instead
-  - `SeleniumMFAAutomatorBase` (ABC): DEPRECATED - use modular components instead
-- Configuration DTOs: `EmailConfig`, `MFAConfig`
-- Concrete implementations (refactored to use new modules):
-  - Migdal: `MigdalEmailMFARetriever` + `MigdalSeleniumAutomator`
-  - Phoenix: `PhoenixEmailMFARetriever` + `PhoenixSeleniumAutomator`
-
-**Refactoring Status**: See `plans/SCRAPER_REFACTORING_PLAN.md` for detailed progress and migration guide.
-
-### Key Design Patterns
-
-**Strategy Pattern**: Separate retriever and automator classes allow different MFA flows per institution
-
-**Template Method**: Base classes define automation flow structure:
-- `login()` → `wait_for_mfa_prompt()` → `wait_for_mfa_code()` → `handle_mfa_flow()` → `extract_financial_data()`
-
-**Individual vs Single Field MFA**:
-- `handle_mfa_flow_individual_fields()`: 6 separate digit inputs (Migdal)
-- `handle_mfa_flow()`: Single OTP field (Phoenix)
-
-**Hybrid Selenium + API Pattern** (Credit card scrapers):
-- Uses Selenium to handle complex login and extract session tokens
-- Switches to direct API calls for efficient data retrieval
-- Enables performance logging to capture network requests
-- Extracts tokens from browser session storage or network logs
-
-**Services Layer Pattern** (Business logic separation):
-- `services/` directory contains business logic for data synchronization and management
-- Services handle database operations, scraper orchestration, and data processing
-- Key services:
-  - `credit_card_service.py`: Credit card sync with multi-account support
-  - `broker_service.py`: Broker data synchronization
-  - `pension_service.py`: Pension fund operations
-  - `tag_service.py`: Transaction tagging system
-  - `rules_service.py`: Automated rule-based tagging
-  - `analytics_service.py`: Financial analytics and reporting
-- See `plans/SERVICE_REFACTORING_PLAN.md` for architecture details
-
-### MFA Flow Architecture
-
-1. **Email Retrieval** (`EmailMFARetriever` in `scrapers/base/email_retriever.py`):
-   - Connects to Gmail via IMAP with context manager support
-   - Searches for MFA emails from specific senders
-   - Extracts codes using regex patterns (overridden per institution)
-   - Timing: `email_delay` before checking, `max_wait_time` for polling
-   - Proper logging instead of print statements
-
-2. **MFA Code Entry** (`MFAHandler` in `scrapers/base/mfa_handler.py`):
-   - Supports both single-field and individual-field (6 digit) patterns
-   - Human-like typing with configurable delays
-   - Fallback selector support for robustness
-   - Proper error handling with `MFAEntryError`
-
-3. **Web Automation** (Legacy `SeleniumMFAAutomatorBase` - DEPRECATED):
-   - Chrome headless browser automation
-   - Human-like typing with delays (`enter_id_number_human_like`, `enter_mfa_code_human_like`)
-   - Flexible selectors with fallback support
-   - Handles loader overlays with configurable delays (`post_login_delay`, `mfa_submission_delay`)
-
-4. **Institution-Specific Flows**:
-   - **Migdal**: ID → Email option → Continue → MFA (6 fields) → No submit button
-   - **Phoenix**: ID + Email → Login → MFA (single field) → Submit button
-
-### Credit Card Scraper Architecture (Hybrid Pattern)
-
-**General Flow** (applies to CAL, Max, Isracard):
-
-1. **Login Phase** (Selenium):
-   - Opens institution website and navigates to login form (may be in iframe)
-   - Enters credentials (username/password or ID/card digits)
-   - Handles authentication flow (redirects, tabs, etc.)
-   - Captures authorization token from network requests or session storage
-   - Extracts card/account information from browser session
-
-2. **Data Fetching Phase** (Direct API):
-   - Uses extracted authorization token for API authentication
-   - Institution-specific headers and endpoints:
-     - **CAL**: `Authorization: CALAuthScheme {token}`, endpoints: `/getClearanceRequests`, `/getCardTransactionsDetails`
-     - **Max/Isracard**: Similar pattern with different endpoints
-   - Fetches pending and completed transactions
-   - Default range: 3-18 months historical + 1 month forward
-
-3. **Transaction Processing**:
-   - Converts API responses to standardized `Transaction` objects
-   - Handles installment payments (splits into monthly records)
-   - Distinguishes between pending and completed transactions
-   - Supports multiple cards per account
-   - Stores in SQLite database via `CreditCardService`
 
 ### Project Structure Overview
 
@@ -213,25 +100,6 @@ Fin/
 └── README.md              # User documentation
 ```
 
-## Code Philosophy (from .cursor/rules)
-
-- Follow PEP 8 style guidelines
-- Use type hints for function signatures
-- Prefer simple solutions over complex ones (KISS principle)
-- Leverage Python's standard library before adding dependencies
-- Keep functions small and focused on one task
-- Handle errors explicitly, don't ignore exceptions
-
-## Testing Guidelines (from .cursor/rules)
-
-When generating unit tests:
-- Use pytest with `pytest.mark.parametrize` and descriptive `id` values
-- Mock external dependencies using `mocker` fixture (pytest-mock)
-- Create fixtures for recurring mocks (prefix: `mock_` for fixtures, `mocked_` for variables)
-- Test categories: Happy flow, Edge cases, Exceptions, Boundary values
-- Use function-based tests (no test classes)
-- Naming convention: `test_<function_name>_<scenario>`
-- Limit to 2-3 tests per category
 
 ## Important Implementation Notes
 
