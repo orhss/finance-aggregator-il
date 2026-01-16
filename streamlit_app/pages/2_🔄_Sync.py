@@ -35,6 +35,16 @@ render_minimal_sidebar()
 # Page header
 st.title("🔄 Sync Management")
 st.markdown("View sync status and synchronization history")
+
+# Security Notice - Build Trust
+st.info("""
+🔒 **Your Data is Secure**
+- **Encrypted Credentials**: All credentials are encrypted and never stored in plain text
+- **Read-Only Access**: We only read your financial data, never perform transactions
+- **Local Storage**: All data stays on your device - no cloud uploads or external sharing
+- **Secure Connections**: All connections use HTTPS/TLS encryption
+""")
+
 st.markdown("---")
 
 # Get database session
