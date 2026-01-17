@@ -107,57 +107,58 @@ LIGHT_PALETTE = ColorPalette(
     }
 )
 
-# Dark Mode Color Palette (Improved Contrast)
+# Dark Mode Color Palette (Following UX Best Practices)
+# Based on: https://www.uxdesigninstitute.com/blog/dark-mode-design-practical-guide/
 DARK_PALETTE = ColorPalette(
-    # Brand colors (brighter for better visibility)
-    primary="#90caf9",
-    secondary="#80cbc4",
-    accent="#fff59d",
+    # Brand colors (desaturated for dark mode - avoid visual jarring)
+    primary="#5a9fd4",      # Subdued blue (from #1976d2 light mode)
+    secondary="#5a9a94",    # Muted teal (from #00897b light mode)
+    accent="#d4b95a",       # Muted gold (from #f9ca24 light mode)
 
-    # Status colors (brighter and more saturated)
-    success="#66bb6a",
-    warning="#ffa726",
-    error="#ef5350",
-    info="#42a5f5",
+    # Status colors (significantly desaturated)
+    success="#5a9a94",      # Muted teal (success should be calm)
+    warning="#c98850",      # Muted orange (from #f57c00)
+    error="#b85858",        # Muted red (from #c62828)
+    info="#5a9fd4",         # Subdued blue (consistent with primary)
 
-    # Background colors (better contrast)
-    bg_primary="#0d1117",
-    bg_secondary="#161b22",
-    bg_tertiary="#21262d",
+    # Background colors (avoid pure black #000000 - use dark grey)
+    bg_primary="#121212",   # Dark grey (UX best practice, not pure black)
+    bg_secondary="#1e1e1e", # Slightly lighter grey
+    bg_tertiary="#2a2a2a",  # Medium grey for elevation
 
-    # Text colors (much brighter for readability)
-    text_primary="#f0f6fc",
-    text_secondary="#c9d1d9",
-    text_muted="#8b949e",
+    # Text colors (avoid pure white #FFFFFF - use off-white)
+    text_primary="#e0e0e0", # Off-white (UX best practice)
+    text_secondary="#b0b0b0",  # Light grey for secondary text
+    text_muted="#808080",   # Medium grey for muted text
 
-    # Border colors (more visible)
-    border_light="#30363d",
-    border_medium="#484f58",
-    border_heavy="#6e7681",
+    # Border colors (subtle but visible)
+    border_light="#2a2a2a",
+    border_medium="#404040",
+    border_heavy="#5a5a5a",
 
-    # Financial colors (high contrast)
-    income_color="#66bb6a",
-    expense_color="#ef5350",
-    neutral_color="#8b949e",
+    # Financial colors (desaturated for better readability)
+    income_color="#5a9a94",  # Muted teal (calm, positive)
+    expense_color="#b85858", # Muted red (not aggressive)
+    neutral_color="#808080", # Grey
 
-    # Chart colors (vibrant and visible)
-    chart_primary="#90caf9",
-    chart_secondary="#80cbc4",
-    chart_tertiary="#ffa726",
-    chart_quaternary="#fff59d",
+    # Chart colors (desaturated, harmonious palette)
+    chart_primary="#5a9fd4",   # Subdued blue
+    chart_secondary="#5a9a94",  # Muted teal
+    chart_tertiary="#c98850",   # Muted orange
+    chart_quaternary="#d4b95a", # Muted gold
 
-    # Category colors (bright and saturated for dark mode)
+    # Category colors (desaturated versions - avoid bright/jarring colors)
     category_colors={
-        'Food & Dining': '#ff6b6b',
-        'Transportation': '#4ecdc4',
-        'Shopping': '#45b7d1',
-        'Entertainment': '#ffd93d',
-        'Bills & Utilities': '#a78bfa',
-        'Healthcare': '#f687b3',
-        'Groceries': '#34d399',
-        'Salary': '#66bb6a',
-        'Investment': '#60a5fa',
-        'Transfer': '#94a3b8',
+        'Food & Dining': '#c97676',      # Muted red (from #ff6b6b)
+        'Transportation': '#6ba8a0',     # Muted teal (from #4ecdc4)
+        'Shopping': '#6197ad',           # Muted blue (from #45b7d1)
+        'Entertainment': '#d4b95a',      # Muted gold (from #ffd93d)
+        'Bills & Utilities': '#8b7fc7',  # Muted purple (from #a78bfa)
+        'Healthcare': '#c988a6',         # Muted pink (from #f687b3)
+        'Groceries': '#5fa888',          # Muted green (from #34d399)
+        'Salary': '#5a9a94',             # Muted teal
+        'Investment': '#5a9fd4',         # Subdued blue
+        'Transfer': '#8a939e',           # Muted grey-blue
     }
 )
 
@@ -286,15 +287,20 @@ class Theme:
         Returns:
             CSS style string
         """
-        shadow = "0 2px 8px rgba(0,0,0,0.1)" if self.mode == "light" else "0 2px 8px rgba(0,0,0,0.3)"
-        shadow_str = f"box-shadow: {shadow};" if elevated else ""
+        # UX Best Practice: Shadows don't work well on dark backgrounds
+        # Use outer glow (30% opacity) for dark mode instead
+        if self.mode == "light":
+            elevation_str = "box-shadow: 0 2px 8px rgba(0,0,0,0.1);" if elevated else ""
+        else:
+            # Dark mode: use subtle outer glow with 30% opacity for illumination effect
+            elevation_str = "box-shadow: 0 0 16px rgba(255,255,255,0.05);" if elevated else ""
 
         return f"""
             background-color: {self.palette.bg_secondary};
             border: 1px solid {self.palette.border_light};
             border-radius: 8px;
             padding: 1rem;
-            {shadow_str}
+            {elevation_str}
         """
 
     def generate_global_css(self) -> str:

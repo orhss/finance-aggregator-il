@@ -290,19 +290,28 @@ def themed_hero_metric(
     else:
         gradient_colors = theme.get_color('bg_secondary')
 
+    # UX Best Practice: Use outer glow instead of shadow for dark mode
+    if theme.mode == "light":
+        shadow = "box-shadow: 0 2px 8px rgba(0,0,0,0.1);"
+    else:
+        shadow = "box-shadow: 0 0 16px rgba(255,255,255,0.05);"
+
     card_css = f"""
         background: {gradient_colors};
         border: 1px solid {theme.get_color('border_light')};
         border-radius: 12px;
         padding: 1.5rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        {shadow}
     """
+
+    # UX Best Practice: Use medium/bold fonts in dark mode (thin fonts appear faint)
+    font_weight = "700" if theme.mode == "dark" else "600"
 
     st.markdown(f"""
         <div style='{card_css}'>
             <div style='font-size: 2rem; margin-bottom: 0.5rem'>{icon}</div>
-            <div style='color: {theme.get_color('text_secondary')}; font-size: 0.9rem; margin-bottom: 0.5rem'>{label}</div>
-            <div style='color: {theme.get_color('text_primary')}; font-size: 2rem; font-weight: 600'>{value}</div>
+            <div style='color: {theme.get_color('text_secondary')}; font-size: 0.9rem; margin-bottom: 0.5rem; font-weight: 500'>{label}</div>
+            <div style='color: {theme.get_color('text_primary')}; font-size: 2rem; font-weight: {font_weight}'>{value}</div>
         </div>
     """, unsafe_allow_html=True)
 
