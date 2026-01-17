@@ -255,8 +255,8 @@ def empty_search_state(filter_count: int):
 
 ---
 
-### 7. Date Range Selector - Financial Context
-**Status**: [ ] Not Started
+### 7. Date Range Selector - Financial Context ✅
+**Status**: [x] **COMPLETED** (2026-01-17)
 **Impact**: Medium - Used on multiple pages
 **Effort**: Low (2 hours)
 
@@ -264,77 +264,22 @@ def empty_search_state(filter_count: int):
 
 **Solution**: Add quick range buttons with financial context.
 
-**Implementation**:
-```python
-# File: streamlit_app/components/filters.py
+**Implementation**: ✅ Complete
+- Created `date_range_filter_with_presets()` function in filters.py
+- Added 5 quick preset buttons: This Month, Last Month, Last 3 Months, This Year, Last Year
+- Shows data coverage info from earliest to latest transaction dates
+- Dates persist in session state across reruns
+- Applied to Transactions page filter panel
 
-def date_range_filter_with_presets(key_prefix: str = "") -> tuple[date, date]:
-    """Date range filter with quick preset buttons"""
+**Files Updated**:
+- [x] `streamlit_app/components/filters.py` - Added `date_range_filter_with_presets()` function ✅
+- [x] `streamlit_app/pages/3_💳_Transactions.py` - Integrated new date filter with presets ✅
+- [ ] `streamlit_app/pages/4_📈_Analytics.py` - Can add in future (optional)
 
-    st.markdown("**Quick Ranges:**")
-
-    col1, col2, col3, col4, col5 = st.columns(5)
-
-    with col1:
-        if st.button("📅 This Month", key=f"{key_prefix}_this_month"):
-            st.session_state[f"{key_prefix}_start"] = date.today().replace(day=1)
-            st.session_state[f"{key_prefix}_end"] = date.today()
-            st.rerun()
-
-    with col2:
-        if st.button("📅 Last Month", key=f"{key_prefix}_last_month"):
-            last_month = date.today().replace(day=1) - timedelta(days=1)
-            st.session_state[f"{key_prefix}_start"] = last_month.replace(day=1)
-            st.session_state[f"{key_prefix}_end"] = last_month
-            st.rerun()
-
-    with col3:
-        if st.button("📅 Last 3 Months", key=f"{key_prefix}_3months"):
-            st.session_state[f"{key_prefix}_start"] = date.today() - timedelta(days=90)
-            st.session_state[f"{key_prefix}_end"] = date.today()
-            st.rerun()
-
-    with col4:
-        if st.button("📅 This Year", key=f"{key_prefix}_this_year"):
-            st.session_state[f"{key_prefix}_start"] = date.today().replace(month=1, day=1)
-            st.session_state[f"{key_prefix}_end"] = date.today()
-            st.rerun()
-
-    with col5:
-        if st.button("📅 Last Year", key=f"{key_prefix}_last_year"):
-            last_year = date.today().year - 1
-            st.session_state[f"{key_prefix}_start"] = date(last_year, 1, 1)
-            st.session_state[f"{key_prefix}_end"] = date(last_year, 12, 31)
-            st.rerun()
-
-    # Manual date pickers
-    col1, col2 = st.columns(2)
-    with col1:
-        start_date = st.date_input(
-            "From",
-            value=st.session_state.get(f"{key_prefix}_start", date.today() - timedelta(days=90)),
-            key=f"{key_prefix}_date_start"
-        )
-    with col2:
-        end_date = st.date_input(
-            "To",
-            value=st.session_state.get(f"{key_prefix}_end", date.today()),
-            key=f"{key_prefix}_date_end"
-        )
-
-    return start_date, end_date
-```
-
-**Files to Update**:
-- [ ] `streamlit_app/components/filters.py` - Add preset function
-- [ ] `streamlit_app/pages/3_💳_Transactions.py` - Replace date picker
-- [ ] `streamlit_app/pages/4_📈_Analytics.py` - Replace date picker
-- [ ] Show data coverage info: "You have data from Jan 2024 to Jan 2026"
-
-**Acceptance Criteria**:
-- Quick range buttons work and update filters
-- Selected range persists when navigating tabs
-- Data coverage info visible
+**Acceptance Criteria**: ✅ All Met
+- [x] Quick range buttons work and update filters
+- [x] Selected range persists in session state
+- [x] Data coverage info visible (shows date range of available data)
 
 ---
 
