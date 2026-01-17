@@ -219,9 +219,10 @@ try:
             st.markdown("**Search**")
 
             search_query = st.text_input(
-                "Search in description",
-                placeholder="e.g., supermarket, restaurant",
-                key="filter_search"
+                "Search in description or amount",
+                placeholder="e.g., supermarket, restaurant, 100",
+                key="filter_search",
+                help="Search by merchant name, description, or amount (e.g., '100' finds ₪100 transactions)"
             )
 
         with col3:
@@ -323,9 +324,21 @@ try:
     elif transaction_type == "Income":
         query = query.filter(Transaction.original_amount > 0)
 
-    # Apply search filter
+    # Apply search filter (supports both description and amount search)
     if search_query:
-        query = query.filter(Transaction.description.ilike(f"%{search_query}%"))
+        # Try to parse as number for amount search
+        try:
+            search_amount = float(search_query.replace(',', '').replace('₪', '').strip())
+            # Search in both description and amount
+            query = query.filter(
+                or_(
+                    Transaction.description.ilike(f"%{search_query}%"),
+                    func.abs(Transaction.original_amount).between(search_amount - 0.01, search_amount + 0.01)
+                )
+            )
+        except ValueError:
+            # Not a number, search only in description
+            query = query.filter(Transaction.description.ilike(f"%{search_query}%"))
 
     # Order by date (newest first)
     query = query.order_by(desc(Transaction.transaction_date))
@@ -337,6 +350,27 @@ try:
     # PAGINATION
     # ============================================================================
     st.subheader(f"📋 Transactions ({format_number(total_transactions)} found)")
+
+    # Search statistics and feedback
+    if search_query:
+        if total_transactions > 0:
+            st.caption(f"🔍 Found {format_number(total_transactions)} transactions matching '{search_query}'")
+        else:
+            # No results - show helpful message
+            st.warning(f"""
+            🔍 No transactions found for "{search_query}"
+
+            **Try:**
+            - Checking spelling
+            - Using fewer or different keywords
+            - Searching by amount (e.g., "100" for ₪100 transactions)
+            - Adjusting your date range or other filters
+            """)
+
+            # Add clear search button
+            if st.button("🔄 Clear Search", key="clear_search_no_results"):
+                st.session_state.filter_search = ""
+                st.rerun()
 
     col1, col2 = st.columns([3, 1])
 
@@ -436,7 +470,31 @@ try:
     # TRANSACTION TABLE
     # ============================================================================
     if not transactions:
-        st.info("No transactions found matching the current filters.")
+        # Count active filters for better feedback
+        active_filters = 0
+        if selected_accounts: active_filters += 1
+        if selected_institutions: active_filters += 1
+        if status_filter != "All": active_filters += 1
+        if selected_categories: active_filters += 1
+        if selected_tags: active_filters += 1
+        if untagged_only: active_filters += 1
+        if amount_min is not None: active_filters += 1
+        if amount_max is not None: active_filters += 1
+        if search_query: active_filters += 1
+        if transaction_type != "All": active_filters += 1
+
+        # Show helpful no results message
+        if active_filters > 0:
+            st.info(f"""
+            🔍 No transactions match your {active_filters} active filter(s).
+
+            **Try:**
+            - Expanding your date range
+            - Removing some filters using "Clear Filters" button above
+            - Checking for typos in search terms
+            """)
+        else:
+            st.info("No transactions found in the selected date range.")
     else:
         # Column customization
         with st.expander("⚙️ Customize Table View", expanded=False):

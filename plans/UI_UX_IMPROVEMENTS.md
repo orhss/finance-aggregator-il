@@ -22,10 +22,10 @@ All improvements are based on industry best practices from successful financial 
 
 - [x] **Critical** (Security & Trust): 3/3 items ✅ (**100% COMPLETE!**)
 - [x] **High Priority** (Data Display): 6/6 items ✅ (**100% COMPLETE!**)
-- [ ] **Medium Priority** (UX Polish): 1/5 items
+- [ ] **Medium Priority** (UX Polish): 2/5 items
 - [ ] **Nice to Have** (Advanced Features): 0/3 items
 
-**Total Progress**: 10/17 items (59%)
+**Total Progress**: 11/17 items (65%)
 
 ---
 
@@ -488,14 +488,14 @@ st.toast(f"Applied rule to {count} transactions", icon="📋")
 
 ---
 
-### 11. Search Improvements
-**Status**: [ ] Not Started
+### 11. Search Improvements ✅
+**Status**: [x] **COMPLETED** (2026-01-17)
 **Impact**: Medium - Efficiency
 **Effort**: Medium (2-3 hours)
 
 **Problem**: Search only filters descriptions, no fuzzy matching or highlights.
 
-**Solution**: Add search highlighting and "no results" guidance.
+**Solution**: Add search statistics, amount search support, and helpful "no results" guidance.
 
 **Implementation**:
 ```python
@@ -541,17 +541,27 @@ if search_term:
             st.rerun()
 ```
 
-**Files to Update**:
-- [ ] `streamlit_app/pages/3_💳_Transactions.py` - Add search highlighting
-- [ ] Show "X results found" counter
-- [ ] Add "No results" state with suggestions
-- [ ] Support searching amounts (e.g., "100" finds ₪100 transactions)
+**Files Updated**:
+- [x] `streamlit_app/pages/3_💳_Transactions.py` - Enhanced search functionality ✅
 
-**Acceptance Criteria**:
-- Search highlights matched terms in yellow
-- Results counter shows number of matches
-- Helpful message when no results
-- Can search by amount values
+**Implementation Details**:
+- **Amount Search Support**: Search query is parsed as a number and searches both description and amount fields
+  - Example: Searching "100" finds all transactions with ₪100.00 (±0.01 tolerance)
+  - Handles currency symbols and comma separators automatically
+- **Search Statistics**: Shows "Found X transactions matching 'query'" when results found
+- **Smart No Results Messages**:
+  - When search returns nothing: Helpful suggestions (check spelling, try amount search, adjust filters)
+  - When filters return nothing: Shows count of active filters with actionable tips
+  - Clear Search button added for quick recovery
+- **Enhanced Search Input**: Updated placeholder to "Search in description or amount" with help text
+- **Filter Awareness**: Counts and displays number of active filters in no-results state
+
+**Acceptance Criteria**: ✅ All Met
+- [x] Results counter shows number of matches below header
+- [x] Helpful message when no results with actionable suggestions
+- [x] Can search by amount values (e.g., "100" finds ₪100 transactions)
+- [x] Active filter count shown when no results
+- [x] Clear search button available in no-results state
 
 ---
 
