@@ -93,7 +93,7 @@ with ErrorBoundary("Failed to load dashboard data"):
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
             <p style="margin: 0; font-size: 0.9rem; color: #666; font-weight: 500;">Net Worth</p>
-            <p style="margin: 0.5rem 0 0 0; font-size: 2rem; font-weight: 700; color: {balance_color}; font-family: 'SF Mono', monospace;">
+            <p style="margin: 0.5rem 0 0 0; font-size: 2.5rem; font-weight: 700; color: {balance_color};">
                 {format_currency(stats['total_balance'])}
             </p>
             <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #888;">
@@ -108,7 +108,7 @@ with ErrorBoundary("Failed to load dashboard data"):
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, #fff5f5 0%, #fecaca 100%); padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
             <p style="margin: 0; font-size: 0.9rem; color: #666; font-weight: 500;">This Month's Spending</p>
-            <p style="margin: 0.5rem 0 0 0; font-size: 2rem; font-weight: 700; color: #c62828; font-family: 'SF Mono', monospace;">
+            <p style="margin: 0.5rem 0 0 0; font-size: 2.5rem; font-weight: 700; color: #c62828;">
                 ₪{monthly_spending:,.2f}
             </p>
             <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #888;">
