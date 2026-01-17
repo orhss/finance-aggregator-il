@@ -15,7 +15,8 @@ sys.path.insert(0, str(project_root))
 from streamlit_app.utils.session import init_session_state, get_db_session
 from streamlit_app.utils.formatters import (
     format_currency, format_number, format_datetime,
-    format_transaction_amount, color_for_amount, AMOUNT_STYLE_CSS
+    format_transaction_amount, color_for_amount, AMOUNT_STYLE_CSS,
+    format_status
 )
 from streamlit_app.utils.cache import get_dashboard_stats, get_transactions_cached, get_accounts_cached
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary
@@ -282,8 +283,9 @@ with ErrorBoundary("Failed to load dashboard data"):
 
                 txn_data.append({
                     'Date': format_datetime(txn['transaction_date'], '%Y-%m-%d'),
-                    'Description': desc[:40] + '...' if len(desc) > 40 else desc,
+                    'Description': desc[:35] + '...' if len(desc) > 35 else desc,
                     'Amount': amount_str,
+                    'Status': format_status(txn['status'], as_badge=False),
                     'Category': txn['effective_category'] or '-'
                 })
 
@@ -296,6 +298,11 @@ with ErrorBoundary("Failed to load dashboard data"):
                     'Amount': st.column_config.TextColumn(
                         'Amount',
                         help='Transaction amount',
+                        width='small'
+                    ),
+                    'Status': st.column_config.TextColumn(
+                        'Status',
+                        help='Transaction status',
                         width='small'
                     )
                 }

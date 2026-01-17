@@ -211,28 +211,93 @@ def format_balance(amount: Optional[float], masked: bool = False, currency: str 
     return format_currency(amount, currency)
 
 
-def format_status(status: str) -> str:
+def format_status(status: str, as_badge: bool = True) -> str:
     """
-    Format status with emoji indicator
+    Format transaction status with icon and color
 
     Args:
         status: Status string
+        as_badge: If True, return HTML badge. If False, return simple emoji + text
 
     Returns:
-        Status with emoji
+        Formatted status (HTML if as_badge=True, plain text otherwise)
     """
-    status_map = {
-        'completed': '✅ Completed',
-        'pending': '⏳ Pending',
-        'failed': '❌ Failed',
-        'success': '✅ Success',
-        'error': '❌ Error',
-        'running': '🔄 Running',
-        'active': '✅ Active',
-        'inactive': '⭕ Inactive',
+    status_config = {
+        'completed': {
+            'icon': '✅',
+            'color': '#00897b',
+            'bg': '#e0f2f1',
+            'label': 'Completed'
+        },
+        'pending': {
+            'icon': '⏳',
+            'color': '#f57c00',
+            'bg': '#fff3e0',
+            'label': 'Pending'
+        },
+        'failed': {
+            'icon': '❌',
+            'color': '#c62828',
+            'bg': '#ffebee',
+            'label': 'Failed'
+        },
+        'success': {
+            'icon': '✅',
+            'color': '#00897b',
+            'bg': '#e0f2f1',
+            'label': 'Success'
+        },
+        'error': {
+            'icon': '❌',
+            'color': '#c62828',
+            'bg': '#ffebee',
+            'label': 'Error'
+        },
+        'running': {
+            'icon': '🔄',
+            'color': '#1976d2',
+            'bg': '#e3f2fd',
+            'label': 'Running'
+        },
+        'active': {
+            'icon': '✅',
+            'color': '#00897b',
+            'bg': '#e0f2f1',
+            'label': 'Active'
+        },
+        'inactive': {
+            'icon': '⭕',
+            'color': '#666',
+            'bg': '#f5f5f5',
+            'label': 'Inactive'
+        }
     }
 
-    return status_map.get(status.lower(), status)
+    config = status_config.get(status.lower(), {
+        'icon': '❓',
+        'color': '#666',
+        'bg': '#f5f5f5',
+        'label': status
+    })
+
+    if not as_badge:
+        # Simple emoji + text format
+        return f"{config['icon']} {config['label']}"
+
+    # HTML badge format
+    style = f"""
+        display: inline-flex;
+        align-items: center;
+        background-color: {config['bg']};
+        color: {config['color']};
+        border-radius: 12px;
+        padding: 4px 10px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        gap: 4px;
+    """
+
+    return f"<span style='{style}'>{config['icon']} {config['label']}</span>"
 
 
 def format_institution_name(institution: str) -> str:

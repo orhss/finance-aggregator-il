@@ -17,7 +17,7 @@ from streamlit_app.utils.session import init_session_state, get_db_session
 from streamlit_app.utils.formatters import (
     format_currency, format_number, format_datetime,
     format_transaction_amount, color_for_amount, AMOUNT_STYLE_CSS,
-    format_category_badge, format_tags
+    format_category_badge, format_tags, format_status
 )
 from streamlit_app.utils.rtl import fix_rtl, has_hebrew
 from streamlit_app.utils.cache import get_transactions_cached, invalidate_transaction_cache
@@ -595,7 +595,11 @@ try:
                     st.text(f"Description: {txn.description}")
                     st.text(f"Amount: {format_currency(txn.original_amount)}")
                     st.text(f"Currency: {txn.original_currency}")
-                    st.text(f"Status: {txn.status}")
+
+                    # Display status as colored badge
+                    st.markdown("**Status:**")
+                    status_badge = format_status(txn.status, as_badge=True)
+                    st.markdown(status_badge, unsafe_allow_html=True)
 
                 with col2:
                     st.markdown("**Categorization**")
