@@ -32,8 +32,7 @@ from streamlit_app.components.theme import apply_theme, render_theme_switcher
 st.set_page_config(
     page_title="Transactions - Financial Aggregator",
     page_icon="💳",
-    layout="wide",
-    initial_sidebar_state="auto"  # Auto-collapses on mobile
+    layout="wide"
 )
 
 # Initialize session state

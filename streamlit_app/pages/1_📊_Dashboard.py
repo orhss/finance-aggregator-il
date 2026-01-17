@@ -21,7 +21,7 @@ from streamlit_app.utils.formatters import (
 from streamlit_app.utils.cache import get_dashboard_stats, get_transactions_cached, get_accounts_cached
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary
 from streamlit_app.utils.insights import generate_spending_insight, generate_pending_insight
-from streamlit_app.components.sidebar import render_full_sidebar
+from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.loading import contextual_spinner, cache_status_indicator
 from streamlit_app.components.responsive import apply_mobile_styles, responsive_metrics
 from streamlit_app.components.theme import apply_theme, render_theme_switcher
@@ -37,8 +37,7 @@ from streamlit_app.components.empty_states import empty_dashboard_state
 st.set_page_config(
     page_title="Dashboard - Financial Aggregator",
     page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="auto"  # Auto-collapses on mobile
+    layout="wide"
 )
 
 # Initialize session state
@@ -51,7 +50,7 @@ theme = apply_theme()
 apply_mobile_styles()
 
 # Render sidebar
-render_full_sidebar()
+render_minimal_sidebar()
 
 # Render theme switcher in sidebar
 render_theme_switcher("sidebar")
