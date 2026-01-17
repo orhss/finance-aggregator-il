@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 import threading
 import queue
+import time
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -69,23 +70,32 @@ try:
         st.session_state.sync_output = []
     if 'sync_status' not in st.session_state:
         st.session_state.sync_status = None
+    if 'sync_thread' not in st.session_state:
+        st.session_state.sync_thread = None
+    if 'sync_institution' not in st.session_state:
+        st.session_state.sync_institution = None
+    if 'sync_queue' not in st.session_state:
+        st.session_state.sync_queue = queue.Queue()
+    if 'sync_start_time' not in st.session_state:
+        st.session_state.sync_start_time = None
 
-    # Helper function to run sync command
-    def run_sync_command(institution: str = "all", headless: bool = True, months_back: int = 3, months_forward: int = 1):
+    # Helper function to run sync command in background thread
+    def run_sync_in_thread(institution: str = "all", headless: bool = True, months_back: int = 3, months_forward: int = 1, output_queue: queue.Queue = None):
         """Run sync command in subprocess and capture output"""
-        st.session_state.sync_running = True
-        st.session_state.sync_output = []
-        st.session_state.sync_status = "running"
-
         # Build command
         cmd = ["fin-cli", "sync", institution]
         if headless:
             cmd.append("--headless")
-        if months_back:
-            cmd.extend(["--months-back", str(months_back)])
-        if months_forward:
-            cmd.extend(["--months-forward", str(months_forward)])
 
+        # Date range options are only supported by credit card scrapers
+        credit_card_institutions = ['cal', 'max', 'isracard']
+        if institution in credit_card_institutions or institution == 'all':
+            if months_back:
+                cmd.extend(["--months-back", str(months_back)])
+            if months_forward:
+                cmd.extend(["--months-forward", str(months_forward)])
+
+        output_lines = []
         try:
             # Run command and capture output
             process = subprocess.Popen(
@@ -99,37 +109,166 @@ try:
 
             # Read output line by line
             for line in process.stdout:
-                st.session_state.sync_output.append(line)
+                output_lines.append(line)
+                if output_queue:
+                    output_queue.put(('output', line))
 
             # Wait for completion
             return_code = process.wait()
 
+            # Send final status through queue
             if return_code == 0:
-                st.session_state.sync_status = "success"
+                if output_queue:
+                    output_queue.put(('status', 'success'))
             else:
-                st.session_state.sync_status = "failed"
+                if output_queue:
+                    output_queue.put(('status', 'failed'))
 
         except Exception as e:
-            st.session_state.sync_output.append(f"Error: {str(e)}")
-            st.session_state.sync_status = "error"
+            error_msg = f"Error: {str(e)}"
+            output_lines.append(error_msg)
+            if output_queue:
+                output_queue.put(('output', error_msg))
+                output_queue.put(('status', 'error'))
         finally:
-            st.session_state.sync_running = False
+            if output_queue:
+                output_queue.put(('done', output_lines))
+
+    def start_sync(institution: str = "all", headless: bool = True, months_back: int = 3, months_forward: int = 1):
+        """Start sync in background thread"""
+        st.session_state.sync_running = True
+        st.session_state.sync_output = []
+        st.session_state.sync_status = "running"
+        st.session_state.sync_institution = institution
+        st.session_state.sync_start_time = time.time()
+
+        # Create new queue for this sync
+        st.session_state.sync_queue = queue.Queue()
+
+        # Start background thread
+        thread = threading.Thread(
+            target=run_sync_in_thread,
+            args=(institution, headless, months_back, months_forward, st.session_state.sync_queue),
+            daemon=True
+        )
+        thread.start()
+        st.session_state.sync_thread = thread
+
+    # Process queue messages if sync is running
+    if st.session_state.sync_running and st.session_state.sync_queue:
+        try:
+            while not st.session_state.sync_queue.empty():
+                msg_type, msg_data = st.session_state.sync_queue.get_nowait()
+
+                if msg_type == 'output':
+                    st.session_state.sync_output.append(msg_data)
+                elif msg_type == 'status':
+                    st.session_state.sync_status = msg_data
+                elif msg_type == 'done':
+                    st.session_state.sync_running = False
+                    st.session_state.sync_thread = None
+        except queue.Empty:
+            pass
 
     # ============================================================================
     # SYNC EXECUTION SECTION
     # ============================================================================
-    if st.session_state.sync_running:
-        st.warning("🔄 Sync in progress... Please wait.")
 
-        # Display sync output
+    # Display sync status messages
+    if st.session_state.sync_status == "success":
+        st.success("✅ Sync completed successfully!")
+        # Show brief output summary if available
         if st.session_state.sync_output:
-            with st.expander("📋 Sync Output", expanded=True):
+            with st.expander("📋 View Sync Log", expanded=False):
+                for line in st.session_state.sync_output:
+                    st.text(line.strip())
+        # Add clear button
+        if st.button("Clear Status", key="clear_success"):
+            st.session_state.sync_status = None
+            st.session_state.sync_output = []
+            st.rerun()
+
+    elif st.session_state.sync_status == "failed":
+        st.error("❌ Sync failed. Please check the output below for details.")
+
+        # Always show output for failed syncs
+        if st.session_state.sync_output:
+            st.markdown("**Sync Output:**")
+            with st.container():
+                for line in st.session_state.sync_output:
+                    if line.strip():
+                        st.text(line.strip())
+        else:
+            st.warning("No output captured. The sync process may have failed to start.")
+
+        # Add clear button
+        if st.button("Clear Status", key="clear_failed"):
+            st.session_state.sync_status = None
+            st.session_state.sync_output = []
+            st.rerun()
+
+    elif st.session_state.sync_status == "error":
+        st.error("❌ Sync error occurred. Please see details below.")
+
+        # Always show output for errors
+        if st.session_state.sync_output:
+            st.markdown("**Error Details:**")
+            with st.container():
+                for line in st.session_state.sync_output:
+                    if line.strip():
+                        st.text(line.strip())
+        else:
+            st.warning("No error details captured.")
+
+        # Add clear button
+        if st.button("Clear Status", key="clear_error"):
+            st.session_state.sync_status = None
+            st.session_state.sync_output = []
+            st.rerun()
+
+    if st.session_state.sync_running:
+        # Show prominent progress indicator with institution info
+        institution_name = st.session_state.sync_institution.upper() if st.session_state.sync_institution else "ALL"
+
+        # Calculate elapsed time
+        elapsed_time = int(time.time() - st.session_state.sync_start_time) if st.session_state.sync_start_time else 0
+        elapsed_minutes = elapsed_time // 60
+        elapsed_seconds = elapsed_time % 60
+
+        # Progress indicator
+        progress_col1, progress_col2 = st.columns([3, 1])
+        with progress_col1:
+            st.info(f"🔄 **Syncing {institution_name}** - Please wait while we fetch your latest financial data...")
+        with progress_col2:
+            st.metric("Elapsed Time", f"{elapsed_minutes:02d}:{elapsed_seconds:02d}")
+
+        # Show progress bar (indeterminate)
+        st.progress(0.5)
+
+        # Display simplified status or detailed output
+        if st.session_state.sync_output and len(st.session_state.sync_output) > 0:
+            # Show last few lines as preview
+            recent_output = st.session_state.sync_output[-3:]
+            for line in recent_output:
+                if line.strip():
+                    st.caption(f"› {line.strip()}")
+
+            # Show full output in collapsible section
+            with st.expander("📋 View Detailed Sync Log", expanded=False):
                 for line in st.session_state.sync_output:
                     st.text(line.strip())
 
-        # Auto-refresh while sync is running
-        if st.button("🔄 Refresh Status"):
-            st.rerun()
+        # Show manual refresh button and auto-refresh timer
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            if st.button("🔄 Refresh Now", use_container_width=True):
+                st.rerun()
+        with col2:
+            st.caption("ℹ️ Auto-refreshing every 3 seconds...")
+
+        # Auto-refresh every 3 seconds while sync is running
+        time.sleep(3)
+        st.rerun()
 
     # ============================================================================
     # SYNC STATUS OVERVIEW
@@ -241,7 +380,8 @@ try:
                             'Phoenix': 'phoenix'
                         }
                         sync_target = institution_map.get(institution, institution.lower())
-                        run_sync_command(sync_target)
+                        st.toast(f"🔄 Starting sync for {institution}...", icon="🔄")
+                        start_sync(sync_target)
                         st.rerun()
 
                     st.markdown("---")
@@ -395,19 +535,22 @@ try:
 
     with col2:
         st.markdown("**Date Range**")
+        st.caption("ℹ️ Only applies to credit card syncs")
         months_back = st.slider(
             "Months Back",
             min_value=1,
             max_value=24,
             value=3,
-            disabled=st.session_state.sync_running
+            disabled=st.session_state.sync_running,
+            help="Number of months of historical data to fetch (credit cards only)"
         )
         months_forward = st.slider(
             "Months Forward",
             min_value=0,
             max_value=6,
             value=1,
-            disabled=st.session_state.sync_running
+            disabled=st.session_state.sync_running,
+            help="Number of future months to fetch (credit cards only)"
         )
 
     st.markdown("**Select Institutions to Sync**")
@@ -460,11 +603,10 @@ try:
                 selected.append("isracard")
 
             if selected:
-                # Sync each institution sequentially
-                for inst in selected:
-                    run_sync_command(inst, headless_mode, months_back, months_forward)
-                st.toast(f"Synced {len(selected)} institutions successfully!", icon="✅")
-                st.balloons()  # Celebration for successful sync
+                st.toast(f"🔄 Starting sync for {len(selected)} institutions...", icon="🔄")
+                # Note: Currently syncs first institution only
+                # TODO: Implement sequential sync for multiple institutions
+                start_sync(selected[0], headless_mode, months_back, months_forward)
                 st.rerun()
             else:
                 st.toast("Please select at least one institution", icon="⚠️")
@@ -476,7 +618,8 @@ try:
             use_container_width=True,
             help="Sync all configured institutions"
         ):
-            run_sync_command("all", headless_mode, months_back, months_forward)
+            st.toast("🔄 Starting sync for all institutions...", icon="🔄")
+            start_sync("all", headless_mode, months_back, months_forward)
             st.rerun()
 
     # ============================================================================
