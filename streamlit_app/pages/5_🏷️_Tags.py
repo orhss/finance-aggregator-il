@@ -16,7 +16,6 @@ from streamlit_app.utils.session import init_session_state
 from streamlit_app.utils.formatters import format_currency, format_number, format_category_badge, format_tags
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.bulk_actions import show_bulk_preview, show_bulk_confirmation
-from streamlit_app.components.responsive import apply_mobile_styles
 from streamlit_app.components.theme import apply_theme, render_theme_switcher
 
 # Page config
@@ -31,9 +30,6 @@ init_session_state()
 
 # Apply theme (must be called before any content)
 theme = apply_theme()
-
-# Apply mobile-friendly styles
-apply_mobile_styles()
 
 # Render sidebar
 render_minimal_sidebar()

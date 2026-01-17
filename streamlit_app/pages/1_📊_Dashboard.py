@@ -22,8 +22,7 @@ from streamlit_app.utils.cache import get_dashboard_stats, get_transactions_cach
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary
 from streamlit_app.utils.insights import generate_spending_insight, generate_pending_insight
 from streamlit_app.components.sidebar import render_minimal_sidebar
-from streamlit_app.components.loading import contextual_spinner, cache_status_indicator
-from streamlit_app.components.responsive import apply_mobile_styles, responsive_metrics
+from streamlit_app.components.loading import contextual_spinner
 from streamlit_app.components.theme import apply_theme, render_theme_switcher
 from streamlit_app.components.charts import (
     spending_donut,
@@ -45,9 +44,6 @@ init_session_state()
 
 # Apply theme (must be called before any content)
 theme = apply_theme()
-
-# Apply mobile-friendly styles
-apply_mobile_styles()
 
 # Render sidebar
 render_minimal_sidebar()

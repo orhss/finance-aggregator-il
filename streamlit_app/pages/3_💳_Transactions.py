@@ -25,7 +25,6 @@ from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, sh
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.empty_states import empty_transactions_state
 from streamlit_app.components.filters import date_range_filter_with_presets
-from streamlit_app.components.responsive import apply_mobile_styles
 from streamlit_app.components.theme import apply_theme, render_theme_switcher
 
 # Page config
@@ -40,9 +39,6 @@ init_session_state()
 
 # Apply theme (must be called before any content)
 theme = apply_theme()
-
-# Apply mobile-friendly styles
-apply_mobile_styles()
 
 # Render sidebar
 render_minimal_sidebar()
