@@ -17,6 +17,7 @@ sys.path.insert(0, str(project_root))
 from streamlit_app.utils.session import init_session_state
 from streamlit_app.utils.formatters import format_number
 from streamlit_app.components.sidebar import render_minimal_sidebar
+from streamlit_app.components.theme import apply_theme, render_theme_switcher
 
 # Page config
 st.set_page_config(
@@ -28,8 +29,14 @@ st.set_page_config(
 # Initialize session state
 init_session_state()
 
+# Apply theme (must be called before any content)
+theme = apply_theme()
+
 # Render sidebar
 render_minimal_sidebar()
+
+# Render theme switcher in sidebar
+render_theme_switcher("sidebar")
 
 # Page header
 st.title("⚙️ Settings")

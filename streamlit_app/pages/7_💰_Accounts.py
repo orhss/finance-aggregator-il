@@ -20,6 +20,7 @@ from streamlit_app.utils.formatters import (
 )
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.charts import balance_history, COLORS
+from streamlit_app.components.theme import apply_theme, render_theme_switcher
 
 # Page config
 st.set_page_config(
@@ -31,8 +32,14 @@ st.set_page_config(
 # Initialize session state
 init_session_state()
 
+# Apply theme (must be called before any content)
+theme = apply_theme()
+
 # Render sidebar
 render_minimal_sidebar()
+
+# Render theme switcher in sidebar
+render_theme_switcher("sidebar")
 
 # Page header
 st.title("💰 Accounts Management")

@@ -23,9 +23,9 @@ All improvements are based on industry best practices from successful financial 
 - [x] **Critical** (Security & Trust): 3/3 items ✅ (**100% COMPLETE!**)
 - [x] **High Priority** (Data Display): 6/6 items ✅ (**100% COMPLETE!**)
 - [x] **Medium Priority** (UX Polish): 5/5 items ✅ (**100% COMPLETE!**)
-- [ ] **Nice to Have** (Advanced Features): 0/3 items
+- [ ] **Nice to Have** (Advanced Features): 1/3 items
 
-**Total Progress**: 14/17 items (82%)
+**Total Progress**: 15/17 items (88%)
 
 ---
 
@@ -974,90 +974,187 @@ st.download_button(
 
 ---
 
-### 17. Visual Theme Consistency
-**Status**: [ ] Not Started
+### 17. Visual Theme Consistency with Dark Mode ✅
+**Status**: [x] **COMPLETED** (2026-01-17)
 **Impact**: Low - Polish
-**Effort**: Low (1-2 hours)
+**Effort**: Medium (4-5 hours)
 
-**Problem**: Mixed visual styles (buttons, cards, spacing).
+**Problem**: Mixed visual styles (buttons, cards, spacing). No dark mode support.
 
-**Solution**: Standardize spacing, borders, shadows.
+**Solution**: Create centralized, DRY theme system with light/dark mode support. Single source of truth for all colors, styles, and theming.
 
 **Implementation**:
 ```python
-# File: streamlit_app/app.py
+# File: streamlit_app/config/theme.py
 
-# Add comprehensive CSS theme
-THEME_CSS = """
-<style>
-/* ===== Design System Variables ===== */
-:root {
-    --primary-color: #0066cc;
-    --success-color: #00a86b;
-    --danger-color: #d32f2f;
-    --warning-color: #f57c00;
-    --neutral-color: #546e7a;
+from dataclasses import dataclass
+from typing import Dict
 
-    --border-radius: 8px;
-    --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
-    --shadow-md: 0 4px 8px rgba(0,0,0,0.12);
-    --spacing-sm: 0.5rem;
-    --spacing-md: 1rem;
-    --spacing-lg: 1.5rem;
-}
+@dataclass
+class ColorPalette:
+    """Complete color palette for a theme mode"""
+    # Brand colors
+    primary: str
+    secondary: str
+    accent: str
 
-/* ===== Cards ===== */
-.element-container > div {
-    border-radius: var(--border-radius);
-}
+    # Status colors
+    success: str
+    warning: str
+    error: str
+    info: str
 
-[data-testid="stMetric"] {
-    background-color: white;
-    padding: var(--spacing-md);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-sm);
-}
+    # Background, text, border colors...
+    # Financial colors (income, expense, neutral)
+    # Chart colors
+    # Category colors
 
-/* ===== Buttons ===== */
-.stButton > button {
-    border-radius: var(--border-radius);
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
+LIGHT_PALETTE = ColorPalette(
+    primary="#1976d2",
+    success="#00897b",
+    bg_primary="#ffffff",
+    text_primary="#212121",
+    # ... all colors
+)
 
-.stButton > button:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
-}
+DARK_PALETTE = ColorPalette(
+    primary="#64b5f6",
+    success="#4db6ac",
+    bg_primary="#1a1a1a",
+    text_primary="#e0e0e0",
+    # ... all colors (adjusted for dark mode)
+)
 
-/* ===== Consistent Spacing ===== */
-.main .block-container {
-    padding-top: var(--spacing-lg);
-    padding-bottom: var(--spacing-lg);
-}
+class Theme:
+    """Single source of truth for all theming"""
+    def __init__(self, mode: str = "light"):
+        self.mode = mode
+        self.palette = LIGHT_PALETTE if mode == "light" else DARK_PALETTE
 
-/* ===== Chart Container ===== */
-.plotly-graph-div {
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-sm);
-    padding: var(--spacing-sm);
-    background-color: white;
-}
-</style>
-"""
+    def get_color(self, color_name: str) -> str:
+        """Get color from palette"""
+        return getattr(self.palette, color_name, "#000000")
+
+    def get_badge_style(self, bg_color, ...) -> str:
+        """Generate theme-aware CSS for badges"""
+        # Returns CSS string with theme-aware opacity
+
+    def generate_global_css(self) -> str:
+        """Generate complete app CSS for current theme"""
+        # Returns CSS with all theme colors applied to Streamlit components
+
+# Singleton pattern
+_current_theme: Theme = None
+
+def get_theme(mode: str = None) -> Theme:
+    """Get or create theme instance"""
+    global _current_theme
+    if mode is not None or _current_theme is None:
+        if mode is None:
+            mode = "light"
+        _current_theme = Theme(mode)
+    return _current_theme
+
+def set_theme_mode(mode: str) -> Theme:
+    """Set theme mode globally"""
+    global _current_theme
+    _current_theme = Theme(mode)
+    return _current_theme
 ```
 
-**Files to Update**:
-- [ ] `streamlit_app/app.py` - Add comprehensive theme CSS
-- [ ] Audit all pages for consistent spacing
-- [ ] Ensure all buttons use same styling
-- [ ] Standardize card shadows
+```python
+# File: streamlit_app/components/theme.py
 
-**Acceptance Criteria**:
-- All buttons have same border-radius
-- Consistent spacing between sections
-- Uniform shadows on cards and charts
-- Visual harmony across all pages
+def init_theme() -> Theme:
+    """Initialize theme from session state"""
+    if 'theme_mode' not in st.session_state:
+        st.session_state.theme_mode = 'light'
+    return get_theme(st.session_state.theme_mode)
+
+def render_theme_switcher(location: str = "sidebar"):
+    """Render theme toggle in sidebar/header/main"""
+    current_mode = st.session_state.get('theme_mode', 'light')
+    is_dark = current_mode == 'dark'
+
+    new_mode_is_dark = st.toggle("🌙 Dark Mode", value=is_dark)
+
+    if new_mode_is_dark != is_dark:
+        new_mode = 'dark' if new_mode_is_dark else 'light'
+        st.session_state.theme_mode = new_mode
+        set_theme_mode(new_mode)
+        st.rerun()
+
+def apply_theme() -> Theme:
+    """Apply theme to current page - MUST be called at top of each page"""
+    theme = init_theme()
+    st.markdown(theme.generate_global_css(), unsafe_allow_html=True)
+    return theme
+
+# Theme-aware formatters
+def format_category_badge_themed(category: str, theme: Theme) -> str:
+    """Format category badge using theme colors"""
+    color = theme.get_category_color(category)
+    style = theme.get_badge_style(color)
+    return f"<span style='{style}'>{category}</span>"
+```
+
+```python
+# Usage in pages:
+from streamlit_app.components.theme import apply_theme, render_theme_switcher
+
+# Initialize session state
+init_session_state()
+
+# Apply theme (must be called before any content)
+theme = apply_theme()
+
+# Render sidebar
+render_minimal_sidebar()
+
+# Render theme switcher in sidebar
+render_theme_switcher("sidebar")
+```
+
+**Files Created/Updated**:
+- [x] `streamlit_app/config/theme.py` - **NEW** Centralized theme configuration (single source of truth) ✅
+  - ColorPalette dataclass with all color definitions
+  - LIGHT_PALETTE and DARK_PALETTE with complete color schemes
+  - Theme class with color getters, CSS generators, badge styles
+  - Singleton pattern with get_theme() and set_theme_mode()
+  - Category colors, status colors, financial colors, chart colors
+- [x] `streamlit_app/components/theme.py` - **NEW** Theme utilities and switcher component ✅
+  - init_theme() - Initialize from session state
+  - render_theme_switcher() - Toggle UI for sidebar/header/main
+  - apply_theme() - Apply global CSS to page
+  - Theme-aware formatters: format_category_badge_themed(), format_tags_themed(), format_status_themed()
+  - Helper components: themed_metric(), themed_card(), themed_hero_metric()
+  - current_theme() - Get current theme anywhere
+- [x] `streamlit_app/pages/1_📊_Dashboard.py` - Applied theme system ✅
+- [x] `streamlit_app/pages/2_🔄_Sync.py` - Applied theme system ✅
+- [x] `streamlit_app/pages/3_💳_Transactions.py` - Applied theme system ✅
+- [x] `streamlit_app/pages/4_📈_Analytics.py` - Applied theme system ✅
+- [x] `streamlit_app/pages/5_🏷️_Tags.py` - Applied theme system ✅
+- [x] `streamlit_app/pages/6_📋_Rules.py` - Applied theme system ✅
+
+**Implementation Details**:
+- **DRY Principle**: Single source of truth in `config/theme.py` - all colors, styles, CSS defined once
+- **Singleton Pattern**: Global theme instance ensures consistency across all pages
+- **Session State**: Theme preference persists across page navigation and reruns
+- **Reusable Component Pattern**: Following same modular architecture as other components
+- **Theme-Aware CSS**: Complete Streamlit component styling (sidebar, metrics, tables, buttons, charts, etc.)
+- **Easy Extension**: New pages just import and call `apply_theme()` + `render_theme_switcher()`
+- **Dark Mode**: Full dark mode support with adjusted colors for better contrast and readability
+- **Comprehensive Coverage**: All brand colors, status colors, financial colors, category colors, chart colors
+
+**Acceptance Criteria**: ✅ All Met
+- [x] Centralized theme configuration with DRY principle (config/theme.py)
+- [x] Light and dark mode support with complete color palettes
+- [x] Theme switcher component in sidebar on all pages
+- [x] Session state persistence for theme preference
+- [x] Single source of truth for all colors and styles
+- [x] Easily extendable to new pages (simple imports)
+- [x] Theme-aware CSS applied to all Streamlit components
+- [x] Consistent visual harmony across all pages in both light and dark modes
 
 ---
 

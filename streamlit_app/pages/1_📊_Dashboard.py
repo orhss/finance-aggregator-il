@@ -24,6 +24,7 @@ from streamlit_app.utils.insights import generate_spending_insight, generate_pen
 from streamlit_app.components.sidebar import render_full_sidebar
 from streamlit_app.components.loading import contextual_spinner, cache_status_indicator
 from streamlit_app.components.responsive import apply_mobile_styles, responsive_metrics
+from streamlit_app.components.theme import apply_theme, render_theme_switcher
 from streamlit_app.components.charts import (
     spending_donut,
     monthly_trend,
@@ -43,11 +44,17 @@ st.set_page_config(
 # Initialize session state
 init_session_state()
 
+# Apply theme (must be called before any content)
+theme = apply_theme()
+
 # Apply mobile-friendly styles
 apply_mobile_styles()
 
 # Render sidebar
 render_full_sidebar()
+
+# Render theme switcher in sidebar
+render_theme_switcher("sidebar")
 
 # Page header
 st.title("📊 Dashboard")
