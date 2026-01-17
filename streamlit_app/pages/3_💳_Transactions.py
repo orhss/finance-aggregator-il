@@ -16,7 +16,8 @@ sys.path.insert(0, str(project_root))
 from streamlit_app.utils.session import init_session_state, get_db_session
 from streamlit_app.utils.formatters import (
     format_currency, format_number, format_datetime,
-    format_transaction_amount, color_for_amount, AMOUNT_STYLE_CSS
+    format_transaction_amount, color_for_amount, AMOUNT_STYLE_CSS,
+    format_category_badge, format_tags
 )
 from streamlit_app.utils.rtl import fix_rtl, has_hebrew
 from streamlit_app.utils.cache import get_transactions_cached, invalidate_transaction_cache
@@ -598,18 +599,31 @@ try:
 
                 with col2:
                     st.markdown("**Categorization**")
-                    st.text(f"Category: {txn.effective_category or 'None'}")
-                    st.text(f"User Category: {txn.user_category or 'None'}")
 
-                    # Get tags
+                    # Display category as badge
+                    st.markdown("**Category:**")
+                    category_badge = format_category_badge(txn.effective_category or "")
+                    st.markdown(category_badge, unsafe_allow_html=True)
+
+                    if txn.user_category:
+                        st.caption(f"User Category: {txn.user_category}")
+
+                    # Get tags and display as badges
                     txn_tags = session.query(Tag.name).join(
                         TransactionTag,
                         TransactionTag.tag_id == Tag.id
                     ).filter(
                         TransactionTag.transaction_id == txn.id
                     ).all()
-                    tags_str = ", ".join([tag[0] for tag in txn_tags]) if txn_tags else "None"
-                    st.text(f"Tags: {tags_str}")
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.markdown("**Tags:**")
+                    if txn_tags:
+                        tag_names = [tag[0] for tag in txn_tags]
+                        tags_html = format_tags(tag_names)
+                        st.markdown(tags_html, unsafe_allow_html=True)
+                    else:
+                        st.markdown("<span style='color:#999; font-size:0.85rem'>No tags</span>", unsafe_allow_html=True)
 
                     st.markdown("**Account Information**")
                     if txn.account:

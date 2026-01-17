@@ -381,6 +381,81 @@ def format_amount_delta(
     return formatted_current, f"{direction} {abs(delta_pct):.1f}%"
 
 
+def format_category_badge(category: str, clickable: bool = False) -> str:
+    """
+    Format category as colored badge/pill
+
+    Args:
+        category: Category name
+        clickable: If True, style for clickable appearance (reserved for future use)
+
+    Returns:
+        HTML string with styled badge
+    """
+    if not category:
+        return "<span style='color:#999; font-size:0.85rem'>Uncategorized</span>"
+
+    # Color scheme for common categories
+    category_colors = {
+        'Food & Dining': '#ff6b6b',
+        'Transportation': '#4ecdc4',
+        'Shopping': '#45b7d1',
+        'Entertainment': '#f9ca24',
+        'Bills & Utilities': '#6c5ce7',
+        'Healthcare': '#fd79a8',
+        'Groceries': '#00b894',
+        'Salary': '#00897b',
+        'Investment': '#1976d2',
+        'Transfer': '#95a5a6',
+    }
+
+    # Get color or use default
+    color = category_colors.get(category, '#95a5a6')
+
+    style = f"""
+        display: inline-block;
+        background-color: {color}20;
+        color: {color};
+        border: 1px solid {color}40;
+        border-radius: 12px;
+        padding: 2px 10px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        margin: 2px;
+    """
+
+    return f"<span style='{style}'>{category}</span>"
+
+
+def format_tags(tags: list[str]) -> str:
+    """
+    Format multiple tags as badges
+
+    Args:
+        tags: List of tag names
+
+    Returns:
+        HTML string with all tags as styled badges
+    """
+    if not tags:
+        return ""
+
+    badges = []
+    for tag in tags:
+        style = """
+            display: inline-block;
+            background-color: #e3f2fd;
+            color: #1976d2;
+            border-radius: 10px;
+            padding: 2px 8px;
+            font-size: 0.8rem;
+            margin: 2px;
+        """
+        badges.append(f"<span style='{style}'>🏷️ {tag}</span>")
+
+    return " ".join(badges)
+
+
 # CSS for monospace amount styling (use in Streamlit pages)
 AMOUNT_STYLE_CSS = """
 <style>

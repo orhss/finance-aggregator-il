@@ -13,7 +13,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from streamlit_app.utils.session import init_session_state
-from streamlit_app.utils.formatters import format_currency, format_number
+from streamlit_app.utils.formatters import format_currency, format_number, format_category_badge, format_tags
 from streamlit_app.components.sidebar import render_minimal_sidebar
 
 # Page config
@@ -156,6 +156,11 @@ try:
             hide_index=True
         )
 
+        # Visual tag cloud with badges
+        st.markdown("**📌 Quick Tag View**")
+        tag_badges_html = format_tags([tag_stat['name'] for tag_stat in tag_stats])
+        st.markdown(tag_badges_html, unsafe_allow_html=True)
+
         st.markdown("---")
 
         # ============================================================================
@@ -259,6 +264,13 @@ try:
 
                     df_txns = pd.DataFrame(txn_data)
                     st.dataframe(df_txns, use_container_width=True, hide_index=True)
+
+                    # Show categories as badges below the table
+                    unique_categories = list(set([txn.effective_category for txn in transactions if txn.effective_category]))
+                    if unique_categories:
+                        st.markdown("**Categories in these transactions:**")
+                        categories_badges_html = " ".join([format_category_badge(cat) for cat in sorted(unique_categories)])
+                        st.markdown(categories_badges_html, unsafe_allow_html=True)
 
                     # Link to full transactions page
                     if st.button("📋 View All Transactions", use_container_width=True):
