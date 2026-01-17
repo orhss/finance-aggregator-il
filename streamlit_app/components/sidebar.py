@@ -108,24 +108,6 @@ def render_navigation_info():
     """)
 
 
-def render_quick_actions():
-    """
-    Render quick action buttons in sidebar
-    """
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### ⚡ Quick Actions")
-
-    col1, col2 = st.sidebar.columns(2)
-
-    with col1:
-        if st.button("🔄 Sync", key="sidebar_sync", use_container_width=True):
-            st.switch_page("pages/2_🔄_Sync.py")
-
-    with col2:
-        if st.button("📊 Analytics", key="sidebar_analytics", use_container_width=True):
-            st.switch_page("pages/4_📈_Analytics.py")
-
-
 def render_about():
     """
     Render about section in sidebar
@@ -142,7 +124,6 @@ def render_full_sidebar():
     Can be called from any page
     """
     render_quick_stats()
-    render_quick_actions()
     render_navigation_info()
     render_about()
 

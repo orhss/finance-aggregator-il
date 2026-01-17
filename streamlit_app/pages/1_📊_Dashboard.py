@@ -337,22 +337,3 @@ with ErrorBoundary("Failed to load dashboard data"):
             st.dataframe(df_accounts_summary, use_container_width=True, hide_index=True)
         else:
             st.info("No accounts available")
-
-    st.markdown("---")
-
-    # Quick Actions
-    st.subheader("⚡ Quick Actions")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        if st.button("🔄 Sync All Data", type="primary", use_container_width=True):
-            st.switch_page("pages/2_🔄_Sync.py")
-
-    with col2:
-        if st.button("💳 View Transactions", use_container_width=True):
-            st.switch_page("pages/3_💳_Transactions.py")
-
-    with col3:
-        if st.button("📈 View Analytics", use_container_width=True):
-            st.switch_page("pages/4_📈_Analytics.py")

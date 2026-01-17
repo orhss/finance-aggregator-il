@@ -370,26 +370,6 @@ try:
             with col3:
                 st.metric("Transactions (90 days)", format_number(txn_count_90d))
 
-    # ============================================================================
-    # ACCOUNT ACTIONS
-    # ============================================================================
-    st.markdown("---")
-    st.subheader("⚡ Quick Actions")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        if st.button("🔄 Sync Accounts", type="primary", use_container_width=True):
-            st.switch_page("pages/2_🔄_Sync.py")
-
-    with col2:
-        if st.button("💳 View Transactions", use_container_width=True):
-            st.switch_page("pages/3_💳_Transactions.py")
-
-    with col3:
-        if st.button("📈 View Analytics", use_container_width=True):
-            st.switch_page("pages/4_📈_Analytics.py")
-
 except Exception as e:
     st.error(f"Error loading accounts: {str(e)}")
     st.exception(e)

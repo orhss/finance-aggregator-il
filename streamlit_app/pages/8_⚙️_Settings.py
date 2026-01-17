@@ -402,26 +402,6 @@ try:
         st.code(f"CONFIG_DIR: {CONFIG_DIR}", language="text")
         st.code(f"HOME: {Path.home()}", language="text")
 
-    st.markdown("---")
-
-    # ============================================================================
-    # QUICK ACTIONS
-    # ============================================================================
-    st.subheader("⚡ Quick Actions")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        if st.button("🔄 Go to Sync", type="primary", use_container_width=True):
-            st.switch_page("pages/2_🔄_Sync.py")
-
-    with col2:
-        if st.button("💳 View Transactions", use_container_width=True):
-            st.switch_page("pages/3_💳_Transactions.py")
-
-    with col3:
-        if st.button("📈 View Analytics", use_container_width=True):
-            st.switch_page("pages/4_📈_Analytics.py")
 
 except Exception as e:
     st.error(f"Error loading settings: {str(e)}")
