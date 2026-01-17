@@ -700,12 +700,12 @@ try:
                         try:
                             success = tag_service_edit.update_transaction(txn.id, user_category=final_category)
                             if success:
-                                st.success("✅ Category updated!")
+                                st.toast("✅ Category updated successfully", icon="✅")
                                 st.rerun()
                             else:
-                                st.error("Failed to update category")
+                                st.toast("Failed to update category", icon="❌")
                         except Exception as e:
-                            st.error(f"Error: {str(e)}")
+                            st.toast(f"Error: {str(e)}", icon="❌")
 
                 # Manage Tags
                 st.markdown("---")
@@ -737,12 +737,12 @@ try:
                             if tags_to_add:
                                 try:
                                     added = tag_service_edit.tag_transaction(txn.id, tags_to_add)
-                                    st.success(f"✅ Added {added} tag(s)")
+                                    st.toast(f"Added {added} tag(s) to transaction", icon="🏷️")
                                     st.rerun()
                                 except Exception as e:
-                                    st.error(f"Error: {str(e)}")
+                                    st.toast(f"Error: {str(e)}", icon="❌")
                             else:
-                                st.warning("Please select at least one tag")
+                                st.toast("Please select at least one tag", icon="⚠️")
                     else:
                         st.info("All available tags are already applied")
 
@@ -758,12 +758,12 @@ try:
                             try:
                                 tag_service_edit.get_or_create_tag(new_tag_name_inline.strip())
                                 added = tag_service_edit.tag_transaction(txn.id, [new_tag_name_inline.strip()])
-                                st.success(f"✅ Created and added tag: {new_tag_name_inline.strip()}")
+                                st.toast(f"Created and added tag: {new_tag_name_inline.strip()}", icon="🏷️")
                                 st.rerun()
                             except Exception as e:
-                                st.error(f"Error: {str(e)}")
+                                st.toast(f"Error: {str(e)}", icon="❌")
                         else:
-                            st.warning("Please enter a tag name")
+                            st.toast("Please enter a tag name", icon="⚠️")
 
                 with col_tag2:
                     st.markdown("**Remove Tags**")
@@ -779,12 +779,12 @@ try:
                             if tags_to_remove:
                                 try:
                                     removed = tag_service_edit.untag_transaction(txn.id, tags_to_remove)
-                                    st.success(f"✅ Removed {removed} tag(s)")
+                                    st.toast(f"Removed {removed} tag(s) from transaction", icon="🗑️")
                                     st.rerun()
                                 except Exception as e:
-                                    st.error(f"Error: {str(e)}")
+                                    st.toast(f"Error: {str(e)}", icon="❌")
                             else:
-                                st.warning("Please select at least one tag")
+                                st.toast("Please select at least one tag", icon="⚠️")
                     else:
                         st.info("No tags to remove")
 

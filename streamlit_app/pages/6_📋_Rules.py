@@ -134,12 +134,12 @@ try:
                         match_type=MatchType(rule_match_type),
                         description=rule_description.strip() if rule_description else None
                     )
-                    st.success(f"✅ Created rule: {new_rule.pattern}")
+                    st.toast(f"Created rule: {new_rule.pattern}", icon="📋")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error creating rule: {str(e)}")
+                    st.toast(f"Error creating rule: {str(e)}", icon="❌")
             else:
-                st.warning("Please enter a pattern")
+                st.toast("Please enter a pattern", icon="⚠️")
 
     st.markdown("---")
 
@@ -205,10 +205,10 @@ try:
             if st.button("Delete Rule", type="secondary", use_container_width=True):
                 success = rules_service.remove_rule(delete_rule_pattern)
                 if success:
-                    st.success(f"✅ Deleted rule: {delete_rule_pattern}")
+                    st.toast(f"Deleted rule: {delete_rule_pattern}", icon="🗑️")
                     st.rerun()
                 else:
-                    st.error("Failed to delete rule")
+                    st.toast("Failed to delete rule", icon="❌")
 
         with col2:
             st.markdown("**Test Rule Pattern**")
@@ -286,9 +286,11 @@ try:
                 details = results.get('details', [])
 
                 if dry_run:
-                    st.success(f"✅ Dry run complete: {modified} / {processed} transactions would be modified")
+                    st.toast(f"Dry run complete: {modified} / {processed} transactions would be modified", icon="🔍")
                 else:
-                    st.success(f"✅ Applied rules: {modified} / {processed} transactions modified")
+                    st.toast(f"Applied rules: {modified} / {processed} transactions modified", icon="✅")
+                    if modified > 0:
+                        st.balloons()  # Celebration for successful bulk operation
 
                 if details:
                     st.markdown(f"**Showing first 50 changes:**")
@@ -385,13 +387,13 @@ try:
                         with open(rules_service.rules_file, 'w', encoding='utf-8') as f:
                             f.write(yaml_content)
 
-                        st.success(f"✅ Imported {len(rules_data)} rules")
+                        st.toast(f"Imported {len(rules_data)} rules", icon="📥")
                         st.rerun()
 
                 except yaml.YAMLError as e:
-                    st.error(f"Invalid YAML file: {str(e)}")
+                    st.toast(f"Invalid YAML file: {str(e)}", icon="❌")
                 except Exception as e:
-                    st.error(f"Error importing rules: {str(e)}")
+                    st.toast(f"Error importing rules: {str(e)}", icon="❌")
 
     # Reset to defaults
     st.markdown("---")

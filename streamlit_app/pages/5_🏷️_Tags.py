@@ -98,12 +98,12 @@ try:
                 if new_tag_name and new_tag_name.strip():
                     try:
                         tag = tag_service.get_or_create_tag(new_tag_name.strip())
-                        st.success(f"✅ Created tag: {tag.name}")
+                        st.toast(f"Created tag: {tag.name}", icon="🏷️")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Error creating tag: {str(e)}")
+                        st.toast(f"Error creating tag: {str(e)}", icon="❌")
                 else:
-                    st.warning("Please enter a tag name")
+                    st.toast("Please enter a tag name", icon="⚠️")
 
     st.markdown("---")
 
@@ -196,12 +196,12 @@ try:
 
                     success = tag_service.rename_tag(old_tag_name, new_tag_name_rename.strip())
                     if success:
-                        st.success(f"✅ Successfully renamed/merged tag")
+                        st.toast(f"Successfully renamed/merged tag", icon="✅")
                         st.rerun()
                     else:
-                        st.error(f"Failed to rename tag")
+                        st.toast(f"Failed to rename tag", icon="❌")
                 else:
-                    st.warning("Please enter a new name")
+                    st.toast("Please enter a new name", icon="⚠️")
 
         with col2:
             st.markdown("**Delete Tag**")
@@ -222,10 +222,10 @@ try:
             if st.button("Delete Tag", type="secondary", use_container_width=True):
                 success = tag_service.delete_tag(delete_tag_name)
                 if success:
-                    st.success(f"✅ Deleted tag: {delete_tag_name}")
+                    st.toast(f"Deleted tag: {delete_tag_name}", icon="🗑️")
                     st.rerun()
                 else:
-                    st.error(f"Failed to delete tag")
+                    st.toast(f"Failed to delete tag", icon="❌")
 
         st.markdown("---")
 
@@ -347,14 +347,15 @@ try:
                 if tags_list:
                     try:
                         count = tag_service.bulk_tag_by_merchant(merchant_pattern.strip(), tags_list)
-                        st.success(f"✅ Tagged {count} transactions with: {', '.join(tags_list)}")
+                        st.toast(f"Tagged {count} transactions with: {', '.join(tags_list)}", icon="🏷️")
+                        st.balloons()  # Celebration for bulk operations
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Error applying tags: {str(e)}")
+                        st.toast(f"Error applying tags: {str(e)}", icon="❌")
                 else:
-                    st.warning("Please enter at least one tag")
+                    st.toast("Please enter at least one tag", icon="⚠️")
             else:
-                st.warning("Please enter both merchant pattern and tags")
+                st.toast("Please enter both merchant pattern and tags", icon="⚠️")
 
     # ------------------------------------------------------------------------
     # Tab 2: By Category
@@ -461,14 +462,15 @@ try:
                                 if added > 0:
                                     count += 1
 
-                            st.success(f"✅ Tagged {count} transactions in category '{selected_category}' with: {', '.join(tags_list)}")
+                            st.toast(f"Tagged {count} transactions in category '{selected_category}' with: {', '.join(tags_list)}", icon="🏷️")
+                            st.balloons()  # Celebration for bulk operations
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Error applying tags: {str(e)}")
+                            st.toast(f"Error applying tags: {str(e)}", icon="❌")
                     else:
-                        st.warning("Please enter at least one tag")
+                        st.toast("Please enter at least one tag", icon="⚠️")
                 else:
-                    st.warning("Please enter tags to apply")
+                    st.toast("Please enter tags to apply", icon="⚠️")
 
     # ------------------------------------------------------------------------
     # Tab 3: Migrate Categories to Tags
@@ -507,7 +509,8 @@ try:
 
                 if results:
                     total_tagged = sum(results.values())
-                    st.success(f"✅ Successfully migrated {len(results)} categories, tagged {total_tagged} transactions")
+                    st.toast(f"Successfully migrated {len(results)} categories, tagged {total_tagged} transactions", icon="✅")
+                    st.balloons()  # Celebration for major migration
 
                     migration_data = []
                     for category, count in sorted(results.items(), key=lambda x: x[1], reverse=True):

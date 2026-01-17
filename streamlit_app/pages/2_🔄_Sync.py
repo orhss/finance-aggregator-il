@@ -456,10 +456,11 @@ try:
                 # Sync each institution sequentially
                 for inst in selected:
                     run_sync_command(inst, headless_mode, months_back, months_forward)
-                st.success(f"✅ Queued sync for {len(selected)} institutions")
+                st.toast(f"Synced {len(selected)} institutions successfully!", icon="✅")
+                st.balloons()  # Celebration for successful sync
                 st.rerun()
             else:
-                st.warning("Please select at least one institution")
+                st.toast("Please select at least one institution", icon="⚠️")
 
     with col2:
         if st.button(
