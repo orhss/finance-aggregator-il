@@ -16,6 +16,7 @@ sys.path.insert(0, str(project_root))
 from streamlit_app.utils.session import init_session_state
 from streamlit_app.utils.formatters import format_currency, format_number
 from streamlit_app.components.sidebar import render_minimal_sidebar
+from streamlit_app.components.bulk_actions import show_bulk_confirmation
 
 # Page config
 st.set_page_config(
@@ -287,13 +288,22 @@ try:
 
                 if dry_run:
                     st.toast(f"Dry run complete: {modified} / {processed} transactions would be modified", icon="🔍")
+
+                    # After dry run, show confirmation for actual apply
+                    if modified > 0:
+                        show_bulk_confirmation(
+                            operation_name="modify with rules",
+                            affected_count=modified,
+                            details=f"(out of {processed} processed)",
+                            warning_threshold=50
+                        )
                 else:
                     st.toast(f"Applied rules: {modified} / {processed} transactions modified", icon="✅")
                     if modified > 0:
                         st.balloons()  # Celebration for successful bulk operation
 
                 if details:
-                    st.markdown(f"**Showing first 50 changes:**")
+                    st.markdown(f"**Preview of changes:**" if dry_run else "**Changes applied:**")
 
                     preview_data = []
                     for detail in details[:50]:

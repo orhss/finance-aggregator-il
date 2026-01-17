@@ -15,6 +15,7 @@ sys.path.insert(0, str(project_root))
 from streamlit_app.utils.session import init_session_state
 from streamlit_app.utils.formatters import format_currency, format_number, format_category_badge, format_tags
 from streamlit_app.components.sidebar import render_minimal_sidebar
+from streamlit_app.components.bulk_actions import show_bulk_preview, show_bulk_confirmation
 
 # Page config
 st.set_page_config(
@@ -313,16 +314,20 @@ try:
             )
 
         # Preview button
-        if st.button("Preview Matches", key="preview_merchant"):
+        if st.button("🔍 Preview Matches", key="preview_merchant"):
             if merchant_pattern and merchant_pattern.strip():
-                # Find matching transactions
+                # Get total count for accurate stats
+                total_count = session.query(func.count(Transaction.id)).filter(
+                    Transaction.description.ilike(f"%{merchant_pattern}%")
+                ).scalar()
+
+                # Find matching transactions for preview
                 matching_txns = session.query(Transaction).filter(
                     Transaction.description.ilike(f"%{merchant_pattern}%")
                 ).order_by(Transaction.transaction_date.desc()).limit(20).all()
 
                 if matching_txns:
-                    st.info(f"Found {len(matching_txns)} matching transactions (showing first 20)")
-
+                    # Format preview data
                     preview_data = []
                     for txn in matching_txns:
                         preview_data.append({
@@ -332,30 +337,64 @@ try:
                             'Current Tags': ', '.join(txn.tags) if txn.tags else 'None'
                         })
 
-                    df_preview = pd.DataFrame(preview_data)
-                    st.dataframe(df_preview, use_container_width=True, hide_index=True)
+                    # Use reusable preview component
+                    show_bulk_preview(
+                        items=preview_data,
+                        title=f"Transactions matching '{merchant_pattern}'",
+                        columns=['Date', 'Description', 'Amount', 'Current Tags'],
+                        max_preview=20,
+                        total_count=total_count
+                    )
+
+                    # Show confirmation with tags detail
+                    tags_list = [tag.strip() for tag in merchant_tags_input.split(',') if tag.strip()] if merchant_tags_input else []
+                    if tags_list:
+                        show_bulk_confirmation(
+                            operation_name="tag",
+                            affected_count=total_count,
+                            details=f"with: {', '.join(tags_list)}",
+                            warning_threshold=50
+                        )
+
+                        # Store preview state
+                        st.session_state['merchant_preview_ready'] = True
+                        st.session_state['merchant_preview_count'] = total_count
+                    else:
+                        st.warning("⚠️ Please enter tags to add before applying")
                 else:
                     st.warning("No transactions found matching this pattern")
+                    st.session_state['merchant_preview_ready'] = False
             else:
-                st.warning("Please enter a merchant pattern")
+                st.toast("Please enter a merchant pattern", icon="⚠️")
 
-        # Apply button
-        if st.button("Apply Tags", key="apply_merchant", type="primary"):
-            if merchant_pattern and merchant_pattern.strip() and merchant_tags_input:
-                tags_list = [tag.strip() for tag in merchant_tags_input.split(',') if tag.strip()]
+        # Apply button (only show if preview was successful)
+        if st.session_state.get('merchant_preview_ready', False):
+            st.markdown("---")
+            col1, col2 = st.columns([1, 3])
 
-                if tags_list:
-                    try:
-                        count = tag_service.bulk_tag_by_merchant(merchant_pattern.strip(), tags_list)
-                        st.toast(f"Tagged {count} transactions with: {', '.join(tags_list)}", icon="🏷️")
-                        st.balloons()  # Celebration for bulk operations
-                        st.rerun()
-                    except Exception as e:
-                        st.toast(f"Error applying tags: {str(e)}", icon="❌")
-                else:
-                    st.toast("Please enter at least one tag", icon="⚠️")
-            else:
-                st.toast("Please enter both merchant pattern and tags", icon="⚠️")
+            with col1:
+                if st.button("✅ Apply Tags", key="apply_merchant", type="primary", use_container_width=True):
+                    if merchant_pattern and merchant_pattern.strip() and merchant_tags_input:
+                        tags_list = [tag.strip() for tag in merchant_tags_input.split(',') if tag.strip()]
+
+                        if tags_list:
+                            try:
+                                count = tag_service.bulk_tag_by_merchant(merchant_pattern.strip(), tags_list)
+                                st.session_state['merchant_preview_ready'] = False  # Clear state
+                                st.toast(f"Tagged {count} transactions with: {', '.join(tags_list)}", icon="🏷️")
+                                st.balloons()  # Celebration for bulk operations
+                                st.rerun()
+                            except Exception as e:
+                                st.toast(f"Error applying tags: {str(e)}", icon="❌")
+                        else:
+                            st.toast("Please enter at least one tag", icon="⚠️")
+                    else:
+                        st.toast("Please enter both merchant pattern and tags", icon="⚠️")
+
+            with col2:
+                if st.button("❌ Cancel", key="cancel_merchant", use_container_width=True):
+                    st.session_state['merchant_preview_ready'] = False
+                    st.rerun()
 
     # ------------------------------------------------------------------------
     # Tab 2: By Category
@@ -396,9 +435,9 @@ try:
                 )
 
             # Preview button
-            if st.button("Preview Matches", key="preview_category"):
+            if st.button("🔍 Preview Matches", key="preview_category"):
                 # Count matching transactions
-                count_query = session.query(func.count(Transaction.id)).filter(
+                match_count = session.query(func.count(Transaction.id)).filter(
                     or_(
                         Transaction.user_category == selected_category,
                         and_(
@@ -406,8 +445,7 @@ try:
                             Transaction.category == selected_category
                         )
                     )
-                )
-                match_count = count_query.scalar()
+                ).scalar()
 
                 # Get sample transactions
                 sample_txns = session.query(Transaction).filter(
@@ -421,8 +459,7 @@ try:
                 ).order_by(Transaction.transaction_date.desc()).limit(20).all()
 
                 if sample_txns:
-                    st.info(f"Found {match_count} transactions in category '{selected_category}' (showing first 20)")
-
+                    # Format preview data
                     preview_data = []
                     for txn in sample_txns:
                         preview_data.append({
@@ -432,45 +469,78 @@ try:
                             'Current Tags': ', '.join(txn.tags) if txn.tags else 'None'
                         })
 
-                    df_preview = pd.DataFrame(preview_data)
-                    st.dataframe(df_preview, use_container_width=True, hide_index=True)
+                    # Use reusable preview component
+                    show_bulk_preview(
+                        items=preview_data,
+                        title=f"Transactions in category '{selected_category}'",
+                        columns=['Date', 'Description', 'Amount', 'Current Tags'],
+                        max_preview=20,
+                        total_count=match_count
+                    )
+
+                    # Show confirmation with tags detail
+                    tags_list = [tag.strip() for tag in category_tags_input.split(',') if tag.strip()] if category_tags_input else []
+                    if tags_list:
+                        show_bulk_confirmation(
+                            operation_name="tag",
+                            affected_count=match_count,
+                            details=f"with: {', '.join(tags_list)}",
+                            warning_threshold=50
+                        )
+
+                        # Store preview state
+                        st.session_state['category_preview_ready'] = True
+                        st.session_state['category_preview_count'] = match_count
+                    else:
+                        st.warning("⚠️ Please enter tags to add before applying")
                 else:
                     st.warning("No transactions found in this category")
+                    st.session_state['category_preview_ready'] = False
 
-            # Apply button
-            if st.button("Apply Tags", key="apply_category", type="primary"):
-                if category_tags_input:
-                    tags_list = [tag.strip() for tag in category_tags_input.split(',') if tag.strip()]
+            # Apply button (only show if preview was successful)
+            if st.session_state.get('category_preview_ready', False):
+                st.markdown("---")
+                col1, col2 = st.columns([1, 3])
 
-                    if tags_list:
-                        try:
-                            # Use bulk_tag_by_category for source categories
-                            # For user_category, we need to manually query
-                            transactions = session.query(Transaction).filter(
-                                or_(
-                                    Transaction.user_category == selected_category,
-                                    and_(
-                                        Transaction.user_category.is_(None),
-                                        Transaction.category == selected_category
-                                    )
-                                )
-                            ).all()
+                with col1:
+                    if st.button("✅ Apply Tags", key="apply_category", type="primary", use_container_width=True):
+                        if category_tags_input:
+                            tags_list = [tag.strip() for tag in category_tags_input.split(',') if tag.strip()]
 
-                            count = 0
-                            for txn in transactions:
-                                added = tag_service.tag_transaction(txn.id, tags_list)
-                                if added > 0:
-                                    count += 1
+                            if tags_list:
+                                try:
+                                    # Query transactions in category
+                                    transactions = session.query(Transaction).filter(
+                                        or_(
+                                            Transaction.user_category == selected_category,
+                                            and_(
+                                                Transaction.user_category.is_(None),
+                                                Transaction.category == selected_category
+                                            )
+                                        )
+                                    ).all()
 
-                            st.toast(f"Tagged {count} transactions in category '{selected_category}' with: {', '.join(tags_list)}", icon="🏷️")
-                            st.balloons()  # Celebration for bulk operations
-                            st.rerun()
-                        except Exception as e:
-                            st.toast(f"Error applying tags: {str(e)}", icon="❌")
-                    else:
-                        st.toast("Please enter at least one tag", icon="⚠️")
-                else:
-                    st.toast("Please enter tags to apply", icon="⚠️")
+                                    count = 0
+                                    for txn in transactions:
+                                        added = tag_service.tag_transaction(txn.id, tags_list)
+                                        if added > 0:
+                                            count += 1
+
+                                    st.session_state['category_preview_ready'] = False  # Clear state
+                                    st.toast(f"Tagged {count} transactions in category '{selected_category}' with: {', '.join(tags_list)}", icon="🏷️")
+                                    st.balloons()  # Celebration for bulk operations
+                                    st.rerun()
+                                except Exception as e:
+                                    st.toast(f"Error applying tags: {str(e)}", icon="❌")
+                            else:
+                                st.toast("Please enter at least one tag", icon="⚠️")
+                        else:
+                            st.toast("Please enter tags to apply", icon="⚠️")
+
+                with col2:
+                    if st.button("❌ Cancel", key="cancel_category", use_container_width=True):
+                        st.session_state['category_preview_ready'] = False
+                        st.rerun()
 
     # ------------------------------------------------------------------------
     # Tab 3: Migrate Categories to Tags
