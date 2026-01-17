@@ -382,11 +382,43 @@ class Theme:
         /* Buttons */
         .stButton > button {{
             border-color: {self.palette.border_medium};
+            color: {self.palette.text_primary} !important;
         }}
 
+        /* Primary buttons */
         .stButton > button[kind="primary"] {{
             background-color: {self.palette.primary};
-            color: white;
+            color: white !important;
+        }}
+
+        /* Secondary buttons */
+        .stButton > button[kind="secondary"] {{
+            background-color: {self.palette.bg_tertiary};
+            color: {self.palette.text_primary} !important;
+            border-color: {self.palette.border_medium};
+        }}
+
+        /* Button text content (fixes markdown inside buttons) */
+        .stButton > button p {{
+            color: inherit !important;
+        }}
+
+        .stButton > button div {{
+            color: inherit !important;
+        }}
+
+        .stButton > button span {{
+            color: inherit !important;
+        }}
+
+        /* Button hover states */
+        .stButton > button[kind="secondary"]:hover {{
+            background-color: {self.palette.bg_secondary};
+            border-color: {self.palette.primary};
+        }}
+
+        .stButton > button[kind="primary"]:hover {{
+            opacity: 0.9;
         }}
 
         /* Inputs */
