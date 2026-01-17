@@ -283,108 +283,191 @@ try:
         st.code("fin-cli sync all", language="bash")
         st.stop()
 
-    # Group accounts by institution
-    institutions = {}
+    # Group accounts by institution and type
+    brokers_pensions = {}
+    credit_cards = {}
+
     for account in accounts:
         institution = account.institution
-        if institution not in institutions:
-            institutions[institution] = []
-        institutions[institution].append(account)
+        if account.account_type == 'credit_card':
+            if institution not in credit_cards:
+                credit_cards[institution] = []
+            credit_cards[institution].append(account)
+        else:
+            if institution not in brokers_pensions:
+                brokers_pensions[institution] = []
+            brokers_pensions[institution].append(account)
 
-    # Display status cards by institution
-    st.markdown("### Status by Institution")
-
+    # Display status cards by institution - separated by type
     cols_per_row = 3
-    institutions_list = list(institutions.items())
 
-    for i in range(0, len(institutions_list), cols_per_row):
-        cols = st.columns(cols_per_row)
+    # Brokers & Pensions Section
+    if brokers_pensions:
+        st.markdown("### 📈 Brokers & Pension Funds")
 
-        for j, (institution, accounts_list) in enumerate(institutions_list[i:i+cols_per_row]):
-            with cols[j]:
-                with st.container():
-                    # Institution header
-                    st.markdown(f"**🏦 {institution}**")
+        institutions_list = list(brokers_pensions.items())
 
-                    # Get stats for this institution
-                    account_ids = [acc.id for acc in accounts_list]
+        for i in range(0, len(institutions_list), cols_per_row):
+            cols = st.columns(cols_per_row)
 
-                    # Last sync date (approximate from latest balance date)
-                    last_sync = session.query(func.max(Balance.balance_date)).filter(
-                        Balance.account_id.in_(account_ids)
-                    ).scalar()
+            for j, (institution, accounts_list) in enumerate(institutions_list[i:i+cols_per_row]):
+                with cols[j]:
+                    with st.container():
+                        # Institution header
+                        st.markdown(f"**🏦 {institution}**")
 
-                    # Transaction count
-                    txn_count = session.query(func.count(Transaction.id)).filter(
-                        Transaction.account_id.in_(account_ids)
-                    ).scalar() or 0
+                        # Get stats for this institution
+                        account_ids = [acc.id for acc in accounts_list]
 
-                    # Latest transaction date
-                    latest_txn_date = session.query(func.max(Transaction.transaction_date)).filter(
-                        Transaction.account_id.in_(account_ids)
-                    ).scalar()
+                        # For brokers/pensions, use balance date
+                        last_sync = session.query(func.max(Balance.balance_date)).filter(
+                            Balance.account_id.in_(account_ids)
+                        ).scalar()
 
-                    # Status indicator
-                    if last_sync:
-                        days_since_sync = (date.today() - last_sync).days
-                        if days_since_sync <= 1:
-                            status = "✅ Up to date"
-                            status_color = "green"
-                        elif days_since_sync <= 7:
-                            status = "⚠️ May need sync"
-                            status_color = "orange"
+                        # Get latest balance amount
+                        latest_balance = session.query(Balance).filter(
+                            Balance.account_id.in_(account_ids)
+                        ).order_by(desc(Balance.balance_date)).first()
+
+                        # Status indicator
+                        if last_sync:
+                            days_since_sync = (date.today() - last_sync).days
+                            if days_since_sync <= 1:
+                                status = "✅ Up to date"
+                            elif days_since_sync <= 7:
+                                status = "⚠️ May need sync"
+                            else:
+                                status = "❌ Needs sync"
                         else:
-                            status = "❌ Needs sync"
-                            status_color = "red"
-                    else:
-                        status = "❓ Never synced"
-                        status_color = "gray"
+                            status = "❓ Never synced"
 
-                    st.markdown(f"**Status:** {status}")
+                        st.markdown(f"**Status:** {status}")
 
-                    # Metrics
-                    st.caption(f"Accounts: {len(accounts_list)}")
-                    st.caption(f"Transactions: {format_number(txn_count)}")
+                        # Metrics
+                        st.caption(f"Accounts: {len(accounts_list)}")
+                        if latest_balance:
+                            st.caption(f"Balance: {format_currency(latest_balance.total_amount)}")
+                        else:
+                            st.caption("Balance: N/A")
 
-                    if last_sync:
-                        st.caption(f"Last sync: {format_datetime(last_sync, '%Y-%m-%d')}")
-                    else:
-                        st.caption("Last sync: Never")
+                        if last_sync:
+                            st.caption(f"Last sync: {format_datetime(last_sync, '%Y-%m-%d')}")
+                        else:
+                            st.caption("Last sync: Never")
 
-                    if latest_txn_date:
-                        st.caption(f"Latest txn: {format_datetime(latest_txn_date, '%Y-%m-%d')}")
+                        # Sync button
+                        if st.button(
+                            f"🔄 Sync {institution}",
+                            key=f"sync_{institution}",
+                            disabled=st.session_state.sync_running,
+                            use_container_width=True,
+                            help="Click to sync this institution"
+                        ):
+                            # Map institution names to CLI sync targets
+                            institution_map = {
+                                'excellence': 'excellence',
+                                'Excellence': 'excellence',
+                                'meitav': 'meitav',
+                                'Meitav': 'meitav',
+                                'migdal': 'migdal',
+                                'Migdal': 'migdal',
+                                'phoenix': 'phoenix',
+                                'Phoenix': 'phoenix'
+                            }
+                            sync_target = institution_map.get(institution, institution.lower())
+                            st.toast(f"🔄 Starting sync for {institution}...", icon="🔄")
+                            start_sync(sync_target)
+                            st.rerun()
 
-                    # Sync button
-                    if st.button(
-                        f"🔄 Sync {institution}",
-                        key=f"sync_{institution}",
-                        disabled=st.session_state.sync_running,
-                        use_container_width=True,
-                        help="Click to sync this institution"
-                    ):
-                        # Map institution names to CLI sync targets
-                        institution_map = {
-                            'cal': 'cal',
-                            'CAL': 'cal',
-                            'max': 'max',
-                            'Max': 'max',
-                            'isracard': 'isracard',
-                            'Isracard': 'isracard',
-                            'excellence': 'excellence',
-                            'Excellence': 'excellence',
-                            'meitav': 'meitav',
-                            'Meitav': 'meitav',
-                            'migdal': 'migdal',
-                            'Migdal': 'migdal',
-                            'phoenix': 'phoenix',
-                            'Phoenix': 'phoenix'
-                        }
-                        sync_target = institution_map.get(institution, institution.lower())
-                        st.toast(f"🔄 Starting sync for {institution}...", icon="🔄")
-                        start_sync(sync_target)
-                        st.rerun()
+                        st.markdown("---")
 
-                    st.markdown("---")
+        st.markdown("")  # Add spacing between sections
+
+    # Credit Cards Section
+    if credit_cards:
+        st.markdown("### 💳 Credit Cards")
+
+        institutions_list = list(credit_cards.items())
+
+        for i in range(0, len(institutions_list), cols_per_row):
+            cols = st.columns(cols_per_row)
+
+            for j, (institution, accounts_list) in enumerate(institutions_list[i:i+cols_per_row]):
+                with cols[j]:
+                    with st.container():
+                        # Institution header
+                        st.markdown(f"**💳 {institution}**")
+
+                        # Get stats for this institution
+                        account_ids = [acc.id for acc in accounts_list]
+
+                        # For credit cards, use the latest transaction's created_at (when it was synced)
+                        last_sync_datetime = session.query(func.max(Transaction.created_at)).filter(
+                            Transaction.account_id.in_(account_ids)
+                        ).scalar()
+                        last_sync = last_sync_datetime.date() if last_sync_datetime else None
+
+                        # Transaction count
+                        txn_count = session.query(func.count(Transaction.id)).filter(
+                            Transaction.account_id.in_(account_ids)
+                        ).scalar() or 0
+
+                        # Latest transaction date
+                        latest_txn_date = session.query(func.max(Transaction.transaction_date)).filter(
+                            Transaction.account_id.in_(account_ids)
+                        ).scalar()
+
+                        # Status indicator
+                        if last_sync:
+                            days_since_sync = (date.today() - last_sync).days
+                            if days_since_sync <= 1:
+                                status = "✅ Up to date"
+                            elif days_since_sync <= 7:
+                                status = "⚠️ May need sync"
+                            else:
+                                status = "❌ Needs sync"
+                        else:
+                            status = "❓ Never synced"
+
+                        st.markdown(f"**Status:** {status}")
+
+                        # Metrics
+                        st.caption(f"Accounts: {len(accounts_list)}")
+                        st.caption(f"Transactions: {format_number(txn_count)}")
+
+                        if last_sync:
+                            st.caption(f"Last sync: {format_datetime(last_sync, '%Y-%m-%d')}")
+                        else:
+                            st.caption("Last sync: Never")
+
+                        if latest_txn_date:
+                            st.caption(f"Latest txn: {format_datetime(latest_txn_date, '%Y-%m-%d')}")
+                        else:
+                            st.caption("Latest txn: N/A")
+
+                        # Sync button
+                        if st.button(
+                            f"🔄 Sync {institution}",
+                            key=f"sync_{institution}",
+                            disabled=st.session_state.sync_running,
+                            use_container_width=True,
+                            help="Click to sync this institution"
+                        ):
+                            # Map institution names to CLI sync targets
+                            institution_map = {
+                                'cal': 'cal',
+                                'CAL': 'cal',
+                                'max': 'max',
+                                'Max': 'max',
+                                'isracard': 'isracard',
+                                'Isracard': 'isracard',
+                            }
+                            sync_target = institution_map.get(institution, institution.lower())
+                            st.toast(f"🔄 Starting sync for {institution}...", icon="🔄")
+                            start_sync(sync_target)
+                            st.rerun()
+
+                        st.markdown("---")
 
     st.markdown("---")
 
@@ -395,10 +478,21 @@ try:
 
     account_status_data = []
     for account in accounts:
-        # Last balance date
-        last_balance = session.query(Balance).filter(
-            Balance.account_id == account.id
-        ).order_by(desc(Balance.balance_date)).first()
+        # Determine last sync date based on account type
+        if account.account_type == 'credit_card':
+            # For credit cards, use latest transaction's created_at
+            last_txn_created = session.query(func.max(Transaction.created_at)).filter(
+                Transaction.account_id == account.id
+            ).scalar()
+            last_sync = last_txn_created.date() if last_txn_created else None
+            balance_amount = None  # Credit cards don't have balance
+        else:
+            # For brokers/pensions, use balance date
+            last_balance = session.query(Balance).filter(
+                Balance.account_id == account.id
+            ).order_by(desc(Balance.balance_date)).first()
+            last_sync = last_balance.balance_date if last_balance else None
+            balance_amount = last_balance.total_amount if last_balance else None
 
         # Transaction count
         txn_count = session.query(func.count(Transaction.id)).filter(
@@ -419,8 +513,8 @@ try:
         ).scalar() or 0
 
         # Determine status
-        if last_balance:
-            days_since_sync = (date.today() - last_balance.balance_date).days
+        if last_sync:
+            days_since_sync = (date.today() - last_sync).days
             if days_since_sync <= 1:
                 status = "✅"
             elif days_since_sync <= 7:
@@ -435,11 +529,11 @@ try:
             'Institution': account.institution,
             'Type': account.account_type or 'N/A',
             'Account Number': account.account_number or 'N/A',
-            'Last Sync': format_datetime(last_balance.balance_date, '%Y-%m-%d') if last_balance else 'Never',
+            'Last Sync': format_datetime(last_sync, '%Y-%m-%d') if last_sync else 'Never',
             'Transactions': format_number(txn_count),
             'Latest Transaction': format_datetime(latest_txn.transaction_date, '%Y-%m-%d') if latest_txn else 'N/A',
             'Pending': pending_count,
-            'Balance': format_currency(last_balance.total_amount) if last_balance else 'N/A'
+            'Balance': format_currency(balance_amount) if balance_amount else 'N/A'
         })
 
     df_account_status = pd.DataFrame(account_status_data)
