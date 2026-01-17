@@ -89,25 +89,6 @@ def render_quick_stats():
         st.sidebar.caption(f"Error: {str(e)}")
 
 
-def render_navigation_info():
-    """
-    Render navigation information and tips
-    """
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🧭 Navigation")
-    st.sidebar.caption("""
-    Use the menu above to navigate:
-    - **Dashboard** - Overview
-    - **Sync** - Update data
-    - **Transactions** - Browse
-    - **Analytics** - Insights
-    - **Tags** - Organize
-    - **Rules** - Automate
-    - **Accounts** - Manage
-    - **Settings** - Configure
-    """)
-
-
 def render_about():
     """
     Render about section in sidebar
@@ -116,16 +97,6 @@ def render_about():
     st.sidebar.markdown("### ℹ️ About")
     st.sidebar.caption("Financial Data Aggregator v1.0")
     st.sidebar.caption("[Documentation](https://github.com) · [Issues](https://github.com)")
-
-
-def render_full_sidebar():
-    """
-    Render complete sidebar with all components
-    Can be called from any page
-    """
-    render_quick_stats()
-    render_navigation_info()
-    render_about()
 
 
 def render_minimal_sidebar():
