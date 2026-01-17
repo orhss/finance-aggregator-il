@@ -28,6 +28,7 @@ from streamlit_app.utils.cache import (
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, show_info
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.empty_states import empty_analytics_state
+from streamlit_app.components.loading import contextual_spinner
 from streamlit_app.components.charts import (
     spending_donut,
     trend_line,
@@ -153,7 +154,7 @@ with ErrorBoundary("Failed to load analytics data"):
     # Fetch transactions for selected period (cached for 5 minutes)
     transactions_list = safe_call_with_spinner(
         get_transactions_cached,
-        spinner_text="Loading transactions for analysis...",
+        spinner_text=contextual_spinner("analyzing", "transaction patterns"),
         error_message="Failed to load transaction data",
         default_return=[],
         start_date=start_date,

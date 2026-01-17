@@ -22,6 +22,8 @@ from streamlit_app.utils.cache import get_dashboard_stats, get_transactions_cach
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary
 from streamlit_app.utils.insights import generate_spending_insight, generate_pending_insight
 from streamlit_app.components.sidebar import render_full_sidebar
+from streamlit_app.components.loading import contextual_spinner, cache_status_indicator
+from streamlit_app.components.responsive import apply_mobile_styles, responsive_metrics
 from streamlit_app.components.charts import (
     spending_donut,
     monthly_trend,
@@ -34,11 +36,15 @@ from streamlit_app.components.empty_states import empty_dashboard_state
 st.set_page_config(
     page_title="Dashboard - Financial Aggregator",
     page_icon="📊",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="auto"  # Auto-collapses on mobile
 )
 
 # Initialize session state
 init_session_state()
+
+# Apply mobile-friendly styles
+apply_mobile_styles()
 
 # Render sidebar
 render_full_sidebar()
@@ -57,7 +63,7 @@ with ErrorBoundary("Failed to load dashboard data"):
     # Get dashboard statistics (cached for 1 minute, default 3 months for performance)
     stats = safe_call_with_spinner(
         get_dashboard_stats,
-        spinner_text="Loading dashboard statistics...",
+        spinner_text=contextual_spinner("calculating", "financial statistics"),
         error_message="Failed to load dashboard stats",
         default_return=None,
         months_back=3
@@ -136,7 +142,7 @@ with ErrorBoundary("Failed to load dashboard data"):
 
     transactions_data = safe_call_with_spinner(
         get_transactions_cached,
-        spinner_text="Loading transaction data for charts...",
+        spinner_text=contextual_spinner("loading", "transaction history"),
         error_message="Failed to load transaction data",
         default_return=[],
         start_date=six_months_ago,
@@ -159,7 +165,7 @@ with ErrorBoundary("Failed to load dashboard data"):
     # Load accounts data once
     accounts_data = safe_call_with_spinner(
         get_accounts_cached,
-        spinner_text="Loading account balances...",
+        spinner_text=contextual_spinner("fetching", "account balances"),
         error_message="Failed to load account data",
         default_return=[]
     )

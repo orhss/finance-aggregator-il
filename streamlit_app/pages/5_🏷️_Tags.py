@@ -16,16 +16,21 @@ from streamlit_app.utils.session import init_session_state
 from streamlit_app.utils.formatters import format_currency, format_number, format_category_badge, format_tags
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.bulk_actions import show_bulk_preview, show_bulk_confirmation
+from streamlit_app.components.responsive import apply_mobile_styles
 
 # Page config
 st.set_page_config(
     page_title="Tags - Financial Aggregator",
     page_icon="🏷️",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="auto"  # Auto-collapses on mobile
 )
 
 # Initialize session state
 init_session_state()
+
+# Apply mobile-friendly styles
+apply_mobile_styles()
 
 # Render sidebar
 render_minimal_sidebar()

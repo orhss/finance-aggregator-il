@@ -25,16 +25,21 @@ from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, sh
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.empty_states import empty_transactions_state
 from streamlit_app.components.filters import date_range_filter_with_presets
+from streamlit_app.components.responsive import apply_mobile_styles
 
 # Page config
 st.set_page_config(
     page_title="Transactions - Financial Aggregator",
     page_icon="💳",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="auto"  # Auto-collapses on mobile
 )
 
 # Initialize session state
 init_session_state()
+
+# Apply mobile-friendly styles
+apply_mobile_styles()
 
 # Render sidebar
 render_minimal_sidebar()
