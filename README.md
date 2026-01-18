@@ -109,7 +109,67 @@ Fin/
    fin-cli config set email.address "user@gmail.com"
    ```
 
-### Option 2: Manual Installation (for development)
+### Option 2: Docker Installation (Easy Deployment)
+
+1. **Prerequisites**:
+   - Docker and Docker Compose installed
+
+2. **Create data directory** (if using existing database):
+   ```bash
+   mkdir -p ~/.fin
+   # Copy your existing financial_data.db, credentials.enc, etc. to ~/.fin/
+   ```
+
+3. **Start the application**:
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **Initialize database** (for new installations):
+   ```bash
+   docker-compose exec fin fin-cli init
+   docker-compose exec fin fin-cli config setup
+   ```
+
+5. **Access the application**:
+   - Streamlit UI: http://localhost:8501
+   - CLI commands: `docker-compose exec fin fin-cli <command>`
+
+6. **Stop the application**:
+   ```bash
+   docker-compose down
+   ```
+
+**Key Features**:
+- **Data Persistence**: Your `~/.fin/` directory is mounted to the container, so all data (database, credentials) persists between restarts
+- **Auto-restart**: Container restarts automatically unless explicitly stopped
+- **Customization**: Edit `docker-compose.yml` to change the data directory path
+
+**View Logs**:
+```bash
+docker-compose logs -f
+```
+
+**Run CLI Commands**:
+```bash
+# Sync all sources
+docker-compose exec fin fin-cli sync all
+
+# View accounts
+docker-compose exec fin fin-cli accounts list
+
+# View transactions
+docker-compose exec fin fin-cli transactions list
+```
+
+**Custom Data Path**:
+Edit `docker-compose.yml` and modify the volume path:
+```yaml
+volumes:
+  - /custom/path:/root/.fin  # Change left side to your preferred path
+```
+
+### Option 3: Manual Installation (for development)
 
 1. **Clone the repository**:
    ```bash
