@@ -101,52 +101,15 @@ To refresh the codemap: `python scripts/generate_codemap.py`
 
 ### Project Structure Overview
 
-```
-Fin/
-├── cli/                    # CLI implementation (Typer-based)
-│   ├── main.py            # Entry point
-│   ├── commands/          # Command modules (init, config, sync, etc.)
-│   └── tui/               # Terminal UI components
-├── config/                 # Configuration management
-│   ├── settings.py        # Credentials, encryption, multi-account
-│   └── constants.py       # App constants
-├── db/                     # Database layer
-│   ├── models.py          # SQLAlchemy models
-│   └── database.py        # Database setup and connection
-├── services/               # Business logic layer
-│   ├── credit_card_service.py
-│   ├── broker_service.py
-│   ├── pension_service.py
-│   ├── tag_service.py
-│   └── rules_service.py
-├── scrapers/               # Data extraction layer
-│   ├── base/              # Base classes and utilities
-│   ├── brokers/           # Broker scrapers
-│   ├── pensions/          # Pension fund scrapers
-│   ├── credit_cards/      # Credit card scrapers (CAL, Max, Isracard)
-│   ├── utils/             # Shared utilities
-│   └── exceptions.py      # Custom exceptions
-├── streamlit_app/          # Streamlit web UI
-│   ├── app.py             # Main entry point
-│   ├── pages/             # Multi-page app pages
-│   ├── components/        # Reusable UI components
-│   └── utils/             # UI utilities
-├── plans/                  # Implementation plans and documentation
-│   ├── CLI_PLAN.md
-│   ├── MULTI_ACCOUNT_PLAN.md
-│   ├── SCRAPER_REFACTORING_PLAN.md
-│   ├── SERVICE_REFACTORING_PLAN.md
-│   ├── STREAMLIT_UI_PLAN.md
-│   └── TAGGING_DESIGN.md
-├── examples/               # Usage examples
-├── Dockerfile              # Docker container configuration
-├── docker-compose.yml      # Docker Compose orchestration
-├── .dockerignore          # Files excluded from Docker build
-├── .env                    # Environment variables (dev only)
-├── requirements.txt        # Python dependencies
-├── setup.py               # Package setup for CLI installation
-└── README.md              # User documentation
-```
+- `cli/` - Typer CLI (entry: main.py)
+- `config/` - Settings, credentials, encryption
+- `db/` - SQLAlchemy models, SQLite
+- `services/` - Business logic layer
+- `scrapers/` - Selenium + API data extraction
+- `streamlit_app/` - Web UI
+- `plans/` - Implementation plans and documentation
+
+For detailed file/function navigation, see `.claude/codemap.md`
 
 
 ## Important Implementation Notes
