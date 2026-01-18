@@ -4,7 +4,7 @@ Codemap Generator
 
 Generates a token-efficient codemap for Claude Code navigation.
 Uses AST parsing to extract module summaries without LLM costs.
-Auto-discovers directories, respecting .gitignore and .dockerignore.
+Auto-discovers directories, respecting .gitignore.
 
 Usage:
     python scripts/generate_codemap.py
@@ -45,10 +45,9 @@ def parse_ignore_file(filepath: Path) -> set[str]:
 
 
 def get_ignored_directories() -> set[str]:
-    """Get set of directories to ignore from .gitignore and .dockerignore."""
+    """Get set of directories to ignore from .gitignore."""
     ignored = set()
     ignored.update(parse_ignore_file(PROJECT_ROOT / '.gitignore'))
-    ignored.update(parse_ignore_file(PROJECT_ROOT / '.dockerignore'))
 
     # Always ignore these regardless
     ignored.update({'.git', '.claude', 'scripts'})

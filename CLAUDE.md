@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Navigation Rule**: Always read `.claude/codemap.md` BEFORE using Glob/Grep. The codemap contains the full file/function index. Do NOT use Glob/Grep to verify file existence.
+**Navigation Rule**: Always read `.claude/codemap.md` BEFORE using Glob/Grep for code files. The codemap contains the full Python file/function index. Use Glob only for non-code files (plans/*.md, config files, etc.).
 
 ## Project Overview
 

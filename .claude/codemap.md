@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-01-18 23:22
+# Auto-generated: 2026-01-18 23:28
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -35,6 +35,9 @@ scrapers → services → db → cli/streamlit_app
 - db/database.py: fn:get_database_url,enable_foreign_keys,create_database_engine,init_db,drop_all_tables
 - db/migrations/add_indexes.py: fn:run_migration,rollback_migration,check_indexes
 - db/models.py: class:Account,Transaction,Balance,SyncHistory,Tag
+
+## examples/ - Example scripts demonstrating scraper usage
+- examples/example_cal_usage.py: fn:main,display_results,export_to_csv
 
 ## scrapers/ - Financial Institution Scrapers
 - scrapers/base/broker_base.py: class:LoginCredentials,AccountInfo,BalanceInfo,BrokerAPIError,AuthenticationError
