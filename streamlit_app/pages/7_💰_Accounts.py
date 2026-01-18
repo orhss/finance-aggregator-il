@@ -259,8 +259,8 @@ try:
                     st.metric("Total Amount", format_currency(latest_balance.total_amount))
 
                 with col2:
-                    if latest_balance.available_amount:
-                        st.metric("Available", format_currency(latest_balance.available_amount))
+                    if latest_balance.available:
+                        st.metric("Available", format_currency(latest_balance.available))
 
                 with col3:
                     st.metric("As of", format_datetime(latest_balance.balance_date, '%Y-%m-%d'))
