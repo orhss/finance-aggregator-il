@@ -1,5 +1,7 @@
 # Fin Codemap
-# Auto-generated: 2026-01-18 23:10
+# USE THIS FILE to check if files/directories exist
+# Do NOT use Glob/Grep for file existence checks
+# Auto-generated: 2026-01-18 23:22
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow

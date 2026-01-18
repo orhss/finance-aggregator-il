@@ -180,6 +180,8 @@ def generate_codemap() -> str:
     """Generate the full codemap content."""
     lines = [
         "# Fin Codemap",
+        "# USE THIS FILE to check if files/directories exist",
+        "# Do NOT use Glob/Grep for file existence checks",
         f"# Auto-generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         "# Refresh: python scripts/generate_codemap.py",
         "",

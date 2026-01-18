@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Navigation Rule**: Always read `.claude/codemap.md` BEFORE using Glob/Grep. The codemap contains the full file/function index. Do NOT use Glob/Grep to verify file existence.
+
 ## Project Overview
 
 Python automation framework for financial institutions (brokers, pension funds, and credit cards) using web scraping with Selenium and API clients. Implements MFA (Multi-Factor Authentication) automation via email retrieval.
@@ -74,8 +76,6 @@ docker-compose down
 - **Customization**: Edit `docker-compose.yml` to change data directory path
 
 ## Codebase Navigation
-
-Before exploring the codebase with Glob/Grep, read `.claude/codemap.md` for a structural overview. This saves significant context vs. exploring manually.
 
 To refresh the codemap: `python scripts/generate_codemap.py`
 
