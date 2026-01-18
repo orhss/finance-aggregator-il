@@ -73,6 +73,12 @@ docker-compose down
 - **Auto-restart**: Container restarts automatically unless explicitly stopped
 - **Customization**: Edit `docker-compose.yml` to change data directory path
 
+## Codebase Navigation
+
+Before exploring the codebase with Glob/Grep, read `.claude/codemap.md` for a structural overview. This saves significant context vs. exploring manually.
+
+To refresh the codemap: `python scripts/generate_codemap.py`
+
 ## Architecture
 
 ### Architecture Patterns

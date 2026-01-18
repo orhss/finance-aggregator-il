@@ -1,0 +1,30 @@
+name: Update Codemap
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.py'
+      - '!scripts/generate_codemap.py'
+    paths-ignore:
+      - '.claude/codemap.md'
+
+jobs:
+  update-codemap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate codemap
+        run: python scripts/generate_codemap.py
+
+      - name: Commit codemap if changed
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore: update codemap [skip ci]'
+          file_pattern: .claude/codemap.md
