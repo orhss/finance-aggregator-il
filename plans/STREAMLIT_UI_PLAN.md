@@ -1310,6 +1310,33 @@ streamlit run streamlit_app/app.py \
     --browser.gatherUsageStats false
 ```
 
+### Docker (✅ Implemented)
+```bash
+# Build and start services
+docker-compose up -d
+
+# Initialize database (first time only)
+docker-compose exec fin fin-cli init
+docker-compose exec fin fin-cli config setup
+
+# Access the application
+# - Streamlit UI: http://localhost:8501
+# - CLI commands: docker-compose exec fin fin-cli <command>
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+**Features**:
+- ✅ Single container with Streamlit UI + CLI tool
+- ✅ Data persistence via volume mount (`~/.fin` → `/root/.fin`)
+- ✅ Health checks with automatic restart
+- ✅ Port 8501 exposed for web access
+- ✅ All CLI commands available via `docker-compose exec`
+
 ### Add to CLI (optional)
 ```bash
 fin-cli ui  # Launches Streamlit app

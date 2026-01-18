@@ -34,17 +34,50 @@ fin-cli transactions list # View transactions
 fin-cli reports stats     # View statistics
 ```
 
+### Docker Deployment
+```bash
+# Build and start services
+docker-compose up -d
+
+# Initialize database (first time only)
+docker-compose exec fin fin-cli init
+docker-compose exec fin fin-cli config setup
+
+# Run CLI commands inside container
+docker-compose exec fin fin-cli sync all
+docker-compose exec fin fin-cli accounts list
+docker-compose exec fin fin-cli transactions list
+
+# View Streamlit UI
+# Open browser to http://localhost:8501
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
 ### Configuration
 - **Encrypted credentials**: Stored in `~/.fin/credentials.enc` (managed via `fin-cli config`)
 - **Environment variables**: Fallback option in `.env` (for development)
 - **Configuration directory**: `~/.fin/` (config.json, credentials.enc, .key, financial_data.db)
 - Chrome WebDriver is located in `chrome-linux64/` directory
 
+### Docker Configuration
+- **Base image**: Python 3.12-slim
+- **Exposed ports**: 8501 (Streamlit UI)
+- **Data persistence**: Host `~/.fin/` directory mounted to `/root/.fin` in container
+- **Services**: Combined Streamlit UI + CLI tool in single container
+- **Health check**: Streamlit health endpoint monitored every 30s
+- **Auto-restart**: Container restarts automatically unless explicitly stopped
+- **Customization**: Edit `docker-compose.yml` to change data directory path
+
 ## Architecture
 
 ### Architecture Patterns
 
-**Broker API Pattern**: REST API-based broker clients using `BrokerAPIClient` base class. See @ scrapers/brokers/broker_base.py for details.
+**Broker API Pattern**: REST API-based broker clients using `BrokerAPIClient` base class. See @ scrapers/base/broker_base.py for details.
 
 **Credit Card Scrapers (Hybrid Selenium + API)**:
 - Two-phase approach: Selenium login/token extraction → Direct API calls for data
@@ -87,13 +120,22 @@ Fin/
 │   ├── credit_cards/      # Credit card scrapers (CAL, Max, Isracard)
 │   ├── utils/             # Shared utilities
 │   └── exceptions.py      # Custom exceptions
+├── streamlit_app/          # Streamlit web UI
+│   ├── app.py             # Main entry point
+│   ├── pages/             # Multi-page app pages
+│   ├── components/        # Reusable UI components
+│   └── utils/             # UI utilities
 ├── plans/                  # Implementation plans and documentation
 │   ├── CLI_PLAN.md
 │   ├── MULTI_ACCOUNT_PLAN.md
 │   ├── SCRAPER_REFACTORING_PLAN.md
 │   ├── SERVICE_REFACTORING_PLAN.md
+│   ├── STREAMLIT_UI_PLAN.md
 │   └── TAGGING_DESIGN.md
 ├── examples/               # Usage examples
+├── Dockerfile              # Docker container configuration
+├── docker-compose.yml      # Docker Compose orchestration
+├── .dockerignore          # Files excluded from Docker build
 ├── .env                    # Environment variables (dev only)
 ├── requirements.txt        # Python dependencies
 ├── setup.py               # Package setup for CLI installation
