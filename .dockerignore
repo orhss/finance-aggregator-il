@@ -1,0 +1,41 @@
+# Python
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+.pytest_cache
+
+# Environment and secrets
+.env
+~/.fin
+
+# Database files
+**/*.db
+
+# Documentation and examples
+plans/
+examples/
+*.md
+!README.md
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Chrome WebDriver (handle separately in Dockerfile if needed)
+# chrome-linux64/
