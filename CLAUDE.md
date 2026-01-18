@@ -83,20 +83,27 @@ To refresh the codemap: `python scripts/generate_codemap.py`
 
 ### Architecture Patterns
 
-**Broker API Pattern**: REST API-based broker clients using `BrokerAPIClient` base class. See @ scrapers/base/broker_base.py for details.
+**Broker API Pattern**: REST API-based broker clients using `BrokerAPIClient` base class. See @scrapers/base/broker_base.py for details.
 
 **Credit Card Scrapers (Hybrid Selenium + API)**:
 - Two-phase approach: Selenium login/token extraction → Direct API calls for data
-- Implementations: CAL, Max, Isracard (see @ scrapers/credit_cards/)
-- Key quirk: Login forms may be in iframes, tokens extracted from network logs or session storage
-- See @ plans/MULTI_ACCOUNT_PLAN.md for multi-account support details
+- Implementations: CAL, Max, Isracard (see @scrapers/credit_cards/)
+- Key quirks:
+  - Login forms may be in iframes - must switch context before interacting
+  - Token extraction via Chrome performance logging (`goog:loggingPrefs`)
+  - Session storage holds card info and auth tokens (JSON format)
+- Institution-specific:
+  - **CAL**: iframe login, token in network logs or session storage
+  - **Max**: Multiple transaction plan types, different API structure
+  - **Isracard**: Uses last 6 digits of card + user ID, handles password change prompts
+- See @plans/MULTI_ACCOUNT_PLAN.md for multi-account support
 
 **Pension MFA Automation**:
 - Modular components: `EmailMFARetriever` (IMAP), `MFAHandler` (code entry), `SmartWait` (timing)
 - Institution-specific flows: Migdal (6-field MFA), Phoenix (single-field MFA)
-- See @ scrapers/base/ and @ plans/SCRAPER_REFACTORING_PLAN.md for implementation details
+- See @scrapers/base/ and @plans/SCRAPER_REFACTORING_PLAN.md for implementation details
 
-**Services Layer**: Business logic separated from scrapers. Database operations, orchestration, tagging, analytics. See @ plans/SERVICE_REFACTORING_PLAN.md for architecture.
+**Services Layer**: Business logic separated from scrapers. Database operations, orchestration, tagging, analytics. See @plans/SERVICE_REFACTORING_PLAN.md for architecture.
 
 
 ### Project Structure Overview
@@ -120,23 +127,6 @@ For detailed file/function navigation, see `.claude/codemap.md`
 - **Email polling**: `wait_for_mfa_code_with_delay()` waits `email_delay` seconds before checking emails
 - **Human-like behavior**: Character-by-character typing with delays to avoid detection
 - **Session management**: Always call `cleanup()` to properly close browser and email connections
-
-### Credential Management
-- **Encrypted storage**: Use `fin-cli config` for encrypted credential management (~/.fin/credentials.enc)
-- **Multi-account support**: Credit cards support multiple accounts per institution
-  - List-based model with optional labels ("Personal", "Business")
-  - Selection by index or label: `fin-cli sync cal --account 0` or `--account personal`
-  - See `plans/MULTI_ACCOUNT_PLAN.md` for details
-- **Environment variables**: Fallback for development (`.env` file, never commit)
-
-### Credit Card Scrapers (CAL, Max, Isracard)
-- **Token extraction**: Enable Chrome performance logging (`goog:loggingPrefs`) to capture network requests
-- **Iframe handling**: Login forms may be in iframes - must switch context before interacting
-- **Session storage**: Card info and auth tokens stored in browser session storage (JSON format)
-- **Institution-specific quirks**:
-  - **CAL**: Uses iframe for login, token in network logs or session storage
-  - **Max**: Multiple transaction plan types, different API structure
-  - **Isracard**: Uses last 6 digits of card + user ID, handles password change prompts
 
 ### Database and Services
 - **SQLite database**: `~/.fin/financial_data.db` (initialized via `fin-cli init`)
