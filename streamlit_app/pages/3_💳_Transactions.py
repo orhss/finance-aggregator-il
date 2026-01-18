@@ -548,12 +548,20 @@ try:
             # Get account info
             account_name = f"{txn.account.institution}" if txn.account else "Unknown"
 
+            # Build amount display with original currency in parentheses if different
+            amount_display = {
+                'charged_amount': txn.charged_amount if txn.charged_amount is not None else txn.original_amount,
+                'charged_currency': txn.charged_currency or txn.original_currency,
+                'original_amount': txn.original_amount,
+                'original_currency': txn.original_currency
+            }
+
             row_data = {
                 'ID': txn.id,
                 '#': idx + ((current_page - 1) * rows_per_page),  # Row number with pagination
                 'Date': txn.transaction_date.strftime('%Y-%m-%d') if txn.transaction_date else '',
                 'Description': description[:50] + '...' if len(description) > 50 else description,
-                'Amount': txn.original_amount,  # Keep raw for styling
+                'Amount': amount_display,  # Keep structured data for formatting
                 'Category': txn.effective_category or 'Uncategorized',
                 'Tags': tags_str,
                 'Status': '✅' if txn.status == 'completed' else '⏳',
@@ -564,13 +572,69 @@ try:
         df_display = pd.DataFrame(table_data)
 
         def format_amount_display(val):
-            """Format amount with proper sign"""
-            if val < 0:
-                return f"−₪{abs(val):,.2f}"  # Proper minus sign
-            elif val > 0:
-                return f"+₪{val:,.2f}"
+            """
+            Format amount with proper sign and show original currency in parentheses if different.
+
+            Expected input: dict with keys:
+                - charged_amount: float (primary amount to display)
+                - charged_currency: str (primary currency, e.g., 'ILS', '₪')
+                - original_amount: float (original transaction amount)
+                - original_currency: str (original currency, e.g., '$', 'USD')
+
+            Returns: Formatted string like "−₪18.50 ($5.00)" or just "−₪18.50" if same currency
+            """
+            # Handle legacy format (just a float)
+            if isinstance(val, (int, float)):
+                if val < 0:
+                    return f"−₪{abs(val):,.2f}"
+                elif val > 0:
+                    return f"+₪{val:,.2f}"
+                else:
+                    return f"₪{val:,.2f}"
+
+            # Handle new dict format
+            if not isinstance(val, dict):
+                return "N/A"
+
+            charged_amount = val.get('charged_amount', 0)
+            charged_currency = val.get('charged_currency', '₪')
+            original_amount = val.get('original_amount', charged_amount)
+            original_currency = val.get('original_currency', charged_currency)
+
+            # Normalize currency symbols for comparison
+            def normalize_currency(curr):
+                """Convert currency codes to symbols for display"""
+                curr_map = {
+                    'ILS': '₪',
+                    'USD': '$',
+                    'EUR': '€',
+                    'GBP': '£',
+                }
+                return curr_map.get(curr, curr)
+
+            charged_curr_symbol = normalize_currency(charged_currency)
+            original_curr_symbol = normalize_currency(original_currency)
+
+            # Format the primary (charged) amount
+            if charged_amount < 0:
+                primary = f"−{charged_curr_symbol}{abs(charged_amount):,.2f}"
+            elif charged_amount > 0:
+                primary = f"+{charged_curr_symbol}{charged_amount:,.2f}"
             else:
-                return f"₪{val:,.2f}"
+                primary = f"{charged_curr_symbol}{charged_amount:,.2f}"
+
+            # Check if we need to show original currency in parentheses
+            # Show only if currencies differ OR amounts differ significantly (>0.01 tolerance)
+            currencies_differ = charged_curr_symbol != original_curr_symbol
+            amounts_differ = abs(abs(charged_amount) - abs(original_amount)) > 0.01
+
+            if currencies_differ or amounts_differ:
+                # Format original amount (without sign, just the value)
+                original_formatted = f"{original_curr_symbol}{abs(original_amount):,.2f}"
+                return f"{primary} ({original_formatted})"
+            else:
+                # Same currency and amount, just show primary
+                return primary
 
         # Create a copy for display with formatted amounts
         df_styled = df_display.copy()

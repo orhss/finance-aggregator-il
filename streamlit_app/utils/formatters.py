@@ -446,6 +446,88 @@ def format_amount_delta(
     return formatted_current, f"{direction} {abs(delta_pct):.1f}%"
 
 
+def format_transaction_with_currency(
+    charged_amount: Optional[float],
+    charged_currency: str,
+    original_amount: Optional[float] = None,
+    original_currency: Optional[str] = None,
+    show_sign: bool = True
+) -> str:
+    """
+    Format transaction amount showing charged amount primarily and original currency
+    in parentheses only if different from charged.
+
+    Best practices:
+    - Show charged amount (ILS) as primary for budgeting
+    - Show original foreign currency in parentheses only if it differs
+    - Use proper minus sign (−) not hyphen (-)
+
+    Args:
+        charged_amount: Amount charged in local currency (required)
+        charged_currency: Currency code/symbol for charged amount (e.g., 'ILS', '₪')
+        original_amount: Original transaction amount (optional, defaults to charged_amount)
+        original_currency: Original currency code/symbol (optional, defaults to charged_currency)
+        show_sign: If True, show +/- sign for clarity
+
+    Returns:
+        Formatted string like "−₪18.50 ($5.00)" or just "−₪18.50" if same currency
+
+    Examples:
+        >>> format_transaction_with_currency(-18.50, '₪', -5.00, '$')
+        "−₪18.50 ($5.00)"
+
+        >>> format_transaction_with_currency(-100.00, '₪', -100.00, '₪')
+        "−₪100.00"
+
+        >>> format_transaction_with_currency(-100.00, '₪')
+        "−₪100.00"
+    """
+    # Default values
+    if charged_amount is None:
+        return "N/A"
+
+    if original_amount is None:
+        original_amount = charged_amount
+
+    if original_currency is None:
+        original_currency = charged_currency
+
+    # Normalize currency symbols for comparison
+    def normalize_currency(curr):
+        """Convert currency codes to symbols for display"""
+        curr_map = {
+            'ILS': '₪',
+            'USD': '$',
+            'EUR': '€',
+            'GBP': '£',
+        }
+        return curr_map.get(curr, curr)
+
+    charged_curr_symbol = normalize_currency(charged_currency)
+    original_curr_symbol = normalize_currency(original_currency)
+
+    # Format the primary (charged) amount
+    if charged_amount < 0:
+        primary = f"−{charged_curr_symbol}{abs(charged_amount):,.2f}"
+    elif charged_amount > 0:
+        primary = f"+{charged_curr_symbol}{charged_amount:,.2f}" if show_sign else f"{charged_curr_symbol}{charged_amount:,.2f}"
+    else:
+        primary = f"{charged_curr_symbol}{charged_amount:,.2f}"
+
+    # Check if we need to show original currency in parentheses
+    # Show only if currencies differ OR amounts differ significantly (>0.01 tolerance)
+    currencies_differ = charged_curr_symbol != original_curr_symbol
+    amounts_differ = abs(abs(charged_amount) - abs(original_amount)) > 0.01
+
+    if currencies_differ or amounts_differ:
+        # Format original amount (without sign, just the value)
+        original_formatted = f"{original_curr_symbol}{abs(original_amount):,.2f}"
+        return f"{primary} ({original_formatted})"
+    else:
+        # Same currency and amount, just show primary
+        return primary
+
+
 def format_category_badge(category: str, clickable: bool = False) -> str:
     """
     Format category as colored badge/pill

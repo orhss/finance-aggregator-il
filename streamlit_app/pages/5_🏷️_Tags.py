@@ -13,7 +13,10 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from streamlit_app.utils.session import init_session_state
-from streamlit_app.utils.formatters import format_currency, format_number, format_category_badge, format_tags
+from streamlit_app.utils.formatters import (
+    format_currency, format_number, format_category_badge, format_tags,
+    format_transaction_with_currency
+)
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.bulk_actions import show_bulk_preview, show_bulk_confirmation
 from streamlit_app.components.theme import apply_theme, render_theme_switcher
@@ -262,10 +265,18 @@ try:
 
                     txn_data = []
                     for txn in transactions:
+                        # Format amount with foreign currency support
+                        formatted_amount = format_transaction_with_currency(
+                            charged_amount=txn.charged_amount if txn.charged_amount is not None else txn.original_amount,
+                            charged_currency=txn.charged_currency or txn.original_currency or '₪',
+                            original_amount=txn.original_amount,
+                            original_currency=txn.original_currency
+                        )
+
                         txn_data.append({
                             'Date': txn.transaction_date.strftime('%Y-%m-%d'),
                             'Description': txn.description[:60] + '...' if len(txn.description) > 60 else txn.description,
-                            'Amount': format_currency(txn.charged_amount if txn.charged_amount else txn.original_amount),
+                            'Amount': formatted_amount,
                             'Category': txn.effective_category or 'Uncategorized',
                             'Status': '✅' if txn.status == 'completed' else '⏳'
                         })
