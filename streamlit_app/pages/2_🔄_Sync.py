@@ -332,9 +332,9 @@ try:
                         # Status indicator
                         if last_sync:
                             days_since_sync = (date.today() - last_sync).days
-                            if days_since_sync <= 1:
+                            if days_since_sync <= 7:
                                 status = "✅ Up to date"
-                            elif days_since_sync <= 7:
+                            elif days_since_sync <= 14:
                                 status = "⚠️ May need sync"
                             else:
                                 status = "❌ Needs sync"

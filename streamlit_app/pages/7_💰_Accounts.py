@@ -4,33 +4,41 @@ Accounts Management Page - View and manage financial accounts
 
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-from datetime import datetime, timedelta, date
+from datetime import timedelta, date
 import sys
 from pathlib import Path
 
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-from streamlit_app.utils.session import init_session_state
-from streamlit_app.utils.formatters import (
-    format_currency, format_number, format_datetime,
-    format_account_number, format_balance
-)
-from streamlit_app.components.sidebar import render_minimal_sidebar
-from streamlit_app.components.charts import balance_history, COLORS
-from streamlit_app.components.theme import apply_theme, render_theme_switcher
-
-# Page config
+# Page config MUST be first (before any other Streamlit commands)
 st.set_page_config(
     page_title="Accounts - Financial Aggregator",
     page_icon="💰",
     layout="wide"
 )
 
+# Third-party imports that don't use Streamlit
+from sqlalchemy import func, and_, desc
+
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+# Now import things that might use st.session_state
+from streamlit_app.utils.session import init_session_state
+
 # Initialize session state
 init_session_state()
+
+from db.database import get_session
+from db.models import Account, Transaction, Balance
+from services.analytics_service import AnalyticsService
+
+from streamlit_app.utils.formatters import (
+    format_currency, format_number, format_datetime,
+    format_account_number
+)
+from streamlit_app.components.sidebar import render_minimal_sidebar
+from streamlit_app.components.charts import balance_history
+from streamlit_app.components.theme import apply_theme, render_theme_switcher
 
 # Apply theme (must be called before any content)
 theme = apply_theme()
@@ -48,10 +56,6 @@ st.markdown("---")
 
 # Get database session
 try:
-    from db.database import get_session
-    from db.models import Account, Transaction, Balance
-    from sqlalchemy import func, and_, desc
-
     session = get_session()
 
     # Check if database has data
@@ -70,7 +74,6 @@ try:
     st.subheader("📊 Accounts Overview")
 
     # Get latest balance for each account using analytics service
-    from services.analytics_service import AnalyticsService
     analytics = AnalyticsService(session)
 
     # Get accounts with their latest balances
@@ -116,7 +119,8 @@ try:
         st.metric("Total Balance", format_currency(total_balance))
 
     with col3:
-        active_accounts = sum([1 for items in account_types.values() for item in items if item['balance'] and item['balance'] > 0])
+        active_accounts = sum(
+            [1 for items in account_types.values() for item in items if item['balance'] and item['balance'] > 0])
         st.metric("Active Accounts", format_number(active_accounts))
 
     st.markdown("---")
@@ -134,10 +138,11 @@ try:
             account = item['account']
             balance = item['balance']
             balance_date = item['balance_date']
+            is_credit_card = True if acc_type == "credit_card" else False
 
             with cols[idx % 3]:
                 # Determine card status
-                if balance and balance > 0:
+                if is_credit_card or (balance and balance > 0):
                     status_icon = "✅"
                     status_color = "green"
                 elif balance == 0:
@@ -152,12 +157,13 @@ try:
                     st.markdown(f"**{status_icon} {account.institution}**")
 
                     # Balance info
-                    if balance is not None:
-                        st.metric("Balance", format_currency(balance))
-                        if balance_date:
-                            st.caption(f"As of: {format_datetime(balance_date, '%Y-%m-%d')}")
-                    else:
-                        st.info("No balance data")
+                    if not is_credit_card:
+                        if balance is not None:
+                            st.metric("Balance", format_currency(balance))
+                            if balance_date:
+                                st.caption(f"As of: {format_datetime(balance_date, '%Y-%m-%d')}")
+                        else:
+                            st.info("No balance data")
 
                     # Account details (masked by default for privacy)
                     if account.account_number:
@@ -181,7 +187,7 @@ try:
     # ============================================================================
     # ACCOUNT TABLE VIEW
     # ============================================================================
-    st.subheader("📋 Account List (Table View)")
+    st.subheader("📋 Account List")
 
     # Get masking preference
     masked = st.session_state.get('mask_account_numbers', True)
@@ -202,12 +208,14 @@ try:
             'ID': account.id,
             'Type': account.account_type or 'Other',
             'Institution': account.institution,
-            'Account Number': format_account_number(account.account_number, masked=masked) if account.account_number else 'N/A',
+            'Account Number': format_account_number(account.account_number,
+                                                    masked=masked) if account.account_number else 'N/A',
             'Balance': format_currency(balance) if balance else 'N/A',
             'Last Updated': format_datetime(balance_date, '%Y-%m-%d') if balance_date else 'Never',
             'Transactions': txn_count or 0,
             'Last Transaction': format_datetime(last_txn, '%Y-%m-%d') if last_txn else 'N/A',
-            'Status': '✅' if balance and balance > 0 else ('⭕' if balance == 0 else '❌')
+            'Status': '✅' if balance and balance > 0 or account.type == "credit_card" else (
+                '⭕' if balance == 0 else '❌')
         })
 
     df_accounts = pd.DataFrame(table_data)

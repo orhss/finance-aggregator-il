@@ -71,7 +71,7 @@ def spending_donut(
         hole=0.4,
         marker=dict(colors=CATEGORY_COLORS),
         textinfo='label+percent',
-        textposition='outside',
+        textposition='auto',
         hovertemplate='<b>%{label}</b><br>%{value:,.2f}₪<br>%{percent}<extra></extra>'
     )])
 
