@@ -94,17 +94,47 @@ try:
     for account in accounts_without_balances:
         accounts_with_balance.append((account, None, None))
 
-    # Group by account type
-    account_types = {}
+    # Build enriched account data once - calculate all needed info in single pass
+    enriched_accounts = []
     for account, balance, balance_date in accounts_with_balance:
-        acc_type = account.account_type or "Other"
-        if acc_type not in account_types:
-            account_types[acc_type] = []
-        account_types[acc_type].append({
+        # Get transaction count
+        txn_count = session.query(func.count(Transaction.id)).filter(
+            Transaction.account_id == account.id
+        ).scalar() or 0
+
+        # Get last transaction date
+        last_txn = session.query(func.max(Transaction.transaction_date)).filter(
+            Transaction.account_id == account.id
+        ).scalar()
+
+        # Determine if credit card
+        is_credit_card = account.account_type == "credit_card"
+
+        # Determine status
+        if is_credit_card or (balance and balance > 0):
+            status_icon = "✅"
+        elif balance == 0:
+            status_icon = "⭕"
+        else:
+            status_icon = "❌"
+
+        enriched_accounts.append({
             'account': account,
             'balance': balance,
-            'balance_date': balance_date
+            'balance_date': balance_date,
+            'txn_count': txn_count,
+            'last_txn': last_txn,
+            'is_credit_card': is_credit_card,
+            'status_icon': status_icon
         })
+
+    # Group by account type
+    account_types = {}
+    for item in enriched_accounts:
+        acc_type = item['account'].account_type or "Other"
+        if acc_type not in account_types:
+            account_types[acc_type] = []
+        account_types[acc_type].append(item)
 
     # Summary metrics
     total_balance = sum([item['balance'] for items in account_types.values() for item in items if item['balance']])
@@ -138,20 +168,11 @@ try:
             account = item['account']
             balance = item['balance']
             balance_date = item['balance_date']
-            is_credit_card = True if acc_type == "credit_card" else False
+            is_credit_card = item['is_credit_card']
+            status_icon = item['status_icon']
+            txn_count = item['txn_count']
 
             with cols[idx % 3]:
-                # Determine card status
-                if is_credit_card or (balance and balance > 0):
-                    status_icon = "✅"
-                    status_color = "green"
-                elif balance == 0:
-                    status_icon = "⭕"
-                    status_color = "gray"
-                else:
-                    status_icon = "❌"
-                    status_color = "red"
-
                 # Card container
                 with st.container():
                     st.markdown(f"**{status_icon} {account.institution}**")
@@ -171,16 +192,12 @@ try:
                         account_display = format_account_number(account.account_number, masked=masked)
                         st.caption(f"Account: {account_display}")
 
-                    # Transaction count
-                    txn_count = session.query(func.count(Transaction.id)).filter(
-                        Transaction.account_id == account.id
-                    ).scalar()
-                    st.caption(f"Transactions: {txn_count or 0}")
+                    # Transaction count (from enriched data)
+                    st.caption(f"Transactions: {txn_count}")
 
                     # View details button
                     if st.button(f"View Details", key=f"view_{account.id}", use_container_width=True):
-                        st.session_state.selected_account_id = account.id
-                        st.rerun()
+                        st.session_state['selected_account_id'] = account.id
 
                     st.markdown("---")
 
@@ -192,17 +209,15 @@ try:
     # Get masking preference
     masked = st.session_state.get('mask_account_numbers', True)
 
+    # Build table data from enriched accounts (no additional queries needed)
     table_data = []
-    for account, balance, balance_date in accounts_with_balance:
-        # Get transaction count
-        txn_count = session.query(func.count(Transaction.id)).filter(
-            Transaction.account_id == account.id
-        ).scalar()
-
-        # Get last transaction date
-        last_txn = session.query(func.max(Transaction.transaction_date)).filter(
-            Transaction.account_id == account.id
-        ).scalar()
+    for item in enriched_accounts:
+        account = item['account']
+        balance = item['balance']
+        balance_date = item['balance_date']
+        txn_count = item['txn_count']
+        last_txn = item['last_txn']
+        status_icon = item['status_icon']
 
         table_data.append({
             'ID': account.id,
@@ -212,10 +227,9 @@ try:
                                                     masked=masked) if account.account_number else 'N/A',
             'Balance': format_currency(balance) if balance else 'N/A',
             'Last Updated': format_datetime(balance_date, '%Y-%m-%d') if balance_date else 'Never',
-            'Transactions': txn_count or 0,
+            'Transactions': txn_count,
             'Last Transaction': format_datetime(last_txn, '%Y-%m-%d') if last_txn else 'N/A',
-            'Status': '✅' if balance and balance > 0 or account.type == "credit_card" else (
-                '⭕' if balance == 0 else '❌')
+            'Status': status_icon
         })
 
     df_accounts = pd.DataFrame(table_data)
