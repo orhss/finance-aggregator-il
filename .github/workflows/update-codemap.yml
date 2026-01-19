@@ -6,8 +6,7 @@ on:
     paths:
       - '**.py'
       - '!scripts/generate_codemap.py'
-    paths-ignore:
-      - '.claude/codemap.md'
+      - '!.claude/codemap.md'
 
 jobs:
   update-codemap:
