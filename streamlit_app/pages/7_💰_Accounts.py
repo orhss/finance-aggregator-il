@@ -156,101 +156,15 @@ try:
     st.markdown("---")
 
     # ============================================================================
-    # ACCOUNTS BY TYPE (Card View)
-    # ============================================================================
-    for acc_type, accounts_list in sorted(account_types.items()):
-        st.subheader(f"📁 {acc_type}")
-
-        # Create columns for cards (3 per row)
-        cols = st.columns(3)
-
-        for idx, item in enumerate(accounts_list):
-            account = item['account']
-            balance = item['balance']
-            balance_date = item['balance_date']
-            is_credit_card = item['is_credit_card']
-            status_icon = item['status_icon']
-            txn_count = item['txn_count']
-
-            with cols[idx % 3]:
-                # Card container
-                with st.container():
-                    st.markdown(f"**{status_icon} {account.institution}**")
-
-                    # Balance info
-                    if not is_credit_card:
-                        if balance is not None:
-                            st.metric("Balance", format_currency(balance))
-                            if balance_date:
-                                st.caption(f"As of: {format_datetime(balance_date, '%Y-%m-%d')}")
-                        else:
-                            st.info("No balance data")
-
-                    # Account details (masked by default for privacy)
-                    if account.account_number:
-                        masked = st.session_state.get('mask_account_numbers', True)
-                        account_display = format_account_number(account.account_number, masked=masked)
-                        st.caption(f"Account: {account_display}")
-
-                    # Transaction count (from enriched data)
-                    st.caption(f"Transactions: {txn_count}")
-
-                    # View details button
-                    if st.button(f"View Details", key=f"view_{account.id}", use_container_width=True):
-                        st.session_state['selected_account_id'] = account.id
-
-                    st.markdown("---")
-
-    # ============================================================================
-    # ACCOUNT TABLE VIEW
-    # ============================================================================
-    st.subheader("📋 Account List")
-
-    # Get masking preference
-    masked = st.session_state.get('mask_account_numbers', True)
-
-    # Build table data from enriched accounts (no additional queries needed)
-    table_data = []
-    for item in enriched_accounts:
-        account = item['account']
-        balance = item['balance']
-        balance_date = item['balance_date']
-        txn_count = item['txn_count']
-        last_txn = item['last_txn']
-        status_icon = item['status_icon']
-
-        table_data.append({
-            'ID': account.id,
-            'Type': account.account_type or 'Other',
-            'Institution': account.institution,
-            'Account Number': format_account_number(account.account_number,
-                                                    masked=masked) if account.account_number else 'N/A',
-            'Balance': format_currency(balance) if balance else 'N/A',
-            'Last Updated': format_datetime(balance_date, '%Y-%m-%d') if balance_date else 'Never',
-            'Transactions': txn_count,
-            'Last Transaction': format_datetime(last_txn, '%Y-%m-%d') if last_txn else 'N/A',
-            'Status': status_icon
-        })
-
-    df_accounts = pd.DataFrame(table_data)
-
-    st.dataframe(
-        df_accounts[['Type', 'Institution', 'Account Number', 'Balance', 'Last Updated', 'Transactions', 'Status']],
-        use_container_width=True,
-        hide_index=True
-    )
-
-    # ============================================================================
-    # ACCOUNT DETAILS VIEW
+    # ACCOUNT DETAILS VIEW (Show at top when selected)
     # ============================================================================
     if 'selected_account_id' in st.session_state and st.session_state.selected_account_id:
-        st.markdown("---")
-        st.subheader("🔍 Account Details")
-
         account_id = st.session_state.selected_account_id
         account = session.query(Account).filter(Account.id == account_id).first()
 
         if account:
+            st.subheader("🔍 Account Details")
+
             col1, col2 = st.columns([2, 1])
 
             with col1:
@@ -391,6 +305,95 @@ try:
 
             with col3:
                 st.metric("Transactions (90 days)", format_number(txn_count_90d))
+
+            st.markdown("---")
+            st.markdown("---")  # Extra separator before account list
+
+    # ============================================================================
+    # ACCOUNTS BY TYPE (Card View)
+    # ============================================================================
+    for acc_type, accounts_list in sorted(account_types.items()):
+        st.subheader(f"📁 {acc_type}")
+
+        # Create columns for cards (3 per row)
+        cols = st.columns(3)
+
+        for idx, item in enumerate(accounts_list):
+            account = item['account']
+            balance = item['balance']
+            balance_date = item['balance_date']
+            is_credit_card = item['is_credit_card']
+            status_icon = item['status_icon']
+            txn_count = item['txn_count']
+
+            with cols[idx % 3]:
+                # Card container
+                with st.container():
+                    st.markdown(f"**{status_icon} {account.institution}**")
+
+                    # Balance info
+                    if not is_credit_card:
+                        if balance is not None:
+                            st.metric("Balance", format_currency(balance))
+                            if balance_date:
+                                st.caption(f"As of: {format_datetime(balance_date, '%Y-%m-%d')}")
+                        else:
+                            st.info("No balance data")
+
+                    # Account details (masked by default for privacy)
+                    if account.account_number:
+                        masked = st.session_state.get('mask_account_numbers', True)
+                        account_display = format_account_number(account.account_number, masked=masked)
+                        st.caption(f"Account: {account_display}")
+
+                    # Transaction count (from enriched data)
+                    st.caption(f"Transactions: {txn_count}")
+
+                    # View details button
+                    if st.button(f"View Details", key=f"view_{account.id}", use_container_width=True):
+                        st.session_state.selected_account_id = account.id
+                        st.rerun()
+
+                    st.markdown("---")
+
+    # ============================================================================
+    # ACCOUNT TABLE VIEW
+    # ============================================================================
+    st.subheader("📋 Account List")
+
+    # Get masking preference
+    masked = st.session_state.get('mask_account_numbers', True)
+
+    # Build table data from enriched accounts (no additional queries needed)
+    table_data = []
+    for item in enriched_accounts:
+        account = item['account']
+        balance = item['balance']
+        balance_date = item['balance_date']
+        txn_count = item['txn_count']
+        last_txn = item['last_txn']
+        status_icon = item['status_icon']
+
+        table_data.append({
+            'ID': account.id,
+            'Type': account.account_type or 'Other',
+            'Institution': account.institution,
+            'Account Number': format_account_number(account.account_number,
+                                                    masked=masked) if account.account_number else 'N/A',
+            'Balance': format_currency(balance) if balance else 'N/A',
+            'Last Updated': format_datetime(balance_date, '%Y-%m-%d') if balance_date else 'Never',
+            'Transactions': txn_count,
+            'Last Transaction': format_datetime(last_txn, '%Y-%m-%d') if last_txn else 'N/A',
+            'Status': status_icon
+        })
+
+    df_accounts = pd.DataFrame(table_data)
+
+    st.dataframe(
+        df_accounts[['Type', 'Institution', 'Account Number', 'Balance', 'Last Updated', 'Transactions', 'Status']],
+        use_container_width=True,
+        hide_index=True
+    )
 
 except Exception as e:
     st.error(f"Error loading accounts: {str(e)}")
