@@ -128,6 +128,12 @@ For detailed file/function navigation, see `.claude/codemap.md`
 - **Human-like behavior**: Character-by-character typing with delays to avoid detection
 - **Session management**: Always call `cleanup()` to properly close browser and email connections
 
+### Python Principles
+- **DRY**: Extract duplicated logic into reusable functions
+- **KISS**: Prefer straightforward solutions over clever ones
+- **SIMPLE**: Minimal code to solve the actual problem, no speculative features
+- Avoid premature abstraction - three similar lines beats a premature helper
+
 ### Database and Services
 - **SQLite database**: `~/.fin/financial_data.db` (initialized via `fin-cli init`)
 - **Services layer**: Use services (not scrapers directly) for business logic
