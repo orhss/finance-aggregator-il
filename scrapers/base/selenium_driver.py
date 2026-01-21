@@ -8,10 +8,12 @@ Provides a clean interface for browser automation with:
 """
 
 import logging
+import os
 from typing import Optional
 from dataclasses import dataclass, field
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.remote.webdriver import WebDriver
 
 logger = logging.getLogger(__name__)
@@ -85,9 +87,17 @@ class SeleniumDriver:
 
         options = self._build_options()
 
+        # Use system chromedriver if CHROMEDRIVER_PATH is set (e.g., in Docker)
+        chromedriver_path = os.environ.get('CHROMEDRIVER_PATH')
+        service = Service(executable_path=chromedriver_path) if chromedriver_path else None
+
         try:
             logger.debug("Initializing Chrome driver...")
-            self.driver = webdriver.Chrome(options=options)
+            if service:
+                logger.debug(f"Using chromedriver at: {chromedriver_path}")
+                self.driver = webdriver.Chrome(service=service, options=options)
+            else:
+                self.driver = webdriver.Chrome(options=options)
             self.driver.implicitly_wait(self.config.implicit_wait)
             logger.info("Chrome driver initialized successfully")
             return self.driver
@@ -115,6 +125,12 @@ class SeleniumDriver:
     def _build_options(self) -> Options:
         """Build Chrome options from config"""
         options = Options()
+
+        # Use system Chrome/Chromium if CHROME_BIN is set (e.g., in Docker)
+        chrome_bin = os.environ.get('CHROME_BIN')
+        if chrome_bin:
+            logger.debug(f"Using Chrome binary at: {chrome_bin}")
+            options.binary_location = chrome_bin
 
         if self.config.headless:
             logger.debug("Running in headless mode")

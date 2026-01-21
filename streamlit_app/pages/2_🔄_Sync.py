@@ -6,6 +6,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, date
 import sys
+import os
 from pathlib import Path
 import subprocess
 import threading
@@ -262,8 +263,9 @@ try:
     # Helper function to run sync command in background thread
     def run_sync_in_thread(institution: str = "all", headless: bool = True, months_back: int = 3, months_forward: int = 1, output_queue: queue.Queue = None):
         """Run sync command in subprocess and capture output"""
-        # Build command
-        cmd = ["fin-cli", "sync", institution]
+        # Build command - use sys.executable to run the CLI module directly
+        # This is more reliable than depending on 'fin-cli' being in PATH
+        cmd = [sys.executable, "-m", "cli.main", "sync", institution]
         if headless:
             cmd.append("--headless")
 
@@ -278,13 +280,16 @@ try:
         output_lines = []
         try:
             # Run command and capture output
+            # Set cwd to project root and pass environment for Selenium to find Chrome
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                universal_newlines=True
+                universal_newlines=True,
+                cwd=str(project_root),
+                env=os.environ.copy()
             )
 
             # Read output line by line

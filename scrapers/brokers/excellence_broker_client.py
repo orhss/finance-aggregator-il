@@ -12,6 +12,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 from scrapers.base.broker_base import AccountInfo, BalanceInfo, LoginCredentials, BrokerAPIClient
@@ -68,6 +69,13 @@ class ExtraDeProAPIClient(BrokerAPIClient):
         """Setup Chrome WebDriver with performance logging to capture network requests"""
         logger.info("Setting up Chrome WebDriver...")
         options = Options()
+
+        # Use system Chrome/Chromium if CHROME_BIN is set (e.g., in Docker)
+        chrome_bin = os.environ.get('CHROME_BIN')
+        if chrome_bin:
+            logger.debug(f"Using Chrome binary at: {chrome_bin}")
+            options.binary_location = chrome_bin
+
         if self.headless:
             options.add_argument('--headless')
         options.add_argument('--no-sandbox')
@@ -79,7 +87,15 @@ class ExtraDeProAPIClient(BrokerAPIClient):
         # Enable performance logging to capture network requests
         options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
 
-        self.driver = webdriver.Chrome(options=options)
+        # Use system chromedriver if CHROMEDRIVER_PATH is set (e.g., in Docker)
+        chromedriver_path = os.environ.get('CHROMEDRIVER_PATH')
+        if chromedriver_path:
+            logger.debug(f"Using chromedriver at: {chromedriver_path}")
+            service = Service(executable_path=chromedriver_path)
+            self.driver = webdriver.Chrome(service=service, options=options)
+        else:
+            self.driver = webdriver.Chrome(options=options)
+
         self.driver.implicitly_wait(10)
         logger.info("Chrome driver initialized")
 
