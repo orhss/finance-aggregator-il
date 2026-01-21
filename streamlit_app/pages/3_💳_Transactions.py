@@ -19,7 +19,7 @@ from streamlit_app.utils.formatters import (
     format_transaction_amount, color_for_amount, AMOUNT_STYLE_CSS
 )
 from streamlit_app.utils.rtl import fix_rtl, has_hebrew
-from streamlit_app.utils.cache import get_transactions_cached, invalidate_transaction_cache
+from streamlit_app.utils.cache import get_transactions_cached, invalidate_transaction_cache, invalidate_tag_cache
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, show_success, show_warning
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.empty_states import empty_transactions_state
@@ -868,6 +868,8 @@ try:
 
                     if changes_made:
                         invalidate_transaction_cache()
+                        if tags_to_add or tags_to_remove:
+                            invalidate_tag_cache()
                         st.success(f"✅ Transaction updated: {', '.join(changes_made)}")
                         st.rerun()
                     else:

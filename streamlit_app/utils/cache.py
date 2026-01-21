@@ -361,10 +361,12 @@ def invalidate_all_caches():
 
 def invalidate_transaction_cache():
     """Clear transaction-related caches. Call after transaction edits."""
+    from streamlit_app.utils.session import get_all_categories
     get_transactions_cached.clear()
     get_category_spending_cached.clear()
     get_monthly_trend_cached.clear()
     get_dashboard_stats.clear()
+    get_all_categories.clear()  # Categories come from transactions
 
 
 def invalidate_account_cache():
@@ -375,4 +377,6 @@ def invalidate_account_cache():
 
 def invalidate_tag_cache():
     """Clear tag-related caches. Call after tag changes."""
+    from streamlit_app.utils.session import get_all_tags
     get_tags_cached.clear()
+    get_all_tags.clear()
