@@ -278,13 +278,19 @@ class TagService:
 
     # ==================== Transaction Editing ====================
 
-    def update_transaction(self, transaction_id: int, user_category: Optional[str] = None) -> bool:
+    def update_transaction(
+        self,
+        transaction_id: int,
+        user_category: Optional[str] = None,
+        memo: Optional[str] = None
+    ) -> bool:
         """
         Update transaction's user-editable fields
 
         Args:
             transaction_id: Transaction ID
             user_category: New user category (pass empty string to clear)
+            memo: User notes/description override (pass empty string to clear)
 
         Returns:
             True if updated, False if not found
@@ -298,6 +304,9 @@ class TagService:
 
         if user_category is not None:
             transaction.user_category = user_category if user_category else None
+
+        if memo is not None:
+            transaction.memo = memo if memo else None
 
         self.session.commit()
         return True

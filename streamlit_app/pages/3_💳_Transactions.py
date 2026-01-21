@@ -13,11 +13,10 @@ from typing import List, Optional
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from streamlit_app.utils.session import init_session_state, get_db_session
+from streamlit_app.utils.session import init_session_state, get_db_session, get_tag_service
 from streamlit_app.utils.formatters import (
     format_currency, format_number, format_datetime,
-    format_transaction_amount, color_for_amount, AMOUNT_STYLE_CSS,
-    format_category_badge, format_tags, format_status
+    format_transaction_amount, color_for_amount, AMOUNT_STYLE_CSS
 )
 from streamlit_app.utils.rtl import fix_rtl, has_hebrew
 from streamlit_app.utils.cache import get_transactions_cached, invalidate_transaction_cache
@@ -698,14 +697,14 @@ try:
         )
 
         # ============================================================================
-        # TRANSACTION DETAILS (Expandable)
+        # TRANSACTION EDIT PANEL
         # ============================================================================
         st.markdown("---")
-        st.subheader("🔍 Transaction Details")
+        st.subheader("✏️ Edit Transaction")
 
-        # Select a transaction to view details
+        # Select a transaction to edit
         selected_txn_id = st.selectbox(
-            "Select a transaction to view details",
+            "Select a transaction to edit",
             options=[txn.id for txn in transactions],
             format_func=lambda x: f"ID {x}: {next((t.description[:40] for t in transactions if t.id == x), 'Unknown')}",
             key="selected_transaction"
@@ -715,220 +714,173 @@ try:
             txn = session.query(Transaction).filter(Transaction.id == selected_txn_id).first()
 
             if txn:
+                # Get current tags for this transaction
+                current_tag_names = [tag[0] for tag in session.query(Tag.name).join(
+                    TransactionTag,
+                    TransactionTag.tag_id == Tag.id
+                ).filter(
+                    TransactionTag.transaction_id == txn.id
+                ).all()]
+
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    st.markdown("**Basic Information**")
+                    st.markdown("**📋 Original Transaction Info** *(read-only)*")
                     st.text(f"ID: {txn.id}")
-                    st.text(f"Date: {format_datetime(txn.transaction_date, '%Y-%m-%d %H:%M')}")
+                    st.text(f"Date: {format_datetime(txn.transaction_date, '%Y-%m-%d')}")
                     st.text(f"Description: {txn.description}")
-                    st.text(f"Amount: {format_currency(txn.original_amount)}")
-                    st.text(f"Currency: {txn.original_currency}")
-
-                    # Display status as colored badge
-                    st.markdown("**Status:**")
-                    status_badge = format_status(txn.status, as_badge=True)
-                    st.markdown(status_badge, unsafe_allow_html=True)
+                    st.text(f"Amount: {format_currency(txn.original_amount)} {txn.original_currency}")
+                    st.text(f"Status: {'✅ Completed' if txn.status == 'completed' else '⏳ Pending'}")
+                    if txn.account:
+                        st.text(f"Account: {txn.account.institution} ({txn.account.account_type or 'N/A'})")
+                    if txn.category:
+                        st.text(f"Source Category: {txn.category}")
 
                 with col2:
-                    st.markdown("**Categorization**")
+                    st.markdown("**✏️ Editable Fields**")
 
-                    # Display category as badge
-                    st.markdown("**Category:**")
-                    category_badge = format_category_badge(txn.effective_category or "")
-                    st.markdown(category_badge, unsafe_allow_html=True)
-
-                    if txn.user_category:
-                        st.caption(f"User Category: {txn.user_category}")
-
-                    # Get tags and display as badges
-                    txn_tags = session.query(Tag.name).join(
-                        TransactionTag,
-                        TransactionTag.tag_id == Tag.id
-                    ).filter(
-                        TransactionTag.transaction_id == txn.id
-                    ).all()
-
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    st.markdown("**Tags:**")
-                    if txn_tags:
-                        tag_names = [tag[0] for tag in txn_tags]
-                        tags_html = format_tags(tag_names)
-                        st.markdown(tags_html, unsafe_allow_html=True)
-                    else:
-                        st.markdown("<span style='color:#999; font-size:0.85rem'>No tags</span>", unsafe_allow_html=True)
-
-                    st.markdown("**Account Information**")
-                    if txn.account:
-                        st.text(f"Institution: {txn.account.institution}")
-                        st.text(f"Type: {txn.account.account_type or 'N/A'}")
-
-                # ============================================================================
-                # TRANSACTION EDITING
-                # ============================================================================
-                st.markdown("---")
-                st.markdown("**✏️ Edit Transaction**")
-
-                # Import tag service
-                from services.tag_service import TagService
-                tag_service_edit = TagService(session=session)
-
-                # Edit Category
-                st.markdown("**Edit Category**")
-
-                # Get all categories for suggestions
-                user_categories = session.query(Transaction.user_category).filter(
-                    Transaction.user_category.isnot(None)
-                ).distinct().all()
-                source_categories = session.query(Transaction.category).filter(
-                    Transaction.category.isnot(None)
-                ).distinct().all()
-
-                category_set = set()
-                category_set.update([cat[0] for cat in user_categories if cat[0]])
-                category_set.update([cat[0] for cat in source_categories if cat[0]])
-                category_list = sorted(list(category_set))
-
-                col_cat1, col_cat2 = st.columns([3, 1])
-
-                with col_cat1:
-                    # Use selectbox with option for custom input
-                    edit_category_mode = st.radio(
-                        "Category Mode",
-                        ["Select Existing", "Custom"],
-                        key=f"cat_mode_{txn.id}",
-                        horizontal=True
+                    # --- Memo/Notes Field ---
+                    new_memo = st.text_area(
+                        "Notes / Description Override",
+                        value=txn.memo or "",
+                        placeholder="Add your own notes or description for this transaction...",
+                        key=f"edit_memo_{txn.id}",
+                        help="Your personal notes. The original description is preserved above."
                     )
 
-                    if edit_category_mode == "Select Existing":
-                        new_category = st.selectbox(
-                            "Category",
-                            ["(Clear Category)"] + category_list,
-                            index=0 if not txn.user_category else (category_list.index(txn.user_category) + 1 if txn.user_category in category_list else 0),
-                            key=f"edit_cat_select_{txn.id}"
-                        )
+                    # --- Category Editor ---
+                    # Get all unique categories for autocomplete
+                    all_categories = set()
+                    user_cats = session.query(Transaction.user_category).filter(
+                        Transaction.user_category.isnot(None)
+                    ).distinct().all()
+                    source_cats = session.query(Transaction.category).filter(
+                        Transaction.category.isnot(None)
+                    ).distinct().all()
+                    all_categories.update([c[0] for c in user_cats if c[0]])
+                    all_categories.update([c[0] for c in source_cats if c[0]])
+                    category_options = ["(No category)", "(Enter new...)"] + sorted(list(all_categories))
+
+                    # Determine current selection
+                    current_category = txn.user_category or txn.category or ""
+                    if current_category in category_options:
+                        default_idx = category_options.index(current_category)
+                    elif current_category:
+                        category_options.append(current_category)
+                        default_idx = len(category_options) - 1
                     else:
-                        new_category = st.text_input(
-                            "Custom Category",
-                            value=txn.user_category or "",
-                            key=f"edit_cat_input_{txn.id}",
-                            placeholder="Enter custom category..."
-                        )
+                        default_idx = 0
 
-                with col_cat2:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("Update Category", key=f"update_cat_{txn.id}", use_container_width=True):
-                        # Determine final category value
-                        if edit_category_mode == "Select Existing" and new_category == "(Clear Category)":
-                            final_category = None
-                        elif new_category:
-                            final_category = new_category
-                        else:
-                            final_category = None
-
-                        try:
-                            success = tag_service_edit.update_transaction(txn.id, user_category=final_category)
-                            if success:
-                                st.toast("✅ Category updated successfully", icon="✅")
-                                st.rerun()
-                            else:
-                                st.toast("Failed to update category", icon="❌")
-                        except Exception as e:
-                            st.toast(f"Error: {str(e)}", icon="❌")
-
-                # Manage Tags
-                st.markdown("---")
-                st.markdown("**Manage Tags**")
-
-                # Get all available tags
-                all_tags = tag_service_edit.get_all_tags()
-                all_tag_names = [tag.name for tag in all_tags]
-
-                # Get current tags for this transaction
-                current_tags = [tag[0] for tag in txn_tags] if txn_tags else []
-
-                col_tag1, col_tag2 = st.columns(2)
-
-                with col_tag1:
-                    st.markdown("**Add Tags**")
-
-                    # Tags to add (exclude already tagged)
-                    available_tags = [tag for tag in all_tag_names if tag not in current_tags]
-
-                    if available_tags:
-                        tags_to_add = st.multiselect(
-                            "Select tags to add",
-                            available_tags,
-                            key=f"add_tags_{txn.id}"
-                        )
-
-                        if st.button("Add Tags", key=f"add_tags_btn_{txn.id}", use_container_width=True):
-                            if tags_to_add:
-                                try:
-                                    added = tag_service_edit.tag_transaction(txn.id, tags_to_add)
-                                    st.toast(f"Added {added} tag(s) to transaction", icon="🏷️")
-                                    st.rerun()
-                                except Exception as e:
-                                    st.toast(f"Error: {str(e)}", icon="❌")
-                            else:
-                                st.toast("Please select at least one tag", icon="⚠️")
-                    else:
-                        st.info("All available tags are already applied")
-
-                    # Option to create new tag
-                    new_tag_name_inline = st.text_input(
-                        "Or create new tag",
-                        key=f"new_tag_{txn.id}",
-                        placeholder="Enter new tag name..."
+                    selected_category = st.selectbox(
+                        "Category",
+                        options=category_options,
+                        index=default_idx,
+                        key=f"edit_category_{txn.id}"
                     )
 
-                    if st.button("Create & Add Tag", key=f"create_add_tag_{txn.id}", use_container_width=True):
-                        if new_tag_name_inline and new_tag_name_inline.strip():
-                            try:
-                                tag_service_edit.get_or_create_tag(new_tag_name_inline.strip())
-                                added = tag_service_edit.tag_transaction(txn.id, [new_tag_name_inline.strip()])
-                                st.toast(f"Created and added tag: {new_tag_name_inline.strip()}", icon="🏷️")
-                                st.rerun()
-                            except Exception as e:
-                                st.toast(f"Error: {str(e)}", icon="❌")
-                        else:
-                            st.toast("Please enter a tag name", icon="⚠️")
-
-                with col_tag2:
-                    st.markdown("**Remove Tags**")
-
-                    if current_tags:
-                        tags_to_remove = st.multiselect(
-                            "Select tags to remove",
-                            current_tags,
-                            key=f"remove_tags_{txn.id}"
+                    # Show text input if "Enter new..." selected
+                    new_category_input = ""
+                    if selected_category == "(Enter new...)":
+                        new_category_input = st.text_input(
+                            "New category name",
+                            key=f"new_category_{txn.id}",
+                            placeholder="Enter a new category..."
                         )
 
-                        if st.button("Remove Tags", key=f"remove_tags_btn_{txn.id}", use_container_width=True):
-                            if tags_to_remove:
-                                try:
-                                    removed = tag_service_edit.untag_transaction(txn.id, tags_to_remove)
-                                    st.toast(f"Removed {removed} tag(s) from transaction", icon="🗑️")
-                                    st.rerun()
-                                except Exception as e:
-                                    st.toast(f"Error: {str(e)}", icon="❌")
-                            else:
-                                st.toast("Please select at least one tag", icon="⚠️")
+                    # --- Tags Editor ---
+                    st.markdown("**Tags**")
+
+                    # Get all existing tags for multiselect
+                    all_tags = [tag.name for tag in session.query(Tag).order_by(Tag.name).all()]
+
+                    # Multiselect for existing tags
+                    selected_tags = st.multiselect(
+                        "Select tags",
+                        options=all_tags,
+                        default=current_tag_names,
+                        key=f"edit_tags_{txn.id}",
+                        help="Select existing tags or add new ones below"
+                    )
+
+                    # Text input for adding new tags
+                    new_tags_input = st.text_input(
+                        "Add new tags (comma-separated)",
+                        key=f"new_tags_{txn.id}",
+                        placeholder="e.g., groceries, monthly, shared"
+                    )
+
+                # --- Save/Reset Buttons ---
+                st.markdown("---")
+                btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 3])
+
+                with btn_col1:
+                    save_clicked = st.button("💾 Save Changes", type="primary", use_container_width=True)
+
+                with btn_col2:
+                    reset_clicked = st.button("↩️ Reset", use_container_width=True)
+
+                if reset_clicked:
+                    # Clear the edit form by removing session state keys
+                    for key in list(st.session_state.keys()):
+                        if key.startswith(f"edit_") or key.startswith(f"new_"):
+                            if str(txn.id) in key:
+                                del st.session_state[key]
+                    st.rerun()
+
+                if save_clicked:
+                    tag_service = get_tag_service()
+                    changes_made = []
+
+                    # Determine final category value
+                    if selected_category == "(No category)":
+                        final_category = ""
+                    elif selected_category == "(Enter new...)":
+                        final_category = new_category_input.strip()
                     else:
-                        st.info("No tags to remove")
+                        final_category = selected_category
 
-                # Additional details
-                if txn.memo:
-                    st.markdown("**Memo**")
-                    st.text(txn.memo)
+                    # Update memo and category
+                    memo_changed = (new_memo.strip() or None) != (txn.memo or None)
+                    category_changed = (final_category or None) != (txn.user_category or None)
 
-                if txn.installment_number and txn.installment_total:
-                    st.markdown("**Installment Information**")
-                    st.text(f"Installment: {txn.installment_number} of {txn.installment_total}")
+                    if memo_changed or category_changed:
+                        tag_service.update_transaction(
+                            txn.id,
+                            user_category=final_category if category_changed else None,
+                            memo=new_memo.strip() if memo_changed else None
+                        )
+                        if memo_changed:
+                            changes_made.append("notes")
+                        if category_changed:
+                            changes_made.append("category")
 
-                if txn.transaction_id:
-                    st.markdown("**Technical Details**")
-                    st.text(f"Transaction ID: {txn.transaction_id}")
+                    # Process tags
+                    # Combine selected tags with any new tags from text input
+                    final_tags = set(selected_tags)
+                    if new_tags_input.strip():
+                        new_tag_names = [t.strip() for t in new_tags_input.split(",") if t.strip()]
+                        final_tags.update(new_tag_names)
+
+                    current_tags_set = set(current_tag_names)
+
+                    tags_to_add = final_tags - current_tags_set
+                    tags_to_remove = current_tags_set - final_tags
+
+                    if tags_to_add:
+                        tag_service.tag_transaction(txn.id, list(tags_to_add))
+                        changes_made.append(f"added {len(tags_to_add)} tag(s)")
+
+                    if tags_to_remove:
+                        tag_service.untag_transaction(txn.id, list(tags_to_remove))
+                        changes_made.append(f"removed {len(tags_to_remove)} tag(s)")
+
+                    if changes_made:
+                        invalidate_transaction_cache()
+                        st.success(f"✅ Transaction updated: {', '.join(changes_made)}")
+                        st.rerun()
+                    else:
+                        st.info("No changes to save.")
+
 
     # ============================================================================
     # SUMMARY FOOTER
