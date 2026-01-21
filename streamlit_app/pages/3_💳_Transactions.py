@@ -13,7 +13,7 @@ from typing import List, Optional
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from streamlit_app.utils.session import init_session_state, get_db_session, get_tag_service
+from streamlit_app.utils.session import init_session_state, get_db_session, get_tag_service, get_all_categories, get_all_tags
 from streamlit_app.utils.formatters import (
     format_currency, format_number, format_datetime,
     format_transaction_amount, color_for_amount, AMOUNT_STYLE_CSS
@@ -750,16 +750,8 @@ try:
 
                     # --- Category Editor ---
                     # Get all unique categories for autocomplete
-                    all_categories = set()
-                    user_cats = session.query(Transaction.user_category).filter(
-                        Transaction.user_category.isnot(None)
-                    ).distinct().all()
-                    source_cats = session.query(Transaction.category).filter(
-                        Transaction.category.isnot(None)
-                    ).distinct().all()
-                    all_categories.update([c[0] for c in user_cats if c[0]])
-                    all_categories.update([c[0] for c in source_cats if c[0]])
-                    category_options = ["(No category)", "(Enter new...)"] + sorted(list(all_categories))
+                    all_categories = get_all_categories()
+                    category_options = ["(No category)", "(Enter new...)"] + all_categories
 
                     # Determine current selection
                     current_category = txn.user_category or txn.category or ""
@@ -791,7 +783,7 @@ try:
                     st.markdown("**Tags**")
 
                     # Get all existing tags for multiselect
-                    all_tags = [tag.name for tag in session.query(Tag).order_by(Tag.name).all()]
+                    all_tags = get_all_tags()
 
                     # Multiselect for existing tags
                     selected_tags = st.multiselect(

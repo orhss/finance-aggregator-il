@@ -172,3 +172,52 @@ def safe_service_call(func, *args, **kwargs):
     except Exception as e:
         st.error(f"Service error: {str(e)}")
         return None
+
+
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def get_all_categories() -> list[str]:
+    """
+    Get all unique categories from transactions (both user_category and source category).
+    Returns a sorted list of category names.
+    """
+    try:
+        from db.database import get_session
+        from db.models import Transaction
+
+        session = get_session()
+        categories = set()
+
+        # Get user-assigned categories
+        user_cats = session.query(Transaction.user_category).filter(
+            Transaction.user_category.isnot(None)
+        ).distinct().all()
+        categories.update([c[0] for c in user_cats if c[0]])
+
+        # Get source categories
+        source_cats = session.query(Transaction.category).filter(
+            Transaction.category.isnot(None)
+        ).distinct().all()
+        categories.update([c[0] for c in source_cats if c[0]])
+
+        return sorted(list(categories))
+    except Exception as e:
+        st.error(f"Failed to fetch categories: {e}")
+        return []
+
+
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def get_all_tags() -> list[str]:
+    """
+    Get all tag names from the database.
+    Returns a sorted list of tag names.
+    """
+    try:
+        from db.database import get_session
+        from db.models import Tag
+
+        session = get_session()
+        tags = session.query(Tag.name).order_by(Tag.name).all()
+        return [tag[0] for tag in tags]
+    except Exception as e:
+        st.error(f"Failed to fetch tags: {e}")
+        return []

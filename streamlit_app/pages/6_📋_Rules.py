@@ -13,7 +13,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from streamlit_app.utils.session import init_session_state
+from streamlit_app.utils.session import init_session_state, get_all_categories, get_all_tags
 from streamlit_app.utils.formatters import format_currency, format_number
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.bulk_actions import show_bulk_confirmation
@@ -82,6 +82,12 @@ try:
     # ============================================================================
     # ADD/EDIT RULE
     # ============================================================================
+
+    # Get all categories and tags for autocomplete
+    all_categories = get_all_categories()
+    all_tags = get_all_tags()
+    category_options = ["(No category)", "(Enter new...)"] + all_categories
+
     with st.expander("➕ Add New Rule", expanded=False):
         st.markdown("**Create a new auto-categorization/tagging rule**")
 
@@ -102,23 +108,48 @@ try:
                 help="How to match the pattern"
             )
 
-            rule_category = st.text_input(
+            # Category with autocomplete
+            selected_category = st.selectbox(
                 "Category (optional)",
-                key="new_rule_category",
-                placeholder="e.g., Food & Dining"
+                options=category_options,
+                index=0,
+                key="new_rule_category_select",
+                help="Select an existing category or enter a new one"
             )
 
+            # Show text input if "Enter new..." selected
+            new_category_input = ""
+            if selected_category == "(Enter new...)":
+                new_category_input = st.text_input(
+                    "New category name",
+                    key="new_rule_category_new",
+                    placeholder="Enter a new category..."
+                )
+
         with col2:
-            rule_tags_input = st.text_input(
-                "Tags to Add (comma-separated, optional)",
-                key="new_rule_tags",
+            # Tags with multiselect autocomplete
+            selected_tags = st.multiselect(
+                "Tags to Add (optional)",
+                options=all_tags,
+                default=[],
+                key="new_rule_tags_select",
+                help="Select existing tags or add new ones below"
+            )
+
+            # Text input for adding new tags
+            new_tags_input = st.text_input(
+                "Add new tags (comma-separated)",
+                key="new_rule_tags_new",
                 placeholder="e.g., delivery, food"
             )
 
-            rule_remove_tags_input = st.text_input(
-                "Tags to Remove (comma-separated, optional)",
-                key="new_rule_remove_tags",
-                placeholder="e.g., uncategorized"
+            # Tags to remove with multiselect autocomplete
+            selected_remove_tags = st.multiselect(
+                "Tags to Remove (optional)",
+                options=all_tags,
+                default=[],
+                key="new_rule_remove_tags_select",
+                help="Select tags to remove when rule matches"
             )
 
             rule_description = st.text_input(
@@ -129,14 +160,27 @@ try:
 
         if st.button("Add Rule", type="primary", use_container_width=True):
             if rule_pattern and rule_pattern.strip():
-                # Parse tags
-                tags_list = [tag.strip() for tag in rule_tags_input.split(',') if tag.strip()] if rule_tags_input else []
-                remove_tags_list = [tag.strip() for tag in rule_remove_tags_input.split(',') if tag.strip()] if rule_remove_tags_input else []
+                # Determine final category
+                if selected_category == "(No category)":
+                    final_category = None
+                elif selected_category == "(Enter new...)":
+                    final_category = new_category_input.strip() if new_category_input else None
+                else:
+                    final_category = selected_category
+
+                # Combine selected tags with new tags from text input
+                tags_list = list(selected_tags)
+                if new_tags_input:
+                    new_tag_names = [tag.strip() for tag in new_tags_input.split(',') if tag.strip()]
+                    tags_list.extend(new_tag_names)
+
+                # Remove tags from multiselect
+                remove_tags_list = list(selected_remove_tags)
 
                 try:
                     new_rule = rules_service.add_rule(
                         pattern=rule_pattern.strip(),
-                        category=rule_category.strip() if rule_category else None,
+                        category=final_category,
                         tags=tags_list,
                         remove_tags=remove_tags_list,
                         match_type=MatchType(rule_match_type),
