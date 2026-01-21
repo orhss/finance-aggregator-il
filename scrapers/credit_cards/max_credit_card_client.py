@@ -12,12 +12,12 @@ from dataclasses import dataclass
 from enum import Enum
 
 import requests
-from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+
+from scrapers.base.selenium_driver import SeleniumDriver, DriverConfig
 
 logger = logging.getLogger(__name__)
 
@@ -145,39 +145,23 @@ class MaxCreditCardScraper:
     def __init__(self, credentials: MaxCredentials, headless: bool = True):
         self.credentials = credentials
         self.headless = headless
-        self.driver = None
+        self._selenium_driver: Optional[SeleniumDriver] = None
+        self.driver = None  # Will be set by setup_driver
         self.categories: Dict[int, str] = {}
 
     def setup_driver(self):
-        """Setup Chrome WebDriver"""
-        logger.info("Setting up Chrome WebDriver...")
-        options = Options()
-        if self.headless:
-            logger.debug("Running in headless mode")
-            options.add_argument('--headless')
-        else:
-            logger.debug("Running in visible mode")
-
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--window-size=1920,1080')
-        options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36')
-
-        logger.debug("Initializing Chrome driver...")
-        self.driver = webdriver.Chrome(options=options)
-        self.driver.implicitly_wait(10)
-        logger.info("Chrome driver initialized successfully")
+        """Setup Chrome WebDriver using centralized SeleniumDriver"""
+        config = DriverConfig(headless=self.headless)
+        self._selenium_driver = SeleniumDriver(config)
+        self.driver = self._selenium_driver.setup()
 
     def cleanup(self):
         """Clean up resources"""
         logger.debug("Starting cleanup process...")
-        if self.driver:
-            logger.debug("Closing Chrome driver...")
-            self.driver.quit()
-            logger.info("Chrome driver closed successfully")
-        else:
-            logger.debug("No Chrome driver to close")
+        if self._selenium_driver:
+            self._selenium_driver.cleanup()
+            self._selenium_driver = None
+        self.driver = None
         logger.debug("Cleanup completed")
 
     def wait_for_element(self, selector: str, timeout: int = 10, clickable: bool = False):

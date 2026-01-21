@@ -11,9 +11,9 @@ from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from enum import Enum
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException
+
+from scrapers.base.selenium_driver import SeleniumDriver, DriverConfig
 
 logger = logging.getLogger(__name__)
 
@@ -115,12 +115,12 @@ class IsracardCreditCardScraper:
     TRANSACTIONS_BATCH_SIZE = 10
 
     def __init__(
-        self,
-        credentials: IsracardCredentials,
-        base_url: str,
-        company_code: str,
-        headless: bool = True,
-        fetch_categories: bool = False
+            self,
+            credentials: IsracardCredentials,
+            base_url: str,
+            company_code: str,
+            headless: bool = True,
+            fetch_categories: bool = False
     ):
         """
         Initialize Isracard scraper.
@@ -137,43 +137,18 @@ class IsracardCreditCardScraper:
         self.company_code = company_code
         self.headless = headless
         self.fetch_categories = fetch_categories
-        self.driver = None
+        self._selenium_driver: Optional[SeleniumDriver] = None
+        self.driver = None  # Will be set by setup_driver
         self.services_url = f"{base_url}/services/ProxyRequestHandler.ashx"
 
     def setup_driver(self):
-        """Setup Chrome WebDriver with bot detection blocking"""
-        logger.info("Setting up Chrome WebDriver...")
-        options = Options()
-        if self.headless:
-            logger.debug("Running in headless mode")
-            options.add_argument('--headless')
-        else:
-            logger.debug("Running in visible mode")
-
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--window-size=1920,1080')
-
-        # Disable automation flags to avoid bot detection
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
-        options.add_argument('--disable-blink-features=AutomationControlled')
-
-        # Set a realistic user agent
-        options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36')
-
-        logger.debug("Initializing Chrome driver...")
-        self.driver = webdriver.Chrome(options=options)
-
-        # Remove webdriver property to avoid detection
-        self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-            'source': '''
-                Object.defineProperty(navigator, 'webdriver', {
-                    get: () => undefined
-                });
-            '''
-        })
+        """Setup Chrome WebDriver using centralized SeleniumDriver"""
+        config = DriverConfig(
+            headless=self.headless,
+            extra_arguments=['--lang=he-IL']  # Hebrew language support
+        )
+        self._selenium_driver = SeleniumDriver(config)
+        self.driver = self._selenium_driver.setup()
 
         self.driver.implicitly_wait(10)
         # Set script timeout for async operations (API calls)
@@ -183,12 +158,10 @@ class IsracardCreditCardScraper:
     def cleanup(self):
         """Clean up resources"""
         logger.debug("Starting cleanup process...")
-        if self.driver:
-            logger.debug("Closing Chrome driver...")
-            self.driver.quit()
-            logger.info("Chrome driver closed successfully")
-        else:
-            logger.debug("No Chrome driver to close")
+        if self._selenium_driver:
+            self._selenium_driver.cleanup()
+            self._selenium_driver = None
+        self.driver = None
         logger.debug("Cleanup completed")
 
     def get_cookies(self) -> Dict[str, str]:
@@ -199,11 +172,11 @@ class IsracardCreditCardScraper:
         return cookies
 
     def api_request(
-        self,
-        endpoint: str,
-        params: Optional[Dict[str, str]] = None,
-        data: Optional[Dict[str, Any]] = None,
-        method: str = 'GET'
+            self,
+            endpoint: str,
+            params: Optional[Dict[str, str]] = None,
+            data: Optional[Dict[str, Any]] = None,
+            method: str = 'GET'
     ) -> Dict[str, Any]:
         """
         Make API request within browser page context (critical for auth tokens).
@@ -404,7 +377,8 @@ class IsracardCreditCardScraper:
             )
 
             # Check validation response
-            if not validate_result or not validate_result.get('Header') or validate_result['Header'].get('Status') != '1':
+            if not validate_result or not validate_result.get('Header') or validate_result['Header'].get(
+                    'Status') != '1':
                 raise IsracardLoginError("Unknown error during validation")
 
             if 'ValidateIdDataBean' not in validate_result:
@@ -559,8 +533,8 @@ class IsracardCreditCardScraper:
         filtered_txns = [
             txn for txn in txns
             if txn.get('dealSumType') != '1'
-            and txn.get('voucherNumberRatz') != '000000000'
-            and txn.get('voucherNumberRatzOutbound') != '000000000'
+               and txn.get('voucherNumberRatz') != '000000000'
+               and txn.get('voucherNumberRatzOutbound') != '000000000'
         ]
 
         return [self.convert_transaction(txn, processed_date) for txn in filtered_txns]
@@ -614,10 +588,10 @@ class IsracardCreditCardScraper:
         return accounts
 
     def fetch_transactions_for_month(
-        self,
-        year: int,
-        month: int,
-        start_date: datetime
+            self,
+            year: int,
+            month: int,
+            start_date: datetime
     ) -> Dict[str, CardAccount]:
         """
         Fetch transactions for a specific month.
@@ -699,11 +673,11 @@ class IsracardCreditCardScraper:
         return account_txns
 
     def fetch_transaction_category(
-        self,
-        account_index: int,
-        transaction: Transaction,
-        year: int,
-        month: int
+            self,
+            account_index: int,
+            transaction: Transaction,
+            year: int,
+            month: int
     ) -> Transaction:
         """
         Fetch additional category information for a transaction.
@@ -742,10 +716,10 @@ class IsracardCreditCardScraper:
         return transaction
 
     def fetch_categories_for_account(
-        self,
-        account: CardAccount,
-        year: int,
-        month: int
+            self,
+            account: CardAccount,
+            year: int,
+            month: int
     ) -> CardAccount:
         """
         Fetch categories for all transactions in an account.
@@ -776,10 +750,10 @@ class IsracardCreditCardScraper:
         return account
 
     def fetch_transactions(
-        self,
-        start_date: Optional[datetime] = None,
-        months_back: int = 12,
-        months_forward: int = 1
+            self,
+            start_date: Optional[datetime] = None,
+            months_back: int = 12,
+            months_forward: int = 1
     ) -> List[CardAccount]:
         """
         Fetch all transactions for all cards.
@@ -858,10 +832,10 @@ class IsracardCreditCardScraper:
         return accounts
 
     def scrape(
-        self,
-        start_date: Optional[datetime] = None,
-        months_back: int = 12,
-        months_forward: int = 1
+            self,
+            start_date: Optional[datetime] = None,
+            months_back: int = 12,
+            months_forward: int = 1
     ) -> List[CardAccount]:
         """
         Complete scraping flow: login and fetch transactions.
@@ -951,13 +925,14 @@ def main():
         accounts = scraper.scrape(months_back=args.months_back)
 
         for account in accounts:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"Card: {account.account_number}")
             print(f"Total transactions: {len(account.transactions)}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
             for txn in account.transactions[:10]:  # Show first 10
-                print(f"{txn.date[:10]} | {txn.description:30} | {txn.charged_amount:>10.2f} {txn.original_currency} | {txn.status.value}")
+                print(
+                    f"{txn.date[:10]} | {txn.description:30} | {txn.charged_amount:>10.2f} {txn.original_currency} | {txn.status.value}")
                 if txn.installments:
                     print(f"           Installment {txn.installments.number}/{txn.installments.total}")
                 if txn.category:
