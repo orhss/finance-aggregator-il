@@ -79,6 +79,186 @@ try:
     if 'sync_start_time' not in st.session_state:
         st.session_state.sync_start_time = None
 
+    # ============================================================================
+    # HELPER FUNCTIONS
+    # ============================================================================
+
+    # Institution name mapping (used throughout the page)
+    INSTITUTION_MAP = {
+        'excellence': 'excellence',
+        'Excellence': 'excellence',
+        'meitav': 'meitav',
+        'Meitav': 'meitav',
+        'migdal': 'migdal',
+        'Migdal': 'migdal',
+        'phoenix': 'phoenix',
+        'Phoenix': 'phoenix',
+        'cal': 'cal',
+        'CAL': 'cal',
+        'max': 'max',
+        'Max': 'max',
+        'isracard': 'isracard',
+        'Isracard': 'isracard',
+    }
+
+    def get_status_indicator(last_sync_date: date) -> tuple[str, str]:
+        """
+        Determine sync status based on last sync date.
+        Returns (emoji, text) tuple.
+
+        Credit cards: 1 day = good, 7 days = warning
+        Others: 7 days = good, 14 days = warning
+        """
+        if not last_sync_date:
+            return "❓", "Never synced"
+
+        days_since_sync = (date.today() - last_sync_date).days
+        if days_since_sync <= 7:
+            return "✅", "Up to date"
+        elif days_since_sync <= 14:
+            return "⚠️", "May need sync"
+        else:
+            return "❌", "Needs sync"
+
+    def render_sync_status_message(status: str, output_lines: list[str], clear_key: str):
+        """Render sync status messages with consistent format."""
+        status_config = {
+            'success': {
+                'message': "✅ Sync completed successfully!",
+                'type': 'success',
+                'expander_title': "📋 View Sync Log",
+                'expander_expanded': False
+            },
+            'failed': {
+                'message': "❌ Sync failed. Please check the output below for details.",
+                'type': 'error',
+                'expander_title': "Sync Output:",
+                'expander_expanded': True
+            },
+            'error': {
+                'message': "❌ Sync error occurred. Please see details below.",
+                'type': 'error',
+                'expander_title': "Error Details:",
+                'expander_expanded': True
+            }
+        }
+
+        config = status_config.get(status)
+        if not config:
+            return
+
+        # Display status message
+        if config['type'] == 'success':
+            st.success(config['message'])
+        else:
+            st.error(config['message'])
+
+        # Display output
+        if output_lines:
+            if config['expander_expanded']:
+                st.markdown(f"**{config['expander_title']}**")
+                with st.container():
+                    for line in output_lines:
+                        if line.strip():
+                            st.text(line.strip())
+            else:
+                with st.expander(config['expander_title'], expanded=False):
+                    for line in output_lines:
+                        st.text(line.strip())
+        elif status != 'success':
+            st.warning("No output captured. The sync process may have failed to start.")
+
+        # Clear button
+        if st.button("Clear Status", key=clear_key):
+            st.session_state.sync_status = None
+            st.session_state.sync_output = []
+            st.rerun()
+
+    def render_institution_card(
+        institution: str,
+        accounts_list: list,
+        is_credit_card: bool,
+        session
+    ):
+        """Render a status card for an institution."""
+        with st.container():
+            # Institution header
+            icon = "💳" if is_credit_card else "🏦"
+            st.markdown(f"**{icon} {institution}**")
+
+            # Get stats for this institution
+            account_ids = [acc.id for acc in accounts_list]
+
+            # Calculate last sync date based on account type
+            if is_credit_card:
+                # For credit cards, use latest transaction's created_at
+                last_sync_datetime = session.query(func.max(Transaction.created_at)).filter(
+                    Transaction.account_id.in_(account_ids)
+                ).scalar()
+                last_sync = last_sync_datetime.date() if last_sync_datetime else None
+
+                # Transaction count
+                txn_count = session.query(func.count(Transaction.id)).filter(
+                    Transaction.account_id.in_(account_ids)
+                ).scalar() or 0
+
+                # Latest transaction date
+                latest_txn_date = session.query(func.max(Transaction.transaction_date)).filter(
+                    Transaction.account_id.in_(account_ids)
+                ).scalar()
+            else:
+                # For brokers/pensions, use balance date
+                last_sync = session.query(func.max(Balance.balance_date)).filter(
+                    Balance.account_id.in_(account_ids)
+                ).scalar()
+
+                # Get latest balance amount
+                latest_balance = session.query(Balance).filter(
+                    Balance.account_id.in_(account_ids)
+                ).order_by(desc(Balance.balance_date)).first()
+
+            # Status indicator
+            emoji, status_text = get_status_indicator(last_sync)
+            st.markdown(f"**Status:** {emoji} {status_text}")
+
+            # Metrics
+            st.caption(f"Accounts: {len(accounts_list)}")
+
+            if is_credit_card:
+                st.caption(f"Transactions: {format_number(txn_count)}")
+                if last_sync:
+                    st.caption(f"Last sync: {format_datetime(last_sync, '%Y-%m-%d')}")
+                else:
+                    st.caption("Last sync: Never")
+                if latest_txn_date:
+                    st.caption(f"Latest txn: {format_datetime(latest_txn_date, '%Y-%m-%d')}")
+                else:
+                    st.caption("Latest txn: N/A")
+            else:
+                if latest_balance:
+                    st.caption(f"Balance: {format_currency(latest_balance.total_amount)}")
+                else:
+                    st.caption("Balance: N/A")
+                if last_sync:
+                    st.caption(f"Last sync: {format_datetime(last_sync, '%Y-%m-%d')}")
+                else:
+                    st.caption("Last sync: Never")
+
+            # Sync button
+            if st.button(
+                f"🔄 Sync {institution}",
+                key=f"sync_{institution}",
+                disabled=st.session_state.sync_running,
+                use_container_width=True,
+                help="Click to sync this institution"
+            ):
+                sync_target = INSTITUTION_MAP.get(institution, institution.lower())
+                st.toast(f"🔄 Starting sync for {institution}...", icon="🔄")
+                start_sync(sync_target)
+                st.rerun()
+
+            st.markdown("---")
+
     # Helper function to run sync command in background thread
     def run_sync_in_thread(institution: str = "all", headless: bool = True, months_back: int = 3, months_forward: int = 1, output_queue: queue.Queue = None):
         """Run sync command in subprocess and capture output"""
@@ -174,57 +354,13 @@ try:
     # SYNC EXECUTION SECTION
     # ============================================================================
 
-    # Display sync status messages
-    if st.session_state.sync_status == "success":
-        st.success("✅ Sync completed successfully!")
-        # Show brief output summary if available
-        if st.session_state.sync_output:
-            with st.expander("📋 View Sync Log", expanded=False):
-                for line in st.session_state.sync_output:
-                    st.text(line.strip())
-        # Add clear button
-        if st.button("Clear Status", key="clear_success"):
-            st.session_state.sync_status = None
-            st.session_state.sync_output = []
-            st.rerun()
-
-    elif st.session_state.sync_status == "failed":
-        st.error("❌ Sync failed. Please check the output below for details.")
-
-        # Always show output for failed syncs
-        if st.session_state.sync_output:
-            st.markdown("**Sync Output:**")
-            with st.container():
-                for line in st.session_state.sync_output:
-                    if line.strip():
-                        st.text(line.strip())
-        else:
-            st.warning("No output captured. The sync process may have failed to start.")
-
-        # Add clear button
-        if st.button("Clear Status", key="clear_failed"):
-            st.session_state.sync_status = None
-            st.session_state.sync_output = []
-            st.rerun()
-
-    elif st.session_state.sync_status == "error":
-        st.error("❌ Sync error occurred. Please see details below.")
-
-        # Always show output for errors
-        if st.session_state.sync_output:
-            st.markdown("**Error Details:**")
-            with st.container():
-                for line in st.session_state.sync_output:
-                    if line.strip():
-                        st.text(line.strip())
-        else:
-            st.warning("No error details captured.")
-
-        # Add clear button
-        if st.button("Clear Status", key="clear_error"):
-            st.session_state.sync_status = None
-            st.session_state.sync_output = []
-            st.rerun()
+    # Display sync status messages using helper function
+    if st.session_state.sync_status in ["success", "failed", "error"]:
+        render_sync_status_message(
+            st.session_state.sync_status,
+            st.session_state.sync_output,
+            f"clear_{st.session_state.sync_status}"
+        )
 
     if st.session_state.sync_running:
         # Show prominent progress indicator with institution info
@@ -312,74 +448,7 @@ try:
 
             for j, (institution, accounts_list) in enumerate(institutions_list[i:i+cols_per_row]):
                 with cols[j]:
-                    with st.container():
-                        # Institution header
-                        st.markdown(f"**🏦 {institution}**")
-
-                        # Get stats for this institution
-                        account_ids = [acc.id for acc in accounts_list]
-
-                        # For brokers/pensions, use balance date
-                        last_sync = session.query(func.max(Balance.balance_date)).filter(
-                            Balance.account_id.in_(account_ids)
-                        ).scalar()
-
-                        # Get latest balance amount
-                        latest_balance = session.query(Balance).filter(
-                            Balance.account_id.in_(account_ids)
-                        ).order_by(desc(Balance.balance_date)).first()
-
-                        # Status indicator
-                        if last_sync:
-                            days_since_sync = (date.today() - last_sync).days
-                            if days_since_sync <= 7:
-                                status = "✅ Up to date"
-                            elif days_since_sync <= 14:
-                                status = "⚠️ May need sync"
-                            else:
-                                status = "❌ Needs sync"
-                        else:
-                            status = "❓ Never synced"
-
-                        st.markdown(f"**Status:** {status}")
-
-                        # Metrics
-                        st.caption(f"Accounts: {len(accounts_list)}")
-                        if latest_balance:
-                            st.caption(f"Balance: {format_currency(latest_balance.total_amount)}")
-                        else:
-                            st.caption("Balance: N/A")
-
-                        if last_sync:
-                            st.caption(f"Last sync: {format_datetime(last_sync, '%Y-%m-%d')}")
-                        else:
-                            st.caption("Last sync: Never")
-
-                        # Sync button
-                        if st.button(
-                            f"🔄 Sync {institution}",
-                            key=f"sync_{institution}",
-                            disabled=st.session_state.sync_running,
-                            use_container_width=True,
-                            help="Click to sync this institution"
-                        ):
-                            # Map institution names to CLI sync targets
-                            institution_map = {
-                                'excellence': 'excellence',
-                                'Excellence': 'excellence',
-                                'meitav': 'meitav',
-                                'Meitav': 'meitav',
-                                'migdal': 'migdal',
-                                'Migdal': 'migdal',
-                                'phoenix': 'phoenix',
-                                'Phoenix': 'phoenix'
-                            }
-                            sync_target = institution_map.get(institution, institution.lower())
-                            st.toast(f"🔄 Starting sync for {institution}...", icon="🔄")
-                            start_sync(sync_target)
-                            st.rerun()
-
-                        st.markdown("---")
+                    render_institution_card(institution, accounts_list, is_credit_card=False, session=session)
 
         st.markdown("")  # Add spacing between sections
 
@@ -394,80 +463,7 @@ try:
 
             for j, (institution, accounts_list) in enumerate(institutions_list[i:i+cols_per_row]):
                 with cols[j]:
-                    with st.container():
-                        # Institution header
-                        st.markdown(f"**💳 {institution}**")
-
-                        # Get stats for this institution
-                        account_ids = [acc.id for acc in accounts_list]
-
-                        # For credit cards, use the latest transaction's created_at (when it was synced)
-                        last_sync_datetime = session.query(func.max(Transaction.created_at)).filter(
-                            Transaction.account_id.in_(account_ids)
-                        ).scalar()
-                        last_sync = last_sync_datetime.date() if last_sync_datetime else None
-
-                        # Transaction count
-                        txn_count = session.query(func.count(Transaction.id)).filter(
-                            Transaction.account_id.in_(account_ids)
-                        ).scalar() or 0
-
-                        # Latest transaction date
-                        latest_txn_date = session.query(func.max(Transaction.transaction_date)).filter(
-                            Transaction.account_id.in_(account_ids)
-                        ).scalar()
-
-                        # Status indicator
-                        if last_sync:
-                            days_since_sync = (date.today() - last_sync).days
-                            if days_since_sync <= 1:
-                                status = "✅ Up to date"
-                            elif days_since_sync <= 7:
-                                status = "⚠️ May need sync"
-                            else:
-                                status = "❌ Needs sync"
-                        else:
-                            status = "❓ Never synced"
-
-                        st.markdown(f"**Status:** {status}")
-
-                        # Metrics
-                        st.caption(f"Accounts: {len(accounts_list)}")
-                        st.caption(f"Transactions: {format_number(txn_count)}")
-
-                        if last_sync:
-                            st.caption(f"Last sync: {format_datetime(last_sync, '%Y-%m-%d')}")
-                        else:
-                            st.caption("Last sync: Never")
-
-                        if latest_txn_date:
-                            st.caption(f"Latest txn: {format_datetime(latest_txn_date, '%Y-%m-%d')}")
-                        else:
-                            st.caption("Latest txn: N/A")
-
-                        # Sync button
-                        if st.button(
-                            f"🔄 Sync {institution}",
-                            key=f"sync_{institution}",
-                            disabled=st.session_state.sync_running,
-                            use_container_width=True,
-                            help="Click to sync this institution"
-                        ):
-                            # Map institution names to CLI sync targets
-                            institution_map = {
-                                'cal': 'cal',
-                                'CAL': 'cal',
-                                'max': 'max',
-                                'Max': 'max',
-                                'isracard': 'isracard',
-                                'Isracard': 'isracard',
-                            }
-                            sync_target = institution_map.get(institution, institution.lower())
-                            st.toast(f"🔄 Starting sync for {institution}...", icon="🔄")
-                            start_sync(sync_target)
-                            st.rerun()
-
-                        st.markdown("---")
+                    render_institution_card(institution, accounts_list, is_credit_card=True, session=session)
 
     st.markdown("---")
 
@@ -679,22 +675,17 @@ try:
             use_container_width=True,
             help="Sync only selected institutions"
         ):
-            # Collect selected institutions
-            selected = []
-            if sync_excellence:
-                selected.append("excellence")
-            if sync_meitav:
-                selected.append("meitav")
-            if sync_migdal:
-                selected.append("migdal")
-            if sync_phoenix:
-                selected.append("phoenix")
-            if sync_cal:
-                selected.append("cal")
-            if sync_max:
-                selected.append("max")
-            if sync_isracard:
-                selected.append("isracard")
+            # Collect selected institutions using a clean mapping
+            institution_selections = {
+                'excellence': sync_excellence,
+                'meitav': sync_meitav,
+                'migdal': sync_migdal,
+                'phoenix': sync_phoenix,
+                'cal': sync_cal,
+                'max': sync_max,
+                'isracard': sync_isracard
+            }
+            selected = [inst for inst, is_selected in institution_selections.items() if is_selected]
 
             if selected:
                 st.toast(f"🔄 Starting sync for {len(selected)} institutions...", icon="🔄")
