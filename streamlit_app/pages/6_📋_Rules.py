@@ -229,12 +229,21 @@ try:
 
         df_rules = pd.DataFrame(table_data)
 
-        # Display table
-        st.dataframe(
-            df_rules[['Pattern', 'Match Type', 'Category', 'Tags', 'Remove Tags', 'Description', 'Enabled']],
+        # Display table with row selection
+        st.caption("Select rows to apply specific rules")
+        selection = st.dataframe(
+            df_rules[['Index', 'Pattern', 'Match Type', 'Category', 'Tags', 'Remove Tags', 'Description', 'Enabled']],
             use_container_width=True,
-            hide_index=True
+            hide_index=True,
+            selection_mode="multi-row",
+            on_select="rerun",
+            key="rules_table"
         )
+
+        # Get selected row indices
+        selected_indices = selection.selection.rows if selection.selection else []
+        if selected_indices:
+            st.info(f"Selected {len(selected_indices)} rule(s)")
 
         st.markdown("---")
 
@@ -301,17 +310,34 @@ try:
 
     st.info("💡 Apply rules to update transaction categories and tags automatically")
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
+        # Get selected indices from the table
+        selected_rule_indices = st.session_state.get("rules_table", {}).get("selection", {}).get("rows", [])
+        has_selection = len(selected_rule_indices) > 0
+
+        # Build options dynamically based on selection
+        rule_scope_options = [f"All Rules ({len(rules)} rules)"]
+        if has_selection:
+            rule_scope_options.append(f"Selected Rules ({len(selected_rule_indices)} selected)")
+
+        rule_scope = st.radio(
+            "Rules to Apply",
+            rule_scope_options,
+            key="rule_scope",
+            help="Apply all rules or only selected ones from the table above"
+        )
+
+    with col2:
         apply_scope = st.radio(
-            "Scope",
+            "Transactions",
             ["All Transactions", "Uncategorized Only"],
             key="apply_scope",
             help="Choose which transactions to process"
         )
 
-    with col2:
+    with col3:
         apply_mode = st.radio(
             "Mode",
             ["Dry Run (Preview)", "Apply Changes"],
@@ -327,30 +353,39 @@ try:
             only_uncategorized = (apply_scope == "Uncategorized Only")
             dry_run = (apply_mode == "Dry Run (Preview)")
 
+            # Determine which rules to apply
+            use_selected = has_selection and "Selected Rules" in rule_scope
+            rule_indices = selected_rule_indices if use_selected else None
+
             try:
                 with st.spinner("Processing transactions..."):
                     results = rules_service.apply_rules(
                         only_uncategorized=only_uncategorized,
-                        dry_run=dry_run
+                        dry_run=dry_run,
+                        rule_indices=rule_indices
                     )
 
                 processed = results.get('processed', 0)
                 modified = results.get('modified', 0)
                 details = results.get('details', [])
 
+                # Build rule count string for messages
+                rules_applied = len(rule_indices) if rule_indices else len(rules)
+                rules_label = f"{rules_applied} rule(s)"
+
                 if dry_run:
-                    st.toast(f"Dry run complete: {modified} / {processed} transactions would be modified", icon="🔍")
+                    st.toast(f"Dry run ({rules_label}): {modified} / {processed} transactions would be modified", icon="🔍")
 
                     # After dry run, show confirmation for actual apply
                     if modified > 0:
                         show_bulk_confirmation(
                             operation_name="modify with rules",
                             affected_count=modified,
-                            details=f"(out of {processed} processed)",
+                            details=f"(out of {processed} processed, using {rules_label})",
                             warning_threshold=50
                         )
                 else:
-                    st.toast(f"Applied rules: {modified} / {processed} transactions modified", icon="✅")
+                    st.toast(f"Applied {rules_label}: {modified} / {processed} transactions modified", icon="✅")
                     if modified > 0:
                         st.balloons()  # Celebration for successful bulk operation
 
