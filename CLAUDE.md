@@ -152,6 +152,10 @@ For detailed file/function navigation, see `.claude/codemap.md`
 - **Transaction deduplication**: Database handles via unique constraints on external IDs
 - **Migrations**: Run `fin-cli maintenance migrate` after schema changes (idempotent, safe to run multiple times)
 
+### Streamlit UI Patterns
+- **Privacy-aware formatting**: Always use `format_amount_private()` from `session.py` for financial amounts (balances, totals, transactions). Never use `format_currency()` directly - it ignores the `mask_balances` privacy setting.
+- **Display wrappers**: Use `get_accounts_display()`, `get_dashboard_stats_display()` etc. from `session.py` - they combine cached data with pre-formatted `_display` fields.
+
 ### Category System
 Three-field hierarchy with `effective_category` property returning first non-null:
 1. `user_category` - Manual override (set by user or rules)
