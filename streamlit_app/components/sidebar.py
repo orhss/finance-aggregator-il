@@ -12,75 +12,47 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from streamlit_app.utils.formatters import format_currency, format_datetime
+from streamlit_app.utils.formatters import format_datetime
+from streamlit_app.utils.session import format_amount_private
+from streamlit_app.utils.cache import get_dashboard_stats
 
 
 def render_quick_stats():
     """
-    Render quick statistics in the sidebar
-    Shows total balance, pending transactions, last sync time
+    Render quick statistics in the sidebar.
+    Uses the same cached data source as the Dashboard for consistency.
     """
     st.sidebar.markdown("### 📊 Quick Stats")
 
     try:
-        from streamlit_app.utils.session import get_db_session
-        from db.models import Account, Transaction, Balance
-        from sqlalchemy import func, and_
+        # Use the same cached stats as Dashboard - single source of truth
+        stats = get_dashboard_stats()
 
-        session = get_db_session()
-
-        if session:
-            # Get total balance from latest Balance records
-            latest_balances = session.query(
-                Balance.account_id,
-                func.max(Balance.balance_date).label('max_date')
-            ).group_by(Balance.account_id).subquery()
-
-            total_balance = session.query(
-                func.sum(Balance.total_amount)
-            ).join(
-                latest_balances,
-                and_(
-                    Balance.account_id == latest_balances.c.account_id,
-                    Balance.balance_date == latest_balances.c.max_date
-                )
-            ).scalar()
-
-            if total_balance:
+        if stats and stats['account_count'] > 0:
+            # Total Balance
+            if stats['total_balance']:
                 st.sidebar.metric(
                     "Total Balance",
-                    format_currency(total_balance),
+                    format_amount_private(stats['total_balance']),
                     help="Sum of all account balances"
                 )
             else:
                 st.sidebar.metric("Total Balance", "Not synced")
 
-            # Get pending transactions count
-            pending_count = session.query(func.count(Transaction.id)).filter(
-                Transaction.status == 'pending'
-            ).scalar()
-
-            pending_amount = session.query(func.sum(Transaction.original_amount)).filter(
-                Transaction.status == 'pending'
-            ).scalar()
-
-            if pending_count and pending_count > 0:
+            # Pending transactions
+            if stats['pending_count'] and stats['pending_count'] > 0:
                 st.sidebar.metric(
                     "Pending Transactions",
-                    f"{pending_count}",
-                    format_currency(pending_amount or 0) if pending_amount else None,
+                    f"{stats['pending_count']}",
+                    format_amount_private(stats['pending_amount']) if stats['pending_amount'] else None,
                     help="Transactions awaiting completion"
                 )
             else:
                 st.sidebar.metric("Pending Transactions", "0")
 
-            # Last sync time from session state
-            if st.session_state.get('last_sync_time'):
-                last_sync = st.session_state.last_sync_time
-                st.sidebar.caption(f"Last sync: {format_datetime(last_sync, '%m/%d %H:%M')}")
-            else:
-                st.sidebar.info("💡 No sync data available")
-
+            # Last sync time
+            if stats['last_sync']:
+                st.sidebar.caption(f"Last sync: {format_datetime(stats['last_sync'], '%m/%d %H:%M')}")
         else:
             st.sidebar.info("💡 Initialize database to see stats")
 

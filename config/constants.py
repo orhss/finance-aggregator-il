@@ -74,3 +74,31 @@ class Currency:
     ILS = "ILS"
     USD = "USD"
     EUR = "EUR"
+
+
+class UnifiedCategory:
+    """Standard unified category names for cross-provider normalization"""
+    GROCERIES = "groceries"
+    RESTAURANTS = "restaurants"
+    FUEL = "fuel"
+    TRANSPORTATION = "transportation"
+    UTILITIES = "utilities"
+    HEALTHCARE = "healthcare"
+    ENTERTAINMENT = "entertainment"
+    SHOPPING = "shopping"
+    TRAVEL = "travel"
+    EDUCATION = "education"
+    INSURANCE = "insurance"
+    SUBSCRIPTIONS = "subscriptions"
+    HOME = "home"
+    CLOTHING = "clothing"
+    ELECTRONICS = "electronics"
+    GIFTS = "gifts"
+    FEES = "fees"
+    OTHER = "other"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        """Get all standard unified category names"""
+        return [v for k, v in vars(cls).items()
+                if not k.startswith('_') and isinstance(v, str) and k.isupper()]

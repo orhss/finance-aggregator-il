@@ -34,20 +34,25 @@ class EditScreen(ModalScreen):
         self.transaction_data = transaction_data
 
     def compose(self) -> ComposeResult:
-        # Apply RTL fix for Hebrew text in description and category
+        # Apply RTL fix for Hebrew text in description and categories
         description = fix_rtl(self.transaction_data.get('description', 'N/A'))
-        category = fix_rtl(self.transaction_data.get('category', 'N/A') or 'N/A')
+        raw_category = fix_rtl(self.transaction_data.get('raw_category', '') or '')
+        normalized_category = fix_rtl(self.transaction_data.get('category', '') or '')
 
         with Container(id="edit-dialog"):
             yield Static("Edit Transaction", id="edit-title")
             yield Static(f"Date: {self.transaction_data.get('date', 'N/A')}", classes="edit-field")
             yield Static(f"Description: {description}", classes="edit-field")
             yield Static(f"Amount: {self.transaction_data.get('amount', 'N/A')}", classes="edit-field")
-            yield Static(f"Original Category: {category}", classes="edit-field")
-            yield Label("User Category:")
+            # Show category hierarchy
+            if raw_category:
+                yield Static(f"Provider Category: {raw_category}", classes="edit-field")
+            if normalized_category and normalized_category != raw_category:
+                yield Static(f"Normalized: {normalized_category}", classes="edit-field")
+            yield Label("Your Category Override:")
             yield Input(
                 value=self.transaction_data.get('user_category', '') or '',
-                placeholder="Enter category...",
+                placeholder="Enter category override...",
                 id="category-input"
             )
             with Horizontal(id="edit-buttons"):
@@ -411,15 +416,16 @@ class TransactionBrowser(App):
             txn_tags = tag_service.get_transaction_tags(txn.id)
             tag_names = [t.name.lower() for t in txn_tags]
 
-            # Apply search filter - search in description, category, user_category, and tags
+            # Apply search filter - search in description, categories (raw, normalized, user), and tags
             if self.search_text:
                 search_lower = self.search_text.lower()
                 matches_description = search_lower in (txn.description or '').lower()
+                matches_raw_category = search_lower in (txn.raw_category or '').lower()
                 matches_category = search_lower in (txn.category or '').lower()
                 matches_user_category = search_lower in (txn.user_category or '').lower()
                 matches_tags = any(search_lower in tag for tag in tag_names)
 
-                if not (matches_description or matches_category or matches_user_category or matches_tags):
+                if not (matches_description or matches_raw_category or matches_category or matches_user_category or matches_tags):
                     continue
 
             tags_str = ", ".join([fix_rtl(t.name) for t in txn_tags[:4]]) if txn_tags else ""
@@ -431,8 +437,8 @@ class TransactionBrowser(App):
             currency = txn.charged_currency or txn.original_currency
             amount_str = f"{amount:,.2f} {currency}"
 
-            # Get effective category
-            category = txn.user_category or txn.category or ""
+            # Get effective category (user_category > category > raw_category)
+            category = txn.effective_category or ""
 
             # Get card info from account
             account = analytics.get_account_by_id(txn.account_id)
@@ -512,6 +518,7 @@ class TransactionBrowser(App):
                     "date": txn.transaction_date.strftime("%Y-%m-%d"),
                     "description": txn.description,
                     "amount": f"{amount:,.2f} {currency}",
+                    "raw_category": txn.raw_category or "",
                     "category": txn.category or "",
                     "user_category": txn.user_category or "",
                     "tags": [t.name for t in txn_tags],
@@ -582,15 +589,16 @@ class TransactionBrowser(App):
             txn_tags = tag_service.get_transaction_tags(txn.id)
             tag_names = [t.name.lower() for t in txn_tags]
 
-            # Apply search filter - search in description, category, user_category, and tags
+            # Apply search filter - search in description, categories (raw, normalized, user), and tags
             if self.search_text:
                 search_lower = self.search_text.lower()
                 matches_description = search_lower in (txn.description or '').lower()
+                matches_raw_category = search_lower in (txn.raw_category or '').lower()
                 matches_category = search_lower in (txn.category or '').lower()
                 matches_user_category = search_lower in (txn.user_category or '').lower()
                 matches_tags = any(search_lower in tag for tag in tag_names)
 
-                if not (matches_description or matches_category or matches_user_category or matches_tags):
+                if not (matches_description or matches_raw_category or matches_category or matches_user_category or matches_tags):
                     continue
 
             tags_str = ", ".join([fix_rtl(t.name) for t in txn_tags[:4]]) if txn_tags else ""
@@ -602,8 +610,8 @@ class TransactionBrowser(App):
             currency = txn.charged_currency or txn.original_currency
             amount_str = f"{amount:,.2f} {currency}"
 
-            # Get effective category
-            category = txn.user_category or txn.category or ""
+            # Get effective category (user_category > category > raw_category)
+            category = txn.effective_category or ""
 
             # Get card info from account
             account = analytics.get_account_by_id(txn.account_id)

@@ -11,7 +11,7 @@ from rich.table import Table
 from rich import box
 from sqlalchemy import func
 
-from db.database import get_db, get_db_path
+from db.database import get_db, get_db_path, migrate_tags_schema, migrate_category_normalization_schema, migrate_merchant_mapping_schema
 from db.models import Account, Transaction, Balance, SyncHistory
 from services.analytics_service import AnalyticsService
 
@@ -267,6 +267,62 @@ def verify():
 
     except Exception as e:
         console.print(f"[red]Error during verification: {str(e)}[/red]")
+        raise typer.Exit(code=1)
+
+
+@app.command("migrate")
+def migrate():
+    """
+    Apply pending database migrations.
+
+    Safe to run multiple times - only applies changes that haven't been made yet.
+    Does NOT delete any data.
+    """
+    try:
+        db_path = get_db_path()
+
+        if not db_path.exists():
+            console.print("[red]Database file not found. Run 'fin-cli init' first.[/red]")
+            raise typer.Exit(code=1)
+
+        console.print("[cyan]Checking for pending migrations...[/cyan]\n")
+
+        # Run tags schema migrations
+        console.print("[bold]1. Tags schema migrations:[/bold]")
+        base_results = migrate_tags_schema(db_path)
+        if base_results["added_columns"] or base_results["created_tables"]:
+            if base_results["added_columns"]:
+                console.print(f"  [green]Added columns:[/green] {', '.join(base_results['added_columns'])}")
+            if base_results["created_tables"]:
+                console.print(f"  [green]Created tables:[/green] {', '.join(base_results['created_tables'])}")
+        else:
+            console.print("  [dim]Already up to date[/dim]")
+
+        # Run category normalization migrations
+        console.print("\n[bold]2. Category normalization migrations:[/bold]")
+        cat_results = migrate_category_normalization_schema(db_path)
+        if cat_results["added_columns"] or cat_results["created_tables"]:
+            if cat_results["added_columns"]:
+                console.print(f"  [green]Added columns:[/green] {', '.join(cat_results['added_columns'])}")
+            if cat_results["created_tables"]:
+                console.print(f"  [green]Created tables:[/green] {', '.join(cat_results['created_tables'])}")
+            if cat_results.get("data_migrated"):
+                console.print("  [green]Migrated existing category data to raw_category[/green]")
+        else:
+            console.print("  [dim]Already up to date[/dim]")
+
+        # Run merchant mapping migrations
+        console.print("\n[bold]3. Merchant mapping migrations:[/bold]")
+        merchant_results = migrate_merchant_mapping_schema(db_path)
+        if merchant_results["created_tables"]:
+            console.print(f"  [green]Created tables:[/green] {', '.join(merchant_results['created_tables'])}")
+        else:
+            console.print("  [dim]Already up to date[/dim]")
+
+        console.print("\n[green]Migration complete![/green]")
+
+    except Exception as e:
+        console.print(f"[red]Error during migration: {str(e)}[/red]")
         raise typer.Exit(code=1)
 
 

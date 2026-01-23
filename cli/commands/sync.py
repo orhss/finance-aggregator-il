@@ -389,6 +389,7 @@ def _sync_credit_card_multi_account(
     total_accounts = len(accounts_to_sync)
     succeeded, failed = 0, 0
     total_cards, total_added, total_updated = 0, 0, 0
+    total_unmapped_categories = 0
     errors = []
 
     try:
@@ -423,6 +424,12 @@ def _sync_credit_card_multi_account(
                         console.print(f"    Transactions added: {result.transactions_added}")
                         console.print(f"    Transactions updated: {result.transactions_updated}")
 
+                        # Report unmapped categories
+                        if result.unmapped_categories:
+                            unmapped_txns = sum(u['count'] for u in result.unmapped_categories)
+                            console.print(f"  [yellow]  Unmapped categories: {len(result.unmapped_categories)} ({unmapped_txns} transactions)[/yellow]")
+                            total_unmapped_categories += len(result.unmapped_categories)
+
                         succeeded += 1
                         total_cards += result.cards_synced
                         total_added += result.transactions_added
@@ -455,6 +462,11 @@ def _sync_credit_card_multi_account(
         console.print(f"\n  Total cards synced: {total_cards}")
         console.print(f"  Total transactions added: {total_added}")
         console.print(f"  Total transactions updated: {total_updated}")
+
+        # Suggest reviewing unmapped categories if any
+        if total_unmapped_categories > 0:
+            console.print(f"\n[yellow]  {total_unmapped_categories} unmapped categories detected.[/yellow]")
+            console.print("  [dim]Run 'fin-cli categories unmapped' to review and map them.[/dim]")
 
         if failed == total_accounts:
             raise typer.Exit(1)

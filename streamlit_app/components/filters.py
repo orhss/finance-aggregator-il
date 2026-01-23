@@ -166,6 +166,54 @@ def category_filter(
     return selected
 
 
+def unified_category_filter(
+    key_prefix: str,
+    include_unmapped: bool = True
+) -> Tuple[List[str], bool]:
+    """
+    Create unified category filter with optional unmapped toggle.
+
+    Fetches unified categories from CategoryMapping table.
+
+    Args:
+        key_prefix: Unique prefix for widget keys
+        include_unmapped: If True, show checkbox for filtering unmapped transactions
+
+    Returns:
+        Tuple of (selected unified categories, unmapped_only flag)
+    """
+    try:
+        from db.database import get_session
+        from db.models import CategoryMapping
+        from sqlalchemy import distinct
+
+        session = get_session()
+        unified_cats = session.query(distinct(CategoryMapping.unified_category)).order_by(
+            CategoryMapping.unified_category
+        ).all()
+        categories = [c[0] for c in unified_cats if c[0]]
+    except Exception:
+        categories = []
+
+    selected = st.multiselect(
+        "Unified Categories",
+        options=categories,
+        default=[],
+        key=f"{key_prefix}_unified_categories",
+        help="Filter by normalized category names"
+    )
+
+    unmapped_only = False
+    if include_unmapped:
+        unmapped_only = st.checkbox(
+            "Unmapped only",
+            key=f"{key_prefix}_unmapped_only",
+            help="Show only transactions without a category mapping"
+        )
+
+    return selected, unmapped_only
+
+
 def tag_filter(
     key_prefix: str,
     tags: Optional[List[str]] = None,

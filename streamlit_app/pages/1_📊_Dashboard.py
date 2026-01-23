@@ -12,13 +12,15 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from streamlit_app.utils.session import init_session_state, get_db_session
+from streamlit_app.utils.session import (
+    init_session_state, get_db_session, format_amount_private,
+    get_accounts_display, get_dashboard_stats_display, get_transactions_display
+)
 from streamlit_app.utils.formatters import (
-    format_currency, format_number, format_datetime,
-    format_transaction_amount, color_for_amount, AMOUNT_STYLE_CSS,
+    format_number, format_datetime, color_for_amount, AMOUNT_STYLE_CSS,
     format_status
 )
-from streamlit_app.utils.cache import get_dashboard_stats, get_transactions_cached, get_accounts_cached
+from streamlit_app.utils.cache import get_transactions_cached
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary
 from streamlit_app.utils.insights import generate_spending_insight, generate_pending_insight
 from streamlit_app.components.sidebar import render_minimal_sidebar
@@ -62,13 +64,12 @@ st.markdown("---")
 
 # Load dashboard data with caching and error handling
 with ErrorBoundary("Failed to load dashboard data"):
-    # Get dashboard statistics (cached for 1 minute, default 3 months for performance)
+    # Get dashboard statistics with pre-formatted display values
     stats = safe_call_with_spinner(
-        get_dashboard_stats,
+        get_dashboard_stats_display,
         spinner_text=contextual_spinner("calculating", "financial statistics"),
         error_message="Failed to load dashboard stats",
-        default_return=None,
-        months_back=3
+        default_return=None
     )
 
     if not stats or stats['account_count'] == 0:
@@ -89,7 +90,7 @@ with ErrorBoundary("Failed to load dashboard data"):
         <div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
             <p style="margin: 0; font-size: 0.9rem; color: #666; font-weight: 500;">Net Worth</p>
             <p style="margin: 0.5rem 0 0 0; font-size: 2.5rem; font-weight: 700; color: {balance_color};">
-                {format_currency(stats['total_balance'])}
+                {stats['total_balance_display']}
             </p>
             <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #888;">
                 Across {stats['account_count']} account{'s' if stats['account_count'] > 1 else ''}
@@ -99,12 +100,11 @@ with ErrorBoundary("Failed to load dashboard data"):
 
     with col2:
         # Monthly Spending (Secondary Hero)
-        monthly_spending = abs(stats['monthly_spending']) if stats['monthly_spending'] else 0
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, #fff5f5 0%, #fecaca 100%); padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
             <p style="margin: 0; font-size: 0.9rem; color: #666; font-weight: 500;">This Month's Spending</p>
             <p style="margin: 0.5rem 0 0 0; font-size: 2.5rem; font-weight: 700; color: #c62828;">
-                ₪{monthly_spending:,.2f}
+                {stats['monthly_spending_display']}
             </p>
             <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #888;">
                 {format_number(stats['transaction_count'])} transactions total
@@ -132,6 +132,21 @@ with ErrorBoundary("Failed to load dashboard data"):
 
     if pending_insight:
         st.warning(f"⏳ {pending_insight}")
+
+    # Check for unmapped categories
+    try:
+        from services.category_service import CategoryService
+        category_service = CategoryService(session=get_db_session())
+        unmapped_count = category_service.get_unmapped_count()
+        unmapped_categories = len(category_service.get_unmapped_categories())
+
+        if unmapped_count > 0:
+            st.warning(
+                f"📂 **{unmapped_categories} categories** ({unmapped_count:,} transactions) need mapping. "
+                f"[Manage Categories →](./10_📂_Categories)"
+            )
+    except Exception:
+        pass  # Silently skip if category service unavailable
 
     st.markdown("---")
 
@@ -164,9 +179,9 @@ with ErrorBoundary("Failed to load dashboard data"):
         if txn['original_amount'] < 0  # Only expenses
     ])
 
-    # Load accounts data once
+    # Load accounts data with pre-formatted display values
     accounts_data = safe_call_with_spinner(
-        get_accounts_cached,
+        get_accounts_display,
         spinner_text=contextual_spinner("fetching", "account balances"),
         error_message="Failed to load account data",
         default_return=[]
@@ -256,7 +271,7 @@ with ErrorBoundary("Failed to load dashboard data"):
                 with col1:
                     st.progress(pct / 100, text=category)
                 with col2:
-                    st.markdown(f"**₪{amount:,.0f}**")
+                    st.markdown(f"**{format_amount_private(amount)}**")
                 with col3:
                     st.markdown(f"*{pct:.1f}%*")
         else:
@@ -281,18 +296,11 @@ with ErrorBoundary("Failed to load dashboard data"):
             for txn in sorted_txns:
                 desc = txn['description']
                 amount = txn['original_amount']
-                # Format amount with proper sign
-                if amount < 0:
-                    amount_str = f"−₪{abs(amount):,.2f}"
-                elif amount > 0:
-                    amount_str = f"+₪{amount:,.2f}"
-                else:
-                    amount_str = f"₪{amount:,.2f}"
 
                 txn_data.append({
                     'Date': format_datetime(txn['transaction_date'], '%Y-%m-%d'),
                     'Description': desc[:35] + '...' if len(desc) > 35 else desc,
-                    'Amount': amount_str,
+                    'Amount': format_amount_private(amount),
                     'Status': format_status(txn['status'], as_badge=False),
                     'Category': txn['effective_category'] or '-'
                 })
@@ -321,16 +329,15 @@ with ErrorBoundary("Failed to load dashboard data"):
     with col2:
         st.markdown("#### Account Summary")
 
-        # Use cached accounts data (already loaded)
+        # Use accounts data with pre-formatted display values
         if accounts_data:
             acc_data = []
             for acc in accounts_data:
-                balance = acc['latest_balance']
                 acc_data.append({
                     'Institution': acc['institution'],
                     'Type': acc['account_type'] or '-',
-                    'Balance': format_currency(balance) if balance else 'N/A',
-                    'Status': '✅' if balance and balance > 0 else '⭕'
+                    'Balance': acc['balance_display'],
+                    'Status': '✅' if acc['latest_balance'] and acc['latest_balance'] > 0 else '⭕'
                 })
 
             df_accounts_summary = pd.DataFrame(acc_data)

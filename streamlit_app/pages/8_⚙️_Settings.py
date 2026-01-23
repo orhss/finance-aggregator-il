@@ -228,34 +228,30 @@ try:
     with col1:
         st.markdown("**Sensitive Data Masking**")
 
+        # Use the session state value directly - toggle writes back to session state via key
         mask_accounts = st.toggle(
             "Mask Account Numbers",
             value=st.session_state.get('mask_account_numbers', True),
-            key="mask_account_numbers_toggle",
+            key="setting_mask_account_numbers",
             help="Show account/card numbers as ••••1234"
         )
-
-        if mask_accounts != st.session_state.get('mask_account_numbers', True):
-            st.session_state.mask_account_numbers = mask_accounts
-            st.success("✅ Account masking preference updated")
-            st.info("💡 Changes will apply on next page load")
+        # Sync back to the main session state key used by other components
+        st.session_state.mask_account_numbers = mask_accounts
 
         st.caption("📋 Account numbers show as ••••1234")
 
     with col2:
         st.markdown("**Balance Visibility**")
 
+        # Use the session state value directly - toggle writes back to session state via key
         mask_balances = st.toggle(
             "Hide All Balances",
             value=st.session_state.get('mask_balances', False),
-            key="mask_balances_toggle",
+            key="setting_mask_balances",
             help="Hide all financial amounts for privacy (shows ••••••)"
         )
-
-        if mask_balances != st.session_state.get('mask_balances', False):
-            st.session_state.mask_balances = mask_balances
-            st.success("✅ Balance visibility preference updated")
-            st.info("💡 Changes will apply on next page load")
+        # Sync back to the main session state key used by other components
+        st.session_state.mask_balances = mask_balances
 
         st.caption("🔒 Useful when sharing screen or in public")
 
@@ -346,33 +342,6 @@ try:
                 st.markdown(f"- ✅ `{file}` ({size:,} bytes)")
             else:
                 st.markdown(f"- ❌ `{file}` (not found)")
-
-    st.markdown("---")
-
-    # ============================================================================
-    # LINKS & RESOURCES
-    # ============================================================================
-    st.subheader("🔗 Links & Resources")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.markdown("**Documentation**")
-        st.markdown("- [README](../README.md)")
-        st.markdown("- [CLI Plan](../plans/CLI_PLAN.md)")
-        st.markdown("- [UI Plan](../plans/STREAMLIT_UI_PLAN.md)")
-
-    with col2:
-        st.markdown("**Plans**")
-        st.markdown("- [Multi-Account](../plans/MULTI_ACCOUNT_PLAN.md)")
-        st.markdown("- [Tagging Design](../plans/TAGGING_DESIGN.md)")
-        st.markdown("- [Service Refactoring](../plans/SERVICE_REFACTORING_PLAN.md)")
-
-    with col3:
-        st.markdown("**Development**")
-        st.markdown("- [CLAUDE.md](../CLAUDE.md)")
-        st.markdown("- GitHub: [Report Issues](#)")
-        st.markdown("- Contribute: [Pull Requests](#)")
 
     st.markdown("---")
 

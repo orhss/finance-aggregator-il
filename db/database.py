@@ -252,3 +252,151 @@ def migrate_tags_schema(db_path: Path = DEFAULT_DB_PATH) -> dict:
         logger.info("Database already up to date")
 
     return results
+
+
+def migrate_category_normalization_schema(db_path: Path = DEFAULT_DB_PATH) -> dict:
+    """
+    Migrate database schema to add category normalization support.
+    Safe to run multiple times (idempotent).
+
+    Adds:
+    - raw_category column to transactions table
+    - category_mappings table
+
+    Note: Existing 'category' column is kept for normalized values.
+    Data migration: copies existing category values to raw_category.
+
+    Args:
+        db_path: Path to SQLite database file
+
+    Returns:
+        Dict with migration results: {added_columns: [], created_tables: [], data_migrated: bool}
+    """
+    engine = get_engine(db_path)
+    results = {"added_columns": [], "created_tables": [], "data_migrated": False}
+
+    with engine.connect() as conn:
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+
+        # Add raw_category column to transactions if needed
+        if 'transactions' in existing_tables:
+            cols = {c['name'] for c in inspector.get_columns('transactions')}
+            if 'raw_category' not in cols:
+                conn.execute(text("ALTER TABLE transactions ADD COLUMN raw_category VARCHAR(255)"))
+                results["added_columns"].append("transactions.raw_category")
+                logger.info("Added raw_category column to transactions")
+
+                # Migrate existing category data to raw_category
+                conn.execute(text("UPDATE transactions SET raw_category = category WHERE category IS NOT NULL"))
+                # Clear category - it should only contain normalized values via CategoryMapping
+                conn.execute(text("UPDATE transactions SET category = NULL"))
+                results["data_migrated"] = True
+                logger.info("Migrated existing category values to raw_category and cleared category")
+            else:
+                # raw_category exists - check if we need to fix legacy data
+                # where category == raw_category (was copied but not cleared)
+                result = conn.execute(text("""
+                    SELECT COUNT(*) FROM transactions
+                    WHERE category IS NOT NULL
+                    AND raw_category IS NOT NULL
+                    AND category = raw_category
+                """))
+                legacy_count = result.scalar()
+                if legacy_count > 0:
+                    conn.execute(text("""
+                        UPDATE transactions
+                        SET category = NULL
+                        WHERE category IS NOT NULL
+                        AND raw_category IS NOT NULL
+                        AND category = raw_category
+                    """))
+                    results["data_migrated"] = True
+                    logger.info(f"Cleared {legacy_count} legacy category values (were same as raw_category)")
+
+        # Create category_mappings table if not exists
+        if 'category_mappings' not in existing_tables:
+            conn.execute(text("""
+                CREATE TABLE category_mappings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    provider VARCHAR(50) NOT NULL,
+                    raw_category VARCHAR(255) NOT NULL,
+                    unified_category VARCHAR(100) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP,
+                    UNIQUE(provider, raw_category)
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_category_mapping_lookup ON category_mappings(provider, raw_category)"))
+            results["created_tables"].append("category_mappings")
+            logger.info("Created category_mappings table")
+
+        # Create index on raw_category if it doesn't exist
+        if 'transactions' in existing_tables:
+            # Check if index exists
+            existing_indexes = {idx['name'] for idx in inspector.get_indexes('transactions')}
+            if 'idx_transactions_raw_category' not in existing_indexes:
+                try:
+                    conn.execute(text("CREATE INDEX idx_transactions_raw_category ON transactions(raw_category)"))
+                    logger.info("Created index idx_transactions_raw_category")
+                except Exception:
+                    pass  # Index might already exist
+
+        conn.commit()
+
+    if results["added_columns"] or results["created_tables"]:
+        logger.info(f"Category normalization migration completed: {results}")
+    else:
+        logger.info("Category normalization schema already up to date")
+
+    return results
+
+
+def migrate_merchant_mapping_schema(db_path: Path = DEFAULT_DB_PATH) -> dict:
+    """
+    Migrate database schema to add merchant mapping support.
+    Safe to run multiple times (idempotent).
+
+    Adds:
+    - merchant_mappings table
+
+    Args:
+        db_path: Path to SQLite database file
+
+    Returns:
+        Dict with migration results: {created_tables: []}
+    """
+    engine = get_engine(db_path)
+    results = {"created_tables": []}
+
+    with engine.connect() as conn:
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+
+        # Create merchant_mappings table if not exists
+        if 'merchant_mappings' not in existing_tables:
+            conn.execute(text("""
+                CREATE TABLE merchant_mappings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pattern VARCHAR(255) NOT NULL,
+                    category VARCHAR(100) NOT NULL,
+                    provider VARCHAR(50),
+                    match_type VARCHAR(20) DEFAULT 'startswith',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP,
+                    UNIQUE(pattern, provider)
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_merchant_mapping_pattern ON merchant_mappings(pattern)"))
+            conn.execute(text("CREATE INDEX idx_merchant_mapping_provider ON merchant_mappings(provider)"))
+            results["created_tables"].append("merchant_mappings")
+            logger.info("Created merchant_mappings table")
+
+        conn.commit()
+
+    if results["created_tables"]:
+        logger.info(f"Merchant mapping migration completed: {results}")
+    else:
+        logger.info("Merchant mapping schema already up to date")
+
+    return results

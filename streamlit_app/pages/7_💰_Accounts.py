@@ -23,7 +23,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 # Now import things that might use st.session_state
-from streamlit_app.utils.session import init_session_state
+from streamlit_app.utils.session import init_session_state, format_amount_private
 
 # Initialize session state
 init_session_state()
@@ -33,7 +33,7 @@ from db.models import Account, Transaction, Balance
 from services.analytics_service import AnalyticsService
 
 from streamlit_app.utils.formatters import (
-    format_currency, format_number, format_datetime,
+    format_number, format_datetime,
     format_account_number
 )
 from streamlit_app.components.sidebar import render_minimal_sidebar
@@ -146,7 +146,7 @@ try:
         st.metric("Total Accounts", format_number(total_accounts))
 
     with col2:
-        st.metric("Total Balance", format_currency(total_balance))
+        st.metric("Total Balance", format_amount_private(total_balance))
 
     with col3:
         active_accounts = sum(
@@ -180,10 +180,8 @@ try:
                     del st.session_state.selected_account_id
                     st.rerun()
 
-            # Get latest balance
-            latest_balance = session.query(Balance).filter(
-                Balance.account_id == account_id
-            ).order_by(desc(Balance.balance_date)).first()
+            # Get latest balance (single source of truth)
+            latest_balance = account.latest_balance
 
             if latest_balance:
                 st.markdown("---")
@@ -192,11 +190,11 @@ try:
                 col1, col2, col3 = st.columns(3)
 
                 with col1:
-                    st.metric("Total Amount", format_currency(latest_balance.total_amount))
+                    st.metric("Total Amount", format_amount_private(latest_balance.total_amount))
 
                 with col2:
                     if latest_balance.available:
-                        st.metric("Available", format_currency(latest_balance.available))
+                        st.metric("Available", format_amount_private(latest_balance.available))
 
                 with col3:
                     st.metric("As of", format_datetime(latest_balance.balance_date, '%Y-%m-%d'))
@@ -251,7 +249,7 @@ try:
                     txn_data.append({
                         'Date': format_datetime(txn.transaction_date, '%Y-%m-%d'),
                         'Description': txn.description[:50] + '...' if len(txn.description) > 50 else txn.description,
-                        'Amount': format_currency(txn.original_amount),
+                        'Amount': format_amount_private(txn.original_amount),
                         'Category': txn.effective_category or 'Uncategorized',
                         'Status': '✅' if txn.status == 'completed' else '⏳'
                     })
@@ -298,10 +296,10 @@ try:
             col1, col2, col3 = st.columns(3)
 
             with col1:
-                st.metric("Income (90 days)", format_currency(income_90d))
+                st.metric("Income (90 days)", format_amount_private(income_90d))
 
             with col2:
-                st.metric("Expenses (90 days)", format_currency(abs(expenses_90d)))
+                st.metric("Expenses (90 days)", format_amount_private(abs(expenses_90d)))
 
             with col3:
                 st.metric("Transactions (90 days)", format_number(txn_count_90d))
@@ -334,7 +332,7 @@ try:
                     # Balance info
                     if not is_credit_card:
                         if balance is not None:
-                            st.metric("Balance", format_currency(balance))
+                            st.metric("Balance", format_amount_private(balance))
                             if balance_date:
                                 st.caption(f"As of: {format_datetime(balance_date, '%Y-%m-%d')}")
                         else:
@@ -380,7 +378,7 @@ try:
             'Institution': account.institution,
             'Account Number': format_account_number(account.account_number,
                                                     masked=masked) if account.account_number else 'N/A',
-            'Balance': format_currency(balance) if balance else 'N/A',
+            'Balance': format_amount_private(balance) if balance else 'N/A',
             'Last Updated': format_datetime(balance_date, '%Y-%m-%d') if balance_date else 'Never',
             'Transactions': txn_count,
             'Last Transaction': format_datetime(last_txn, '%Y-%m-%d') if last_txn else 'N/A',

@@ -115,7 +115,8 @@ def export_transactions_csv(transactions: list, output_path: Path):
             'transaction_id', 'transaction_date', 'processed_date',
             'description', 'original_amount', 'original_currency',
             'charged_amount', 'charged_currency', 'transaction_type',
-            'status', 'category', 'memo', 'installment_number',
+            'status', 'raw_category', 'category', 'user_category',
+            'effective_category', 'memo', 'installment_number',
             'installment_total', 'created_at'
         ]
 
@@ -138,7 +139,10 @@ def export_transactions_csv(transactions: list, output_path: Path):
                 'charged_currency': txn.charged_currency or '',
                 'transaction_type': txn.transaction_type or '',
                 'status': txn.status or '',
+                'raw_category': txn.raw_category or '',
                 'category': txn.category or '',
+                'user_category': txn.user_category or '',
+                'effective_category': txn.effective_category or '',
                 'memo': txn.memo or '',
                 'installment_number': txn.installment_number or '',
                 'installment_total': txn.installment_total or '',
@@ -167,7 +171,10 @@ def export_transactions_json(transactions: list, output_path: Path):
             'charged_currency': txn.charged_currency,
             'transaction_type': txn.transaction_type,
             'status': txn.status,
+            'raw_category': txn.raw_category,
             'category': txn.category,
+            'user_category': txn.user_category,
+            'effective_category': txn.effective_category,
             'memo': txn.memo,
             'installment_number': txn.installment_number,
             'installment_total': txn.installment_total,

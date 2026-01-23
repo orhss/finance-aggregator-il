@@ -12,9 +12,9 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from streamlit_app.utils.session import init_session_state
+from streamlit_app.utils.session import init_session_state, format_amount_private
 from streamlit_app.utils.formatters import (
-    format_currency, format_number, format_category_badge, format_tags,
+    format_number, format_category_badge, format_tags,
     format_transaction_with_currency
 )
 from streamlit_app.components.sidebar import render_minimal_sidebar
@@ -86,7 +86,7 @@ try:
         st.metric("Coverage", f"{tagged_pct:.1f}%")
 
     with col4:
-        st.metric("Untagged Amount", format_currency(untagged_total))
+        st.metric("Untagged Amount", format_amount_private(untagged_total))
 
     st.markdown("---")
 
@@ -134,7 +134,7 @@ try:
             table_data.append({
                 'Tag Name': tag_stat['name'],
                 'Transactions': format_number(tag_stat['count']),
-                'Total Amount': format_currency(tag_stat['total_amount']),
+                'Total Amount': format_amount_private(tag_stat['total_amount']),
                 '% of Total': f"{pct_of_total:.1f}%",
                 '_raw_count': tag_stat['count'],
                 '_raw_amount': tag_stat['total_amount'],
@@ -351,7 +351,7 @@ try:
                         preview_data.append({
                             'Date': txn.transaction_date.strftime('%Y-%m-%d'),
                             'Description': txn.description[:60] + '...' if len(txn.description) > 60 else txn.description,
-                            'Amount': format_currency(txn.charged_amount if txn.charged_amount else txn.original_amount),
+                            'Amount': format_amount_private(txn.charged_amount if txn.charged_amount else txn.original_amount),
                             'Current Tags': ', '.join(txn.tags) if txn.tags else 'None'
                         })
 
@@ -483,7 +483,7 @@ try:
                         preview_data.append({
                             'Date': txn.transaction_date.strftime('%Y-%m-%d'),
                             'Description': txn.description[:60] + '...' if len(txn.description) > 60 else txn.description,
-                            'Amount': format_currency(txn.charged_amount if txn.charged_amount else txn.original_amount),
+                            'Amount': format_amount_private(txn.charged_amount if txn.charged_amount else txn.original_amount),
                             'Current Tags': ', '.join(txn.tags) if txn.tags else 'None'
                         })
 

@@ -93,7 +93,7 @@ def get_dashboard_stats(months_back: int = 3) -> Dict[str, Any]:
     Cache: 1 minute TTL
     """
     from db.database import get_session
-    from db.models import Transaction, Account, Balance
+    from db.models import Transaction, Account
     from sqlalchemy import func, and_
     from datetime import date, timedelta
 
@@ -102,16 +102,13 @@ def get_dashboard_stats(months_back: int = 3) -> Dict[str, Any]:
         end_date = date.today()
         start_date = end_date - timedelta(days=30 * months_back)
 
-        # Total portfolio value (latest balances)
-        latest_balances = session.query(
-            func.sum(Balance.total_amount)
-        ).filter(
-            Balance.id.in_(
-                session.query(func.max(Balance.id))
-                .group_by(Balance.account_id)
-                .subquery()
-            )
-        ).scalar() or 0.0
+        # Total portfolio value (latest balances via Account.latest_balance)
+        accounts = session.query(Account).all()
+        latest_balances = sum(
+            acc.latest_balance.total_amount
+            for acc in accounts
+            if acc.latest_balance is not None
+        ) or 0.0
 
         # Monthly spending (current month, expenses only)
         month_start = date.today().replace(day=1)
@@ -282,8 +279,7 @@ def get_accounts_cached() -> List[Dict[str, Any]]:
     Cache: 5 minutes TTL
     """
     from db.database import get_session
-    from db.models import Account, Balance
-    from sqlalchemy import func
+    from db.models import Account
 
     session = get_session()
     try:
@@ -291,10 +287,8 @@ def get_accounts_cached() -> List[Dict[str, Any]]:
 
         result = []
         for acc in accounts:
-            # Get latest balance
-            latest_balance = session.query(Balance).filter(
-                Balance.account_id == acc.id
-            ).order_by(Balance.balance_date.desc()).first()
+            # Use account.latest_balance (single source of truth)
+            latest_balance = acc.latest_balance
 
             result.append({
                 'id': acc.id,

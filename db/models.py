@@ -31,11 +31,21 @@ class Account(Base):
 
     # Relationships
     transactions = relationship("Transaction", back_populates="account", cascade="all, delete-orphan")
-    balances = relationship("Balance", back_populates="account", cascade="all, delete-orphan")
+    balances = relationship("Balance", back_populates="account", cascade="all, delete-orphan", order_by="desc(Balance.balance_date)")
 
     __table_args__ = (
         UniqueConstraint('account_type', 'institution', 'account_number', name='uq_account'),
     )
+
+    @property
+    def latest_balance(self) -> Optional['Balance']:
+        """
+        Get the most recent balance for this account.
+        Single source of truth for balance access - apply masking/transforms here.
+        """
+        if not self.balances:
+            return None
+        return self.balances[0]  # Already sorted desc by balance_date
 
     def __repr__(self):
         return f"<Account(id={self.id}, type={self.account_type}, institution={self.institution}, number={self.account_number})>"
@@ -44,6 +54,11 @@ class Account(Base):
 class Transaction(Base):
     """
     Unified transaction storage for all account types
+
+    Category field hierarchy (priority order):
+    1. user_category - Manual user override
+    2. category - Normalized category from mapping table
+    3. raw_category - Original category from provider API
     """
     __tablename__ = "transactions"
 
@@ -59,7 +74,8 @@ class Transaction(Base):
     charged_currency = Column(String(10), nullable=True)
     transaction_type = Column(String(50), nullable=True)  # 'normal', 'installments', 'credit', 'debit'
     status = Column(String(50), nullable=True)  # 'pending', 'completed'
-    category = Column(String(100), nullable=True)
+    raw_category = Column(String(255), nullable=True)  # Original category from provider
+    category = Column(String(100), nullable=True)  # Normalized category (from mapping)
     memo = Column(Text, nullable=True)
     installment_number = Column(Integer, nullable=True)
     installment_total = Column(Integer, nullable=True)
@@ -76,6 +92,7 @@ class Transaction(Base):
         Index('idx_transactions_account', 'account_id'),
         Index('idx_transactions_date', 'transaction_date'),
         Index('idx_transactions_status', 'status'),
+        Index('idx_transactions_raw_category', 'raw_category'),
         UniqueConstraint(
             'account_id', 'transaction_id', 'transaction_date', 'description', 'original_amount',
             name='uq_transaction'
@@ -89,8 +106,8 @@ class Transaction(Base):
 
     @property
     def effective_category(self) -> Optional[str]:
-        """Get user category if set, otherwise source category"""
-        return self.user_category or self.category
+        """Get user category if set, then normalized category, then raw category"""
+        return self.user_category or self.category or self.raw_category
 
     def __repr__(self):
         return f"<Transaction(id={self.id}, date={self.transaction_date}, description={self.description[:30]}, amount={self.original_amount})>"
@@ -193,3 +210,70 @@ class TransactionTag(Base):
 
     def __repr__(self):
         return f"<TransactionTag(transaction_id={self.transaction_id}, tag_id={self.tag_id})>"
+
+
+class CategoryMapping(Base):
+    """
+    Maps provider-specific category names to unified category names.
+
+    Each provider (CAL, Max, Isracard) uses different category names.
+    This table normalizes them to a consistent set of unified categories.
+    """
+    __tablename__ = "category_mappings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    provider = Column(String(50), nullable=False)  # 'cal', 'max', 'isracard'
+    raw_category = Column(String(255), nullable=False)  # Original from provider
+    unified_category = Column(String(100), nullable=False)  # Normalized name
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('provider', 'raw_category', name='uq_category_mapping'),
+        Index('idx_category_mapping_lookup', 'provider', 'raw_category'),
+    )
+
+    def __repr__(self):
+        return f"<CategoryMapping(provider={self.provider}, raw={self.raw_category}, unified={self.unified_category})>"
+
+
+class MerchantMapping(Base):
+    """
+    Maps merchant patterns (from transaction descriptions) to unified category names.
+
+    Used for transactions without provider categories (e.g., Isracard).
+    Pattern matching is done on transaction description during sync.
+    """
+    __tablename__ = "merchant_mappings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pattern = Column(String(255), nullable=False)  # Merchant pattern to match
+    category = Column(String(100), nullable=False)  # Unified category name
+    provider = Column(String(50), nullable=True)  # Optional: limit to specific provider
+    match_type = Column(String(20), default='startswith')  # 'startswith', 'contains', 'exact'
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('pattern', 'provider', name='uq_merchant_mapping'),
+        Index('idx_merchant_mapping_pattern', 'pattern'),
+        Index('idx_merchant_mapping_provider', 'provider'),
+    )
+
+    def matches(self, description: str) -> bool:
+        """Check if this mapping matches the given description."""
+        if not description:
+            return False
+
+        desc_lower = description.lower()
+        pattern_lower = self.pattern.lower()
+
+        if self.match_type == 'exact':
+            return desc_lower == pattern_lower
+        elif self.match_type == 'contains':
+            return pattern_lower in desc_lower
+        else:  # startswith (default)
+            return desc_lower.startswith(pattern_lower)
+
+    def __repr__(self):
+        return f"<MerchantMapping(pattern={self.pattern}, category={self.category}, provider={self.provider})>"

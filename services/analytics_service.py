@@ -29,10 +29,13 @@ def effective_amount_expr():
 
 
 # SQLAlchemy expression for effective category in queries
-# Use COALESCE(user_category, category) so user overrides take precedence
+# Use COALESCE(user_category, category, raw_category) with priority:
+# 1. user_category (user override)
+# 2. category (normalized from mapping)
+# 3. raw_category (original from provider)
 def effective_category_expr():
-    """SQLAlchemy expression for effective category: COALESCE(user_category, category)"""
-    return func.coalesce(Transaction.user_category, Transaction.category)
+    """SQLAlchemy expression for effective category: COALESCE(user_category, category, raw_category)"""
+    return func.coalesce(Transaction.user_category, Transaction.category, Transaction.raw_category)
 
 
 class AnalyticsService:
@@ -269,35 +272,26 @@ class AnalyticsService:
 
     def get_latest_balances(self) -> List[Tuple[Account, Balance]]:
         """
-        Get latest balance for each account
+        Get latest balance for each account.
+        Uses Account.latest_balance property as single source of truth.
 
         Returns:
-            List of (Account, Balance) tuples
+            List of (Account, Balance) tuples for accounts with balances
         """
-        # Subquery to get latest balance date for each account
-        subquery = (
-            self.session.query(
-                Balance.account_id,
-                func.max(Balance.balance_date).label('max_date')
-            )
-            .group_by(Balance.account_id)
-            .subquery()
-        )
-
-        # Join to get the full balance records
-        results = (
-            self.session.query(Account, Balance)
-            .join(Balance, Account.id == Balance.account_id)
-            .join(
-                subquery,
-                and_(
-                    Balance.account_id == subquery.c.account_id,
-                    Balance.balance_date == subquery.c.max_date
-                )
-            )
+        # Get all accounts with their balances eagerly loaded
+        accounts = (
+            self.session.query(Account)
+            .options(joinedload(Account.balances))
             .order_by(Account.account_type, Account.institution)
             .all()
         )
+
+        # Use account.latest_balance property (single source of truth)
+        results = [
+            (account, account.latest_balance)
+            for account in accounts
+            if account.latest_balance is not None
+        ]
 
         return results
 

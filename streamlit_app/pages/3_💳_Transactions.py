@@ -13,9 +13,9 @@ from typing import List, Optional
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from streamlit_app.utils.session import init_session_state, get_db_session, get_tag_service, get_all_categories, get_all_tags
+from streamlit_app.utils.session import init_session_state, get_db_session, get_tag_service, get_all_categories, get_all_tags, format_amount_private
 from streamlit_app.utils.formatters import (
-    format_currency, format_number, format_datetime,
+    format_number, format_datetime,
     format_transaction_amount, color_for_amount, AMOUNT_STYLE_CSS
 )
 from streamlit_app.utils.rtl import fix_rtl, has_hebrew
@@ -163,24 +163,35 @@ try:
                 horizontal=True
             )
 
-            # Get unique categories (both user_category and category columns)
+            # Get unique categories (user_category, normalized category, and raw_category)
             user_categories = session.query(Transaction.user_category).filter(
                 Transaction.user_category.isnot(None)
             ).distinct().all()
             source_categories = session.query(Transaction.category).filter(
                 Transaction.category.isnot(None)
             ).distinct().all()
+            raw_categories = session.query(Transaction.raw_category).filter(
+                Transaction.raw_category.isnot(None)
+            ).distinct().all()
 
             # Combine and deduplicate
             category_set = set()
             category_set.update([cat[0] for cat in user_categories if cat[0]])
             category_set.update([cat[0] for cat in source_categories if cat[0]])
+            category_set.update([cat[0] for cat in raw_categories if cat[0]])
             category_list = sorted(list(category_set))
 
             selected_categories = st.multiselect(
                 "Categories",
                 options=category_list,
                 key="filter_categories"
+            )
+
+            # Option to filter unmapped transactions (no normalized category)
+            unmapped_only = st.checkbox(
+                "Unmapped only",
+                key="filter_unmapped_categories",
+                help="Show only transactions with unmapped raw categories"
             )
 
         with col3:
@@ -288,15 +299,31 @@ try:
     elif status_filter == "Pending":
         query = query.filter(Transaction.status == "pending")
 
-    # Apply category filter (check both user_category and category columns)
+    # Apply category filter (check user_category, normalized category, and raw_category)
     if selected_categories:
         query = query.filter(
             or_(
                 Transaction.user_category.in_(selected_categories),
                 and_(
                     Transaction.user_category.is_(None),
-                    Transaction.category.in_(selected_categories)
+                    or_(
+                        Transaction.category.in_(selected_categories),
+                        and_(
+                            Transaction.category.is_(None),
+                            Transaction.raw_category.in_(selected_categories)
+                        )
+                    )
                 )
+            )
+        )
+
+    # Apply unmapped categories filter (transactions with raw_category but no normalized category)
+    if unmapped_only:
+        query = query.filter(
+            and_(
+                Transaction.raw_category.isnot(None),
+                Transaction.category.is_(None),
+                Transaction.user_category.is_(None)
             )
         )
 
@@ -482,6 +509,7 @@ try:
         if selected_institutions: active_filters += 1
         if status_filter != "All": active_filters += 1
         if selected_categories: active_filters += 1
+        if unmapped_only: active_filters += 1
         if selected_tags: active_filters += 1
         if untagged_only: active_filters += 1
         if amount_min is not None: active_filters += 1
@@ -729,12 +757,14 @@ try:
                     st.text(f"ID: {txn.id}")
                     st.text(f"Date: {format_datetime(txn.transaction_date, '%Y-%m-%d')}")
                     st.text(f"Description: {txn.description}")
-                    st.text(f"Amount: {format_currency(txn.original_amount)} {txn.original_currency}")
+                    st.text(f"Amount: {format_amount_private(txn.original_amount)} {txn.original_currency}")
                     st.text(f"Status: {'✅ Completed' if txn.status == 'completed' else '⏳ Pending'}")
                     if txn.account:
                         st.text(f"Account: {txn.account.institution} ({txn.account.account_type or 'N/A'})")
+                    if txn.raw_category:
+                        st.text(f"Raw Category: {txn.raw_category}")
                     if txn.category:
-                        st.text(f"Source Category: {txn.category}")
+                        st.text(f"Normalized Category: {txn.category}")
 
                 with col2:
                     st.markdown("**✏️ Editable Fields**")
@@ -888,7 +918,7 @@ try:
 
         total_amount = sum([txn.original_amount for txn in all_filtered_transactions])
         income = sum([txn.original_amount for txn in all_filtered_transactions if txn.original_amount > 0])
-        expenses = sum([txn.original_amount for txn in all_filtered_transactions if txn.original_amount < 0])
+        expenses = abs(sum([txn.original_amount for txn in all_filtered_transactions if txn.original_amount < 0]))
         avg_transaction = total_amount / len(all_filtered_transactions) if all_filtered_transactions else 0
 
         col1, col2, col3, col4 = st.columns(4)
@@ -897,36 +927,35 @@ try:
             st.metric("Total Transactions", format_number(total_transactions))
 
         with col2:
-            # Income in green
+            # Income in green (matching Dashboard style)
             st.markdown(f"""
             <div style="padding: 10px 0;">
                 <p style="margin: 0; font-size: 0.875rem; color: #666;">Total Income</p>
-                <p style="margin: 0; font-size: 1.5rem; font-weight: 600; color: #00897b; font-family: 'SF Mono', monospace;">
-                    +₪{income:,.2f}
+                <p style="margin: 0; font-size: 1.5rem; font-weight: 600; color: #00897b;">
+                    {format_amount_private(income)}
                 </p>
             </div>
             """, unsafe_allow_html=True)
 
         with col3:
-            # Expenses in red
+            # Expenses in red (matching Dashboard style)
             st.markdown(f"""
             <div style="padding: 10px 0;">
                 <p style="margin: 0; font-size: 0.875rem; color: #666;">Total Expenses</p>
-                <p style="margin: 0; font-size: 1.5rem; font-weight: 600; color: #c62828; font-family: 'SF Mono', monospace;">
-                    −₪{abs(expenses):,.2f}
+                <p style="margin: 0; font-size: 1.5rem; font-weight: 600; color: #c62828;">
+                    {format_amount_private(expenses)}
                 </p>
             </div>
             """, unsafe_allow_html=True)
 
         with col4:
-            # Net amount with appropriate color
+            # Net amount with appropriate color (matching Dashboard style)
             net_color = "#00897b" if total_amount >= 0 else "#c62828"
-            net_sign = "+" if total_amount >= 0 else "−"
             st.markdown(f"""
             <div style="padding: 10px 0;">
                 <p style="margin: 0; font-size: 0.875rem; color: #666;">Net Amount</p>
-                <p style="margin: 0; font-size: 1.5rem; font-weight: 600; color: {net_color}; font-family: 'SF Mono', monospace;">
-                    {net_sign}₪{abs(total_amount):,.2f}
+                <p style="margin: 0; font-size: 1.5rem; font-weight: 600; color: {net_color};">
+                    {format_amount_private(total_amount)}
                 </p>
             </div>
             """, unsafe_allow_html=True)

@@ -14,6 +14,11 @@ Python automation framework for financial institutions (brokers, pension funds, 
 
 **Multi-Account Support**: Credit card scrapers support multiple accounts per institution (CAL, Max, Isracard). See `plans/MULTI_ACCOUNT_PLAN.md` for details.
 
+**Category Normalization**: Two-tier system for unified categories:
+- **Provider Mapping**: `CategoryMapping` maps provider's `raw_category` → unified `category` (CAL, Max)
+- **Merchant Mapping**: `MerchantMapping` maps description patterns → unified `category` (Isracard - no provider categories)
+- See @plans/CATEGORY_NORMALIZATION_PLAN.md for full implementation
+
 ## Development Commands
 
 ### Environment Setup
@@ -34,6 +39,13 @@ fin-cli sync all          # Sync all financial sources
 fin-cli accounts list     # View accounts
 fin-cli transactions list # View transactions
 fin-cli reports stats     # View statistics
+fin-cli maintenance migrate # Apply database migrations
+
+# Category management
+fin-cli categories analyze       # Check category mapping coverage
+fin-cli categories suggest       # Show uncategorized by merchant (Isracard)
+fin-cli categories assign-wizard # Interactive merchant categorization
+fin-cli categories merchants     # List saved merchant mappings
 ```
 
 ### Docker Deployment
@@ -138,3 +150,12 @@ For detailed file/function navigation, see `.claude/codemap.md`
 - **SQLite database**: `~/.fin/financial_data.db` (initialized via `fin-cli init`)
 - **Services layer**: Use services (not scrapers directly) for business logic
 - **Transaction deduplication**: Database handles via unique constraints on external IDs
+- **Migrations**: Run `fin-cli maintenance migrate` after schema changes (idempotent, safe to run multiple times)
+
+### Category System
+Three-field hierarchy with `effective_category` property returning first non-null:
+1. `user_category` - Manual override (set by user or rules)
+2. `category` - Normalized via `CategoryMapping` (provider) or `MerchantMapping` (description pattern)
+3. `raw_category` - Original from provider API (CAL, Max only; Isracard doesn't provide)
+
+**Sync flow**: Transactions with `raw_category` use provider mappings; transactions without use merchant mappings.

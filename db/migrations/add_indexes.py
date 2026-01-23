@@ -78,6 +78,16 @@ INDEXES = [
         'name': 'idx_transaction_tags_tag',
         'sql': 'CREATE INDEX IF NOT EXISTS idx_transaction_tags_tag ON transaction_tags(tag_id)'
     },
+
+    # Category normalization indexes
+    {
+        'name': 'idx_transactions_raw_category',
+        'sql': 'CREATE INDEX IF NOT EXISTS idx_transactions_raw_category ON transactions(raw_category)'
+    },
+    {
+        'name': 'idx_category_mapping_lookup',
+        'sql': 'CREATE INDEX IF NOT EXISTS idx_category_mapping_lookup ON category_mappings(provider, raw_category)'
+    },
 ]
 
 

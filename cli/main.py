@@ -17,7 +17,7 @@ from rich.logging import RichHandler
 from rich import print as rprint
 
 # Import command modules
-from cli.commands import init, config, sync, accounts, transactions, reports, export, maintenance, tags, rules
+from cli.commands import init, config, sync, accounts, transactions, reports, export, maintenance, tags, rules, categories
 
 # Create main Typer app
 app = typer.Typer(
@@ -73,6 +73,7 @@ app.add_typer(export.app, name="export", help="Export financial data to CSV or J
 app.add_typer(maintenance.app, name="maintenance", help="Database maintenance and verification")
 app.add_typer(tags.app, name="tags", help="Manage transaction tags")
 app.add_typer(rules.app, name="rules", help="Manage auto-categorization rules")
+app.add_typer(categories.app, name="categories", help="Manage category mappings")
 
 
 @app.command()

@@ -262,13 +262,18 @@ def show_transaction(
             f"[bold]Type:[/bold] {transaction.transaction_type or 'N/A'}",
         ])
 
-        # Category information (original + user override)
+        # Category information (raw -> normalized -> user override)
         info_lines.append("")
         info_lines.append(f"[bold cyan]Category & Tags:[/bold cyan]")
-        if transaction.category:
-            info_lines.append(f"[bold]Original Category:[/bold] {fix_rtl(transaction.category)}")
+        # Show effective category prominently
+        info_lines.append(f"[bold]Category:[/bold] {fix_rtl(transaction.effective_category) if transaction.effective_category else '[dim](none)[/dim]'}")
+        # Show breakdown of category sources
+        if transaction.raw_category:
+            info_lines.append(f"  [dim]Provider category:[/dim] {fix_rtl(transaction.raw_category)}")
+        if transaction.category and transaction.category != transaction.raw_category:
+            info_lines.append(f"  [dim]Normalized:[/dim] {fix_rtl(transaction.category)}")
         if hasattr(transaction, 'user_category') and transaction.user_category:
-            info_lines.append(f"[bold]User Category:[/bold] [green]{fix_rtl(transaction.user_category)}[/green]")
+            info_lines.append(f"  [dim]Your override:[/dim] [green]{fix_rtl(transaction.user_category)}[/green]")
 
         # Tags
         if txn_tags:

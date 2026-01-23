@@ -17,8 +17,8 @@ import time
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from streamlit_app.utils.session import init_session_state
-from streamlit_app.utils.formatters import format_currency, format_number, format_datetime
+from streamlit_app.utils.session import init_session_state, format_amount_private
+from streamlit_app.utils.formatters import format_number, format_datetime
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.theme import apply_theme, render_theme_switcher
 
@@ -208,15 +208,14 @@ try:
                     Transaction.account_id.in_(account_ids)
                 ).scalar()
             else:
-                # For brokers/pensions, use balance date
-                last_sync = session.query(func.max(Balance.balance_date)).filter(
-                    Balance.account_id.in_(account_ids)
-                ).scalar()
-
-                # Get latest balance amount
-                latest_balance = session.query(Balance).filter(
-                    Balance.account_id.in_(account_ids)
-                ).order_by(desc(Balance.balance_date)).first()
+                # For brokers/pensions, use account.latest_balance (single source of truth)
+                latest_balances = [acc.latest_balance for acc in accounts_list if acc.latest_balance]
+                if latest_balances:
+                    latest_balance = max(latest_balances, key=lambda b: b.balance_date)
+                    last_sync = latest_balance.balance_date
+                else:
+                    latest_balance = None
+                    last_sync = None
 
             # Status indicator
             emoji, status_text = get_status_indicator(last_sync)
@@ -237,7 +236,7 @@ try:
                     st.caption("Latest txn: N/A")
             else:
                 if latest_balance:
-                    st.caption(f"Balance: {format_currency(latest_balance.total_amount)}")
+                    st.caption(f"Balance: {format_amount_private(latest_balance.total_amount)}")
                 else:
                     st.caption("Balance: N/A")
                 if last_sync:
@@ -488,10 +487,8 @@ try:
             last_sync = last_txn_created.date() if last_txn_created else None
             balance_amount = None  # Credit cards don't have balance
         else:
-            # For brokers/pensions, use balance date
-            last_balance = session.query(Balance).filter(
-                Balance.account_id == account.id
-            ).order_by(desc(Balance.balance_date)).first()
+            # For brokers/pensions, use account.latest_balance (single source of truth)
+            last_balance = account.latest_balance
             last_sync = last_balance.balance_date if last_balance else None
             balance_amount = last_balance.total_amount if last_balance else None
 
@@ -534,7 +531,7 @@ try:
             'Transactions': format_number(txn_count),
             'Latest Transaction': format_datetime(latest_txn.transaction_date, '%Y-%m-%d') if latest_txn else 'N/A',
             'Pending': pending_count,
-            'Balance': format_currency(balance_amount) if balance_amount else 'N/A'
+            'Balance': format_amount_private(balance_amount) if balance_amount else 'N/A'
         })
 
     df_account_status = pd.DataFrame(account_status_data)
@@ -574,7 +571,7 @@ try:
                 'Date': format_datetime(balance_date, '%Y-%m-%d'),
                 'Institution': institution,
                 'Account Type': account_type or 'N/A',
-                'Balance': format_currency(total_amount),
+                'Balance': format_amount_private(total_amount),
                 'Status': '✅ Updated'
             })
 

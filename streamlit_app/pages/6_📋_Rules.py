@@ -15,7 +15,7 @@ sys.path.insert(0, str(project_root))
 
 from streamlit_app.utils.session import init_session_state, get_all_categories, get_all_tags
 from streamlit_app.utils.cache import invalidate_transaction_cache, invalidate_tag_cache
-from streamlit_app.utils.formatters import format_currency, format_number
+from streamlit_app.utils.formatters import format_number
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.bulk_actions import show_bulk_confirmation
 from streamlit_app.components.theme import apply_theme, render_theme_switcher

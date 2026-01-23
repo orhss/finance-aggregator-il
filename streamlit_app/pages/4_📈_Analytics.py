@@ -16,13 +16,12 @@ from typing import Tuple, Optional
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from streamlit_app.utils.session import init_session_state, get_db_session
-from streamlit_app.utils.formatters import format_currency, format_number, format_datetime
+from streamlit_app.utils.session import init_session_state, get_db_session, format_amount_private, get_accounts_display
+from streamlit_app.utils.formatters import format_number, format_datetime
 from streamlit_app.utils.cache import (
     get_transactions_cached,
     get_category_spending_cached,
     get_monthly_trend_cached,
-    get_accounts_cached,
     get_tags_cached
 )
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, show_info
@@ -288,15 +287,15 @@ with ErrorBoundary("Failed to load analytics data"):
                 median_transaction = df_expenses['amount'].median()
                 max_transaction = df_expenses['amount'].min()  # Most negative = highest expense
 
-                st.metric("Total Spent", format_currency(abs(total_spent)))
-                st.metric("Average Transaction", format_currency(abs(avg_transaction)))
-                st.metric("Median Transaction", format_currency(abs(median_transaction)))
-                st.metric("Largest Single Expense", format_currency(abs(max_transaction)))
+                st.metric("Total Spent", format_amount_private(abs(total_spent)))
+                st.metric("Average Transaction", format_amount_private(abs(avg_transaction)))
+                st.metric("Median Transaction", format_amount_private(abs(median_transaction)))
+                st.metric("Largest Single Expense", format_amount_private(abs(max_transaction)))
 
                 # Daily average
                 num_days = (end_date - start_date).days + 1
                 daily_avg = abs(total_spent) / num_days
-                st.metric("Average Daily Spending", format_currency(daily_avg))
+                st.metric("Average Daily Spending", format_amount_private(daily_avg))
 
             # Calendar Heatmap
             st.markdown("---")
@@ -337,16 +336,16 @@ with ErrorBoundary("Failed to load analytics data"):
                 col_s1, col_s2, col_s3, col_s4 = st.columns(4)
                 with col_s1:
                     year_total = df_year['amount'].sum()
-                    st.metric("Year Total", format_currency(abs(year_total)))
+                    st.metric("Year Total", format_amount_private(abs(year_total)))
                 with col_s2:
                     year_avg = df_year['amount'].mean()
-                    st.metric("Avg Transaction", format_currency(abs(year_avg)))
+                    st.metric("Avg Transaction", format_amount_private(abs(year_avg)))
                 with col_s3:
                     days_with_spending = df_year['date'].dt.date.nunique()
                     st.metric("Days with Spending", f"{days_with_spending} days")
                 with col_s4:
                     max_day = df_year.groupby(df_year['date'].dt.date)['amount'].sum().abs().max()
-                    st.metric("Highest Day", format_currency(max_day))
+                    st.metric("Highest Day", format_amount_private(max_day))
             else:
                 st.info(f"No spending data available for {selected_year}")
 
@@ -476,7 +475,7 @@ with ErrorBoundary("Failed to load analytics data"):
 
             # Get accounts with balances (cached for 5 minutes)
             accounts_list = safe_call_with_spinner(
-                get_accounts_cached,
+                get_accounts_display,
                 spinner_text="Loading account balances...",
                 error_message="Failed to load account data",
                 default_return=[]
@@ -580,7 +579,7 @@ with ErrorBoundary("Failed to load analytics data"):
                         summary_data.append({
                             'Type': row['account_type'],
                             'Institution': row['institution'],
-                            'Balance': format_currency(row['balance']),
+                            'Balance': format_amount_private(row['balance']),
                             'Transactions': txn_count
                         })
                 finally:
@@ -721,9 +720,9 @@ with ErrorBoundary("Failed to load analytics data"):
             # Tag summary table
             st.subheader("Tag Summary")
             df_tags_display = df_tags.copy()
-            df_tags_display['Amount'] = df_tags_display['amount'].apply(format_currency)
+            df_tags_display['Amount'] = df_tags_display['amount'].apply(format_amount_private)
             df_tags_display['Count'] = df_tags_display['count']
-            df_tags_display['Avg per Transaction'] = (df_tags_display['amount'] / df_tags_display['count']).apply(format_currency)
+            df_tags_display['Avg per Transaction'] = (df_tags_display['amount'] / df_tags_display['count']).apply(format_amount_private)
             st.dataframe(
                 df_tags_display[['tag', 'Count', 'Amount', 'Avg per Transaction']].rename(columns={'tag': 'Tag'}),
                 use_container_width=True,
@@ -766,7 +765,7 @@ with ErrorBoundary("Failed to load analytics data"):
         with col1:
             st.metric("Untagged Transactions", format_number(untagged_count))
         with col2:
-            st.metric("Untagged Amount", format_currency(abs(untagged_amount)))
+            st.metric("Untagged Amount", format_amount_private(abs(untagged_amount)))
 
         if untagged_count > 0:
             st.info(f"💡 You have {untagged_count} untagged expenses. Consider tagging them for better insights!")
@@ -820,13 +819,13 @@ with ErrorBoundary("Failed to load analytics data"):
                 pct_change = ((total1 - total2) / total2 * 100) if total2 > 0 else 0
 
                 with col1:
-                    st.metric(f"{month1}", format_currency(total1))
+                    st.metric(f"{month1}", format_amount_private(total1))
 
                 with col2:
-                    st.metric(f"{month2}", format_currency(total2))
+                    st.metric(f"{month2}", format_amount_private(total2))
 
                 with col3:
-                    st.metric("Difference", format_currency(diff), f"{pct_change:+.1f}%")
+                    st.metric("Difference", format_amount_private(diff), f"{pct_change:+.1f}%")
 
                 # Category comparison
                 cat1 = df_month1.groupby('category')['amount'].sum().abs()
@@ -881,13 +880,13 @@ with ErrorBoundary("Failed to load analytics data"):
                 col1, col2, col3 = st.columns(3)
 
                 with col1:
-                    st.metric("Total Spent", format_currency(abs(df_cat['amount'].sum())))
+                    st.metric("Total Spent", format_amount_private(abs(df_cat['amount'].sum())))
 
                 with col2:
                     st.metric("Transactions", format_number(len(df_cat)))
 
                 with col3:
-                    st.metric("Average", format_currency(abs(df_cat['amount'].mean())))
+                    st.metric("Average", format_amount_private(abs(df_cat['amount'].mean())))
 
                 # Monthly trend for this category
                 df_cat_copy = df_cat.copy()
@@ -912,7 +911,7 @@ with ErrorBoundary("Failed to load analytics data"):
                 # Top transactions in this category
                 st.markdown("**Top 10 Transactions**")
                 df_cat_top = df_cat.nsmallest(10, 'amount')[['date', 'description', 'amount']]
-                df_cat_top['amount'] = df_cat_top['amount'].apply(format_currency)
+                df_cat_top['amount'] = df_cat_top['amount'].apply(format_amount_private)
                 df_cat_top['date'] = df_cat_top['date'].apply(lambda d: d.strftime('%Y-%m-%d'))
                 st.dataframe(
                     df_cat_top.rename(columns={'date': 'Date', 'description': 'Description', 'amount': 'Amount'}),
@@ -931,7 +930,7 @@ with ErrorBoundary("Failed to load analytics data"):
         if len(account_spending) > 0:
             # Get account names from cached data
             accounts_cached = safe_call_with_spinner(
-                get_accounts_cached,
+                get_accounts_display,
                 spinner_text="Loading account details...",
                 error_message="Failed to load accounts",
                 default_return=[]

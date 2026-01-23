@@ -4,7 +4,7 @@ Integrates credit card scrapers with database storage.
 """
 
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Set, Tuple
 from sqlalchemy.exc import IntegrityError
 
 from db.models import Account, Transaction as DBTransaction
@@ -12,6 +12,7 @@ from config.constants import AccountType, Institution, SyncType
 from config.settings import get_card_holder_name
 from services.base_service import BaseSyncService
 from services.tag_service import TagService
+from services.category_service import CategoryService
 from scrapers.credit_cards.cal_credit_card_client import (
     CALCreditCardScraper,
     CALCredentials,
@@ -40,6 +41,7 @@ class CreditCardSyncResult:
         self.transactions_updated = 0
         self.error_message: Optional[str] = None
         self.sync_history_id: Optional[int] = None
+        self.unmapped_categories: List[Dict[str, Any]] = []  # [{raw_category, count}, ...]
 
 
 class CreditCardService(BaseSyncService):
@@ -47,6 +49,37 @@ class CreditCardService(BaseSyncService):
     Service for synchronizing credit card data with the database.
     Inherits common database operations from BaseSyncService.
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._category_service: Optional[CategoryService] = None
+        self._category_cache: Dict[Tuple[str, str], Optional[str]] = {}
+        self._unmapped_categories: Dict[str, int] = {}  # {raw_category: count}
+        self._current_institution: Optional[str] = None
+
+    @property
+    def category_service(self) -> CategoryService:
+        """Lazy-load category service"""
+        if self._category_service is None:
+            self._category_service = CategoryService(session=self.db)
+        return self._category_service
+
+    def _reset_category_tracking(self, institution: str):
+        """Reset category tracking for a new sync operation"""
+        self._category_cache = {}
+        self._unmapped_categories = {}
+        self._current_institution = institution
+
+    def _get_unmapped_summary(self) -> List[Dict[str, Any]]:
+        """Get summary of unmapped categories from current sync"""
+        return [
+            {'raw_category': cat, 'count': count}
+            for cat, count in sorted(
+                self._unmapped_categories.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )
+        ]
 
     def sync_cal(
         self,
@@ -70,6 +103,7 @@ class CreditCardService(BaseSyncService):
             CreditCardSyncResult with sync operation details
         """
         result = CreditCardSyncResult()
+        self._reset_category_tracking(Institution.CAL)
 
         try:
             with self.sync_transaction(SyncType.CREDIT_CARD, Institution.CAL) as sync_record:
@@ -99,7 +133,7 @@ class CreditCardService(BaseSyncService):
 
                     # Save transactions (no commit per transaction - handled by context)
                     for transaction in card_account.transactions:
-                        if self._save_transaction(db_account, transaction):
+                        if self._save_transaction(db_account, transaction, Institution.CAL):
                             result.transactions_added += 1
                         else:
                             result.transactions_updated += 1
@@ -109,6 +143,7 @@ class CreditCardService(BaseSyncService):
                 sync_record.records_updated = result.transactions_updated
 
                 result.success = True
+                result.unmapped_categories = self._get_unmapped_summary()
 
         except Exception as e:
             result.error_message = str(e)
@@ -137,6 +172,7 @@ class CreditCardService(BaseSyncService):
             CreditCardSyncResult with sync operation details
         """
         result = CreditCardSyncResult()
+        self._reset_category_tracking(Institution.MAX)
 
         try:
             with self.sync_transaction(SyncType.CREDIT_CARD, Institution.MAX) as sync_record:
@@ -166,7 +202,7 @@ class CreditCardService(BaseSyncService):
 
                     # Save transactions (no commit per transaction - handled by context)
                     for transaction in card_account.transactions:
-                        if self._save_transaction(db_account, transaction):
+                        if self._save_transaction(db_account, transaction, Institution.MAX):
                             result.transactions_added += 1
                         else:
                             result.transactions_updated += 1
@@ -176,6 +212,7 @@ class CreditCardService(BaseSyncService):
                 sync_record.records_updated = result.transactions_updated
 
                 result.success = True
+                result.unmapped_categories = self._get_unmapped_summary()
 
         except Exception as e:
             result.error_message = str(e)
@@ -204,6 +241,7 @@ class CreditCardService(BaseSyncService):
             CreditCardSyncResult with sync operation details
         """
         result = CreditCardSyncResult()
+        self._reset_category_tracking(Institution.ISRACARD)
 
         try:
             with self.sync_transaction(SyncType.CREDIT_CARD, Institution.ISRACARD) as sync_record:
@@ -251,7 +289,7 @@ class CreditCardService(BaseSyncService):
 
                     # Save transactions (no commit per transaction - handled by context)
                     for transaction in card_account.transactions:
-                        if self._save_transaction(db_account, transaction):
+                        if self._save_transaction(db_account, transaction, Institution.ISRACARD):
                             result.transactions_added += 1
                         else:
                             result.transactions_updated += 1
@@ -261,6 +299,7 @@ class CreditCardService(BaseSyncService):
                 sync_record.records_updated = result.transactions_updated
 
                 result.success = True
+                result.unmapped_categories = self._get_unmapped_summary()
 
         except Exception as e:
             result.error_message = str(e)
@@ -270,21 +309,27 @@ class CreditCardService(BaseSyncService):
     def _save_transaction(
         self,
         account: Account,
-        transaction: Transaction
+        transaction: Transaction,
+        institution: str
     ) -> bool:
         """
-        Save transaction to database with deduplication.
+        Save transaction to database with deduplication and category normalization.
 
         Handles three scenarios:
         1. Completed transaction with ID: Match by transaction_id
         2. Pending transaction (no ID): Match by date + merchant + amount
         3. Pending → Completed transition: Match completed txn to existing pending record
 
+        Category handling:
+        - raw_category: Original category from provider (always saved)
+        - category: Normalized category from mapping table (if mapping exists)
+
         Does NOT commit - relies on transaction management from sync_transaction.
 
         Args:
             account: Account model instance
             transaction: Transaction from scraper
+            institution: Institution name for category normalization
 
         Returns:
             True if new transaction was added, False if existing was updated
@@ -295,6 +340,24 @@ class CreditCardService(BaseSyncService):
 
         # Build unique identifier
         transaction_id = transaction.identifier if transaction.identifier else None
+
+        # Normalize category
+        raw_category = transaction.category
+        normalized_category = None
+
+        if raw_category:
+            # Has provider category - try provider mapping
+            normalized_category = self.category_service.normalize_category_cached(
+                institution, raw_category, self._category_cache
+            )
+            # Track unmapped categories for reporting
+            if not normalized_category:
+                self._unmapped_categories[raw_category] = self._unmapped_categories.get(raw_category, 0) + 1
+        else:
+            # No provider category (e.g., Isracard) - try merchant mapping
+            normalized_category = self.category_service.normalize_by_merchant(
+                transaction.description, institution
+            )
 
         existing_transaction = None
 
@@ -332,7 +395,8 @@ class CreditCardService(BaseSyncService):
             existing_transaction.charged_currency = transaction.charged_currency
             existing_transaction.status = transaction.status.value
             existing_transaction.transaction_type = transaction.transaction_type.value
-            existing_transaction.category = transaction.category
+            existing_transaction.raw_category = raw_category
+            existing_transaction.category = normalized_category
             existing_transaction.memo = transaction.memo
 
             if transaction.installments:
@@ -354,7 +418,8 @@ class CreditCardService(BaseSyncService):
             charged_currency=transaction.charged_currency,
             transaction_type=transaction.transaction_type.value,
             status=transaction.status.value,
-            category=transaction.category,
+            raw_category=raw_category,
+            category=normalized_category,
             memo=transaction.memo,
             installment_number=transaction.installments.number if transaction.installments else None,
             installment_total=transaction.installments.total if transaction.installments else None
@@ -368,9 +433,10 @@ class CreditCardService(BaseSyncService):
             tag_service = TagService(session=self.db)
             tags_to_add = []
 
-            # Tag with category
-            if transaction.category:
-                tags_to_add.append(transaction.category)
+            # Tag with effective category (normalized if available, otherwise raw)
+            effective_cat = normalized_category or raw_category
+            if effective_cat:
+                tags_to_add.append(effective_cat)
 
             # Tag with card holder name if configured
             if account.account_number:
@@ -441,7 +507,9 @@ class CreditCardService(BaseSyncService):
                 "charged_currency": t.charged_currency,
                 "status": t.status,
                 "transaction_type": t.transaction_type,
+                "raw_category": t.raw_category,
                 "category": t.category,
+                "effective_category": t.effective_category,
                 "installments": f"{t.installment_number}/{t.installment_total}" if t.installment_number else None
             }
             for t in transactions
