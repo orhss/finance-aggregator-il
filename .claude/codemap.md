@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-01-18 23:28
+# Auto-generated: 2026-01-23 20:53
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -14,10 +14,11 @@ scrapers → services → db → cli/streamlit_app
 
 ## cli/ - CLI interface for financial data aggregator
 - cli/commands/accounts.py: fn:list_accounts,show_account,account_summary
+- cli/commands/categories.py: fn:analyze_categories,list_mappings,unmapped_categories,map_category,unmap_category
 - cli/commands/config.py: fn:show,set,setup,manage_card_holder,list_card_holders
 - cli/commands/export.py: fn:serialize_date,export_transactions,export_transactions_csv,export_transactions_json,export_balances
 - cli/commands/init.py: fn:main
-- cli/commands/maintenance.py: fn:cleanup,backup,verify
+- cli/commands/maintenance.py: fn:cleanup,backup,verify,migrate
 - cli/commands/reports.py: fn:make_bar,make_sparkline,get_trend_indicator,format_change,generate_insights
 - cli/commands/rules.py: fn:list_rules,add_rule,remove_rule,apply_rules,init_rules
 - cli/commands/sync.py: fn:sync_all,sync_excellence,sync_meitav,sync_migdal,sync_phoenix
@@ -62,6 +63,7 @@ scrapers → services → db → cli/streamlit_app
 - services/analytics_service.py: class:AnalyticsService | fn:get_effective_amount,effective_amount_expr,effective_category_expr
 - services/base_service.py: class:BaseSyncService
 - services/broker_service.py: class:BrokerSyncResult,BrokerService
+- services/category_service.py: class:CategoryService
 - services/credit_card_service.py: class:CreditCardSyncResult,CreditCardService
 - services/pension_service.py: class:PensionSyncResult,PensionService
 - services/rules_service.py: class:MatchType,Rule,RulesService
@@ -79,6 +81,7 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/components/sidebar.py: fn:render_quick_stats,render_about,render_minimal_sidebar
 - streamlit_app/components/theme.py: fn:init_theme,render_theme_switcher,apply_theme,format_category_badge_themed,format_tags_themed
 - streamlit_app/config/theme.py: class:ColorPalette,Theme | fn:get_theme,set_theme_mode
+- streamlit_app/pages/10_📂_Categories.py: Categories Management Page - Manage category mappings for cr
 - streamlit_app/pages/1_📊_Dashboard.py: Dashboard Page - High-level overview of financial status
 - streamlit_app/pages/2_🔄_Sync.py: Sync Management Page - Trigger sync and view sync status
 - streamlit_app/pages/3_💳_Transactions.py: Transactions Browser Page - View, filter, search, and manage
@@ -92,4 +95,4 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/utils/formatters.py: fn:format_currency,format_date,format_datetime,format_number,format_percentage
 - streamlit_app/utils/insights.py: fn:generate_spending_insight,generate_balance_insight,generate_pending_insight,generate_category_insight,get_time_greeting
 - streamlit_app/utils/rtl.py: fn:has_hebrew,fix_rtl,format_description,mixed_rtl_ltr,clean_merchant_name
-- streamlit_app/utils/session.py: fn:init_session_state,get_analytics_service,get_tag_service,get_rules_service,get_credit_card_service
+- streamlit_app/utils/session.py: fn:format_amount_private,get_accounts_display,get_dashboard_stats_display,get_transactions_display,get_tags_display
