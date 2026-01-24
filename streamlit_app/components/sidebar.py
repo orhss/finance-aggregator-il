@@ -17,6 +17,28 @@ from streamlit_app.utils.session import format_amount_private
 from streamlit_app.utils.cache import get_dashboard_stats
 
 
+def render_privacy_toggle():
+    """
+    Render a quick privacy mode toggle in the sidebar.
+    Toggles balance masking with a single click.
+    """
+    # Current state
+    is_private = st.session_state.get('mask_balances', False)
+
+    # Use columns to align the toggle nicely
+    col1, col2 = st.sidebar.columns([3, 1])
+
+    with col1:
+        st.markdown("**Privacy Mode**")
+
+    with col2:
+        # Toggle with eye icon
+        icon = "🙈" if is_private else "👁️"
+        if st.button(icon, key="privacy_toggle", help="Toggle balance visibility"):
+            st.session_state.mask_balances = not is_private
+            st.rerun()
+
+
 def render_quick_stats():
     """
     Render quick statistics in the sidebar.
@@ -76,5 +98,6 @@ def render_minimal_sidebar():
     Render minimal sidebar (just stats)
     For pages that need more sidebar space
     """
+    render_privacy_toggle()
     render_quick_stats()
     render_about()
