@@ -153,6 +153,7 @@ For detailed file/function navigation, see `.claude/codemap.md`
 - **Migrations**: Run `fin-cli maintenance migrate` after schema changes (idempotent, safe to run multiple times)
 
 ### Streamlit UI Patterns
+- **Shared CSS**: Call `apply_theme()` from `components/theme.py` at the top of each page - it loads shared styles from `styles/main.css` automatically.
 - **Privacy-aware formatting**: Always use `format_amount_private()` from `session.py` for financial amounts (balances, totals, transactions). Never use `format_currency()` directly - it ignores the `mask_balances` privacy setting.
 - **Display wrappers**: Use `get_accounts_display()`, `get_dashboard_stats_display()` etc. from `session.py` - they combine cached data with pre-formatted `_display` fields.
 - **Shared sidebar**: Use `render_minimal_sidebar()` from `components/sidebar.py` - ensures consistent privacy toggle and stats across all pages.

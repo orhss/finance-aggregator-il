@@ -45,162 +45,9 @@ st.set_page_config(
 
 
 def load_custom_css():
-    """Load Phase 3 custom CSS styling with cards, gradients, and modern design."""
-    css = """
-    <style>
-    /* ===== GLOBAL BREATHING ROOM ===== */
-    .main .block-container {
-        padding: 1.5rem 2rem 2rem 2rem;
-        max-width: 1200px;
-    }
-
-    /* ===== HERO BALANCE CARD ===== */
-    .hero-balance {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1.5rem 2rem;
-        border-radius: 20px;
-        color: white;
-        margin-bottom: 1rem;
-    }
-    .hero-balance .label {
-        font-size: 0.9rem;
-        opacity: 0.9;
-        margin-bottom: 0.25rem;
-        font-weight: 500;
-    }
-    .hero-balance .amount {
-        font-size: 2.5rem;
-        font-weight: 700;
-        margin: 0;
-        line-height: 1.2;
-    }
-    .hero-balance .sublabel {
-        font-size: 0.85rem;
-        opacity: 0.8;
-        margin-top: 0.5rem;
-    }
-
-    /* ===== METRIC CARDS ===== */
-    .metric-card {
-        background: white;
-        border-radius: 12px;
-        padding: 1rem 1.25rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-        text-align: center;
-        border: 1px solid #f0f0f0;
-        height: 100%;
-    }
-    .metric-card .value {
-        font-size: 1.4rem;
-        font-weight: 600;
-        color: #1f2937;
-        margin-bottom: 0.25rem;
-    }
-    .metric-card .label {
-        font-size: 0.8rem;
-        color: #6b7280;
-        font-weight: 500;
-    }
-    .metric-card .sublabel {
-        font-size: 0.7rem;
-        color: #9ca3af;
-        margin-top: 0.25rem;
-    }
-
-    /* ===== INSIGHT BANNER ===== */
-    .insight-banner {
-        padding: 0.75rem 1rem;
-        border-radius: 10px;
-        margin-bottom: 1.25rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-    .insight-banner.positive {
-        background: #D1FAE5;
-        color: #065F46;
-    }
-    .insight-banner.neutral {
-        background: #F3F4F6;
-        color: #374151;
-    }
-    .insight-banner.warning {
-        background: #FEF3C7;
-        color: #92400E;
-    }
-    .insight-banner .icon {
-        font-size: 1.1rem;
-    }
-    .insight-banner .message {
-        font-size: 0.9rem;
-        font-weight: 500;
-    }
-
-    /* ===== ALERT CARDS ===== */
-    .alert-card {
-        padding: 0.75rem 1rem;
-        border-radius: 10px;
-        margin-bottom: 0.5rem;
-    }
-    .alert-card.sync {
-        background: #FEF3C7;
-        border-left: 3px solid #F59E0B;
-    }
-    .alert-card.category {
-        background: #DBEAFE;
-        border-left: 3px solid #3B82F6;
-    }
-    .alert-card.uncategorized {
-        background: #E0E7FF;
-        border-left: 3px solid #6366F1;
-    }
-
-    /* ===== BUTTONS ===== */
-    .stButton>button {
-        border-radius: 8px;
-        font-weight: 500;
-    }
-
-    div[data-testid="stButton"] button[kind="secondary"] {
-        border-color: #e5e7eb;
-        color: #6b7280;
-    }
-    div[data-testid="stButton"] button[kind="secondary"]:hover {
-        background: #f9fafb;
-        color: #374151;
-        border-color: #d1d5db;
-    }
-
-    /* ===== SIDEBAR STYLING ===== */
-    [data-testid="stSidebarNav"] a[data-testid="stSidebarNavLink"]:hover {
-        background-color: #e1e4e8 !important;
-    }
-    [data-testid="stSidebarNav"] a[data-testid="stSidebarNavLink"][aria-current="page"] {
-        background-color: #667eea !important;
-    }
-    [data-testid="stSidebarNav"] a[data-testid="stSidebarNavLink"][aria-current="page"] span {
-        color: white !important;
-    }
-    [data-testid="stSidebarNav"] li {
-        border-radius: 6px;
-        margin: 4px 0;
-    }
-
-    /* ===== STREAMLIT OVERRIDES ===== */
-    [data-testid="stMetricValue"] {
-        font-size: 24px;
-    }
-    [data-testid="stMetricDelta"] svg {
-        display: none;
-    }
-
-    /* Remove iframe borders from components.html */
-    iframe {
-        border: none !important;
-    }
-    </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
+    """Load shared CSS styling from styles/main.css"""
+    from streamlit_app.components.theme import load_shared_css
+    load_shared_css()
 
 
 def render_empty_state():
@@ -221,8 +68,8 @@ def render_empty_state():
         2. **Sync your data**
         """)
 
-        if st.button("Go to Sync Page", use_container_width=True, type="primary"):
-            st.switch_page("pages/2_🔄_Sync.py")
+        if st.button("Go to Accounts", use_container_width=True, type="primary"):
+            st.switch_page("pages/3_🏦_Accounts.py")
 
         st.markdown("---")
         st.caption("Supports: CAL, Max, Isracard, Excellence, Migdal, Phoenix")
@@ -235,7 +82,7 @@ def render_header():
         st.title(f"{get_time_greeting()}")
     with col2:
         if st.button("Sync Now", use_container_width=True, type="secondary"):
-            st.switch_page("pages/2_🔄_Sync.py")
+            st.switch_page("pages/3_🏦_Accounts.py")
 
 
 def render_hero_and_metrics(stats: dict):
@@ -402,7 +249,7 @@ def render_recent_activity(min_height: int = None) -> int:
     )
 
     if st.button("View all transactions", use_container_width=True, type="secondary"):
-        st.switch_page("pages/3_💳_Transactions.py")
+        st.switch_page("pages/1_💳_Transactions.py")
 
     return height
 
@@ -450,7 +297,7 @@ def render_accounts_overview(min_height: int = None) -> int:
     height = render_summary_card(title="🏦 Accounts", items=items, min_height=min_height)
 
     if st.button("View all accounts", use_container_width=True, type="secondary"):
-        st.switch_page("pages/7_💰_Accounts.py")
+        st.switch_page("pages/3_🏦_Accounts.py")
 
     return height
 

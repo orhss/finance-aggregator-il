@@ -29,7 +29,7 @@ def empty_transactions_state():
         """)
 
         if st.button("🔄 Start Syncing", type="primary", use_container_width=True, key="empty_txn_sync"):
-            st.switch_page("pages/2_🔄_Sync.py")
+            st.switch_page("pages/3_🏦_Accounts.py")
 
         st.caption("⏱️ First sync usually takes 2-3 minutes")
 
@@ -83,8 +83,8 @@ def empty_accounts_state():
         3. **Or use the UI** - click below to go to the Sync page
         """)
 
-        if st.button("🔄 Go to Sync Page", type="primary", use_container_width=True, key="empty_acct_sync"):
-            st.switch_page("pages/2_🔄_Sync.py")
+        if st.button("🔄 Go to Sync", type="primary", use_container_width=True, key="empty_acct_sync"):
+            st.switch_page("pages/3_🏦_Accounts.py")
 
         st.caption("💡 Tip: Start with one institution to test the setup")
 
@@ -115,7 +115,7 @@ def empty_analytics_state():
         """)
 
         if st.button("🔄 Sync Now", type="primary", use_container_width=True, key="empty_analytics_sync"):
-            st.switch_page("pages/2_🔄_Sync.py")
+            st.switch_page("pages/3_🏦_Accounts.py")
 
 
 def empty_dashboard_state():
@@ -150,7 +150,7 @@ def empty_dashboard_state():
 
         with col_b:
             if st.button("🔄 Sync", type="primary", use_container_width=True, key="empty_dash_sync"):
-                st.switch_page("pages/2_🔄_Sync.py")
+                st.switch_page("pages/3_🏦_Accounts.py")
 
         st.caption("🔒 Your data is encrypted and stored locally - we never send it to the cloud")
 

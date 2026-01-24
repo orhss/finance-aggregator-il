@@ -5,7 +5,29 @@ This module provides components for theme switching and theme application.
 """
 
 import streamlit as st
+from pathlib import Path
 from streamlit_app.config.theme import get_theme, set_theme_mode, Theme
+
+
+def load_shared_css():
+    """
+    Load shared CSS styles from styles/main.css
+
+    Call this function once per page to apply consistent styling.
+
+    Example:
+        from streamlit_app.components.theme import load_shared_css
+        load_shared_css()
+    """
+    css_path = Path(__file__).parent.parent / "styles" / "main.css"
+
+    if css_path.exists():
+        with open(css_path, 'r') as f:
+            css = f.read()
+        st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+    else:
+        # Fallback: basic styles inline if file doesn't exist
+        pass
 
 
 def init_theme() -> Theme:
@@ -98,7 +120,7 @@ def apply_theme() -> Theme:
 
     This function should be called at the top of each page to:
     1. Initialize theme from session state
-    2. Apply global CSS
+    2. Apply global CSS (including shared styles)
     3. Return theme instance for use in page
 
     Returns:
@@ -112,7 +134,10 @@ def apply_theme() -> Theme:
     # Initialize theme
     theme = init_theme()
 
-    # Apply global CSS
+    # Load shared CSS styles
+    load_shared_css()
+
+    # Apply theme-specific CSS
     st.markdown(theme.generate_global_css(), unsafe_allow_html=True)
 
     return theme

@@ -594,7 +594,7 @@ def get_hub_alerts() -> List[Dict[str, Any]]:
                 'icon': '🔄',
                 'message': message,
                 'action_label': 'Sync',
-                'page': 'pages/2_🔄_Sync.py',
+                'page': 'pages/3_🏦_Accounts.py',
                 'key': f"alert_sync_{acc['institution']}",
                 'priority': 1
             })
@@ -606,7 +606,7 @@ def get_hub_alerts() -> List[Dict[str, Any]]:
             'icon': '📂',
             'message': f"{unmapped} unmapped categories from last sync",
             'action_label': 'Map',
-            'page': 'pages/10_📂_Categories.py',
+            'page': 'pages/4_🏷️_Organize.py',
             'key': 'alert_unmapped',
             'priority': 2
         })
@@ -619,7 +619,7 @@ def get_hub_alerts() -> List[Dict[str, Any]]:
             'icon': '🏷️',
             'message': f"{uncategorized['count']} uncategorized transactions ({amount_str})",
             'action_label': 'Categorize',
-            'page': 'pages/10_📂_Categories.py',
+            'page': 'pages/4_🏷️_Organize.py',
             'key': 'alert_uncategorized',
             'priority': 3
         })

@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-01-24 20:13
+# Auto-generated: 2026-01-24 22:42
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -80,17 +80,12 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/components/loading.py: class:ProgressTracker | fn:show_progress_steps,contextual_spinner,skeleton_table,skeleton_metrics,show_loading_message
 - streamlit_app/components/responsive.py: fn:responsive_columns,mobile_card,responsive_metrics,responsive_table_config,stacked_layout
 - streamlit_app/components/sidebar.py: fn:render_privacy_toggle,render_quick_stats,render_about,render_minimal_sidebar
-- streamlit_app/components/theme.py: fn:init_theme,render_theme_switcher,apply_theme,format_category_badge_themed,format_tags_themed
+- streamlit_app/components/theme.py: fn:load_shared_css,init_theme,render_theme_switcher,apply_theme,format_category_badge_themed
 - streamlit_app/config/theme.py: class:ColorPalette,Theme | fn:get_theme,set_theme_mode
-- streamlit_app/pages/10_📂_Categories.py: Categories Management Page - Manage category mappings for cr
-- streamlit_app/pages/1_📊_Dashboard.py: Dashboard Page - High-level overview of financial status
-- streamlit_app/pages/2_🔄_Sync.py: Sync Management Page - Trigger sync and view sync status
-- streamlit_app/pages/3_💳_Transactions.py: Transactions Browser Page - View, filter, search, and manage
-- streamlit_app/pages/4_📈_Analytics.py: fn:time_range_selector
-- streamlit_app/pages/5_🏷️_Tags.py: Tags Management Page - Create, edit, and manage transaction 
-- streamlit_app/pages/6_📋_Rules.py: Rules Management Page - Manage auto-categorization and taggi
-- streamlit_app/pages/7_💰_Accounts.py: Accounts Management Page - View and manage financial account
-- streamlit_app/pages/8_⚙️_Settings.py: Settings Page - Application configuration and management
+- streamlit_app/pages/2_📈_Analytics.py: fn:time_range_selector
+- streamlit_app/pages/3_🏦_Accounts.py: fn:get_status_indicator,run_sync_in_thread,start_sync
+- streamlit_app/pages/4_🏷️_Organize.py: Organize Page - Unified management for Categories, Rules, an
+- streamlit_app/pages/5_⚙️_Settings.py: Settings Page - Application configuration and management
 - streamlit_app/utils/cache.py: fn:get_transactions_cached,get_dashboard_stats,get_category_spending_cached,get_monthly_trend_cached,get_accounts_cached
 - streamlit_app/utils/errors.py: class:ErrorBoundary | fn:safe_service_call,get_user_friendly_error,safe_call_with_spinner,handle_error_with_retry,safe_decorator
 - streamlit_app/utils/formatters.py: fn:format_currency,format_date,format_datetime,format_number,format_percentage

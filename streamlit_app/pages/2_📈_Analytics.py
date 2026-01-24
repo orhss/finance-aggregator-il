@@ -68,65 +68,61 @@ st.markdown("---")
 
 def time_range_selector() -> Tuple[date, date]:
     """
-    Render time range selector with quick buttons and custom date picker
+    Render time range selector with single dropdown and custom date picker
 
     Returns:
         Tuple of (start_date, end_date)
     """
-    st.subheader("📅 Time Range")
-
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
-
     today = date.today()
     first_of_month = today.replace(day=1)
+    last_month = first_of_month - timedelta(days=1)
+    first_of_last_month = last_month.replace(day=1)
+    three_months_ago = today - relativedelta(months=3)
+    six_months_ago = today - relativedelta(months=6)
+    first_of_year = today.replace(month=1, day=1)
 
-    # Quick select buttons
+    # Time range presets
+    time_range_options = {
+        "Last 3 Months": ('3_months', three_months_ago, today),
+        "This Month": ('this_month', first_of_month, today),
+        "Last Month": ('last_month', first_of_last_month, last_month),
+        "Last 6 Months": ('6_months', six_months_ago, today),
+        "This Year": ('this_year', first_of_year, today),
+        "Custom Range": ('custom', None, None),
+    }
+
+    col1, col2, col3 = st.columns([1, 1, 2])
+
     with col1:
-        if st.button("This Month", use_container_width=True):
-            st.session_state.date_range = ('this_month', first_of_month, today)
+        # Get current selection from session state
+        current_key = st.session_state.get('date_range', ('3_months', three_months_ago, today))[0]
+        current_label = next(
+            (k for k, v in time_range_options.items() if v[0] == current_key),
+            "Last 3 Months"
+        )
 
-    with col2:
-        last_month = first_of_month - timedelta(days=1)
-        first_of_last_month = last_month.replace(day=1)
-        if st.button("Last Month", use_container_width=True):
-            st.session_state.date_range = ('last_month', first_of_last_month, last_month)
+        selected_range = st.selectbox(
+            "📅 Time Range",
+            options=list(time_range_options.keys()),
+            index=list(time_range_options.keys()).index(current_label),
+            key="time_range_select"
+        )
 
-    with col3:
-        three_months_ago = today - relativedelta(months=3)
-        if st.button("Last 3 Months", use_container_width=True):
-            st.session_state.date_range = ('3_months', three_months_ago, today)
-
-    with col4:
-        six_months_ago = today - relativedelta(months=6)
-        if st.button("Last 6 Months", use_container_width=True):
-            st.session_state.date_range = ('6_months', six_months_ago, today)
-
-    with col5:
-        first_of_year = today.replace(month=1, day=1)
-        if st.button("This Year", use_container_width=True):
-            st.session_state.date_range = ('this_year', first_of_year, today)
-
-    with col6:
-        if st.button("Custom", use_container_width=True):
-            st.session_state.date_range = ('custom', None, None)
-
-    # Initialize default if not set
-    if 'date_range' not in st.session_state:
-        st.session_state.date_range = ('3_months', three_months_ago, today)
+        # Update session state when selection changes
+        st.session_state.date_range = time_range_options[selected_range]
 
     # Custom date picker if custom is selected
     if st.session_state.date_range[0] == 'custom':
-        col1, col2 = st.columns(2)
-        with col1:
+        with col2:
             start_date = st.date_input(
-                "Start Date",
+                "Start",
                 value=today - relativedelta(months=3),
                 max_value=today,
                 key="custom_start_date"
             )
-        with col2:
+        with col3:
             end_date = st.date_input(
-                "End Date",
+                "End",
                 value=today,
                 max_value=today,
                 min_value=start_date if 'custom_start_date' in st.session_state else None,

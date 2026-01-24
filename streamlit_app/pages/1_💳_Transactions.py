@@ -112,11 +112,22 @@ try:
     latest_date = session.query(func.max(Transaction.transaction_date)).scalar()
 
     # ============================================================================
-    # FILTER PANEL
+s    # FILTER PANEL - Essential filters visible, advanced in "More Filters"
     # ============================================================================
-    with st.expander("🔍 Filters", expanded=True):
-        # Date Range with Quick Presets (full width)
-        st.markdown("**Date Range**")
+
+    # Essential Filters Row: Search, Date, Category
+    col1, col2, col3 = st.columns([2, 2, 2])
+
+    with col1:
+        search_query = st.text_input(
+            "🔍 Search",
+            placeholder="merchant, description, or amount",
+            key="filter_search",
+            help="Search by merchant name, description, or amount"
+        )
+
+    with col2:
+        # Simplified date range
         start_date, end_date = date_range_filter_with_presets(
             key_prefix="txn_filter",
             default_months_back=3,
@@ -124,148 +135,135 @@ try:
             data_end=latest_date
         )
 
-        st.markdown("---")
+    with col3:
+        # Get unique categories (user_category, normalized category, and raw_category)
+        user_categories = session.query(Transaction.user_category).filter(
+            Transaction.user_category.isnot(None)
+        ).distinct().all()
+        source_categories = session.query(Transaction.category).filter(
+            Transaction.category.isnot(None)
+        ).distinct().all()
+        raw_categories = session.query(Transaction.raw_category).filter(
+            Transaction.raw_category.isnot(None)
+        ).distinct().all()
 
+        # Combine and deduplicate
+        category_set = set()
+        category_set.update([cat[0] for cat in user_categories if cat[0]])
+        category_set.update([cat[0] for cat in source_categories if cat[0]])
+        category_set.update([cat[0] for cat in raw_categories if cat[0]])
+        category_list = sorted(list(category_set))
+
+        selected_categories = st.multiselect(
+            "Category",
+            options=category_list,
+            key="filter_categories",
+            placeholder="All categories"
+        )
+
+    # More Filters (collapsed by default)
+    with st.expander("More Filters", expanded=False):
         col1, col2, col3 = st.columns(3)
 
         with col1:
             # Account and Institution Filter
-            st.markdown("**Account / Institution**")
-
-            # Get all accounts
             accounts = session.query(Account).all()
             account_options = {f"{acc.institution} - {acc.account_type or 'Account'}": acc.id for acc in accounts}
 
             selected_accounts = st.multiselect(
-                "Select Accounts",
+                "Accounts",
                 options=list(account_options.keys()),
-                key="filter_accounts"
+                key="filter_accounts",
+                placeholder="All accounts"
             )
 
-            # Get unique institutions
             institutions = session.query(Account.institution).distinct().all()
             institution_list = [inst[0] for inst in institutions if inst[0]]
 
             selected_institutions = st.multiselect(
-                "Select Institutions",
+                "Institutions",
                 options=institution_list,
-                key="filter_institutions"
+                key="filter_institutions",
+                placeholder="All institutions"
             )
 
         with col2:
-            # Status and Category Filter
-            st.markdown("**Status / Category**")
+            # Amount Range
+            amount_col1, amount_col2 = st.columns(2)
+            with amount_col1:
+                amount_min = st.number_input(
+                    "Min Amount (₪)",
+                    value=None,
+                    step=10.0,
+                    key="filter_amount_min"
+                )
+            with amount_col2:
+                amount_max = st.number_input(
+                    "Max Amount (₪)",
+                    value=None,
+                    step=10.0,
+                    key="filter_amount_max"
+                )
 
+            # Transaction Type
+            transaction_type = st.radio(
+                "Type",
+                options=["All", "Expenses", "Income"],
+                key="filter_type",
+                horizontal=True
+            )
+
+        with col3:
+            # Status Filter
             status_filter = st.radio(
-                "Transaction Status",
+                "Status",
                 options=["All", "Completed", "Pending"],
                 key="filter_status",
                 horizontal=True
             )
 
-            # Get unique categories (user_category, normalized category, and raw_category)
-            user_categories = session.query(Transaction.user_category).filter(
-                Transaction.user_category.isnot(None)
-            ).distinct().all()
-            source_categories = session.query(Transaction.category).filter(
-                Transaction.category.isnot(None)
-            ).distinct().all()
-            raw_categories = session.query(Transaction.raw_category).filter(
-                Transaction.raw_category.isnot(None)
-            ).distinct().all()
-
-            # Combine and deduplicate
-            category_set = set()
-            category_set.update([cat[0] for cat in user_categories if cat[0]])
-            category_set.update([cat[0] for cat in source_categories if cat[0]])
-            category_set.update([cat[0] for cat in raw_categories if cat[0]])
-            category_list = sorted(list(category_set))
-
-            selected_categories = st.multiselect(
-                "Categories",
-                options=category_list,
-                key="filter_categories"
-            )
-
-            # Option to filter unmapped transactions (no normalized category)
-            unmapped_only = st.checkbox(
-                "Unmapped only",
-                key="filter_unmapped_categories",
-                help="Show only transactions with unmapped raw categories"
-            )
-
-        with col3:
             # Tags Filter
-            st.markdown("**Tags**")
-
-            # Get all tags
             tags = session.query(Tag).all()
             tag_list = [tag.name for tag in tags]
 
             selected_tags = st.multiselect(
-                "Select Tags",
+                "Tags",
                 options=tag_list,
-                key="filter_tags"
+                key="filter_tags",
+                placeholder="All tags"
             )
 
-            untagged_only = st.checkbox("Untagged Only", key="filter_untagged")
+            # Checkbox filters in a row
+            check_col1, check_col2 = st.columns(2)
+            with check_col1:
+                untagged_only = st.checkbox("Untagged", key="filter_untagged")
+            with check_col2:
+                unmapped_only = st.checkbox(
+                    "Unmapped",
+                    key="filter_unmapped_categories",
+                    help="Unmapped raw categories only"
+                )
 
-        # Second row of filters
-        col1, col2, col3 = st.columns(3)
+    # Clear filters button (only show if filters are active)
+    active_filters = []
+    if search_query: active_filters.append("search")
+    if selected_categories: active_filters.append("categories")
+    if 'filter_accounts' in st.session_state and st.session_state.filter_accounts: active_filters.append("accounts")
+    if 'filter_institutions' in st.session_state and st.session_state.filter_institutions: active_filters.append("institutions")
+    if 'filter_tags' in st.session_state and st.session_state.filter_tags: active_filters.append("tags")
+    if 'filter_amount_min' in st.session_state and st.session_state.filter_amount_min is not None: active_filters.append("amount")
+    if 'filter_amount_max' in st.session_state and st.session_state.filter_amount_max is not None: active_filters.append("amount")
+    if 'filter_status' in st.session_state and st.session_state.filter_status != "All": active_filters.append("status")
+    if 'filter_type' in st.session_state and st.session_state.filter_type != "All": active_filters.append("type")
+    if 'filter_untagged' in st.session_state and st.session_state.filter_untagged: active_filters.append("untagged")
+    if 'filter_unmapped_categories' in st.session_state and st.session_state.filter_unmapped_categories: active_filters.append("unmapped")
 
-        with col1:
-            # Amount Range Filter
-            st.markdown("**Amount Range**")
-
-            amount_min = st.number_input(
-                "Min Amount (₪)",
-                value=None,
-                step=10.0,
-                key="filter_amount_min"
-            )
-
-            amount_max = st.number_input(
-                "Max Amount (₪)",
-                value=None,
-                step=10.0,
-                key="filter_amount_max"
-            )
-
-        with col2:
-            # Search Filter
-            st.markdown("**Search**")
-
-            search_query = st.text_input(
-                "Search in description or amount",
-                placeholder="e.g., supermarket, restaurant, 100",
-                key="filter_search",
-                help="Search by merchant name, description, or amount (e.g., '100' finds ₪100 transactions)"
-            )
-
-        with col3:
-            # Transaction Type Filter
-            st.markdown("**Transaction Type**")
-
-            transaction_type = st.radio(
-                "Transaction Type",
-                options=["All", "Expenses", "Income"],
-                key="filter_type",
-                horizontal=True,
-                label_visibility="collapsed"
-            )
-
-        # Action buttons
-        col1, col2, col3, col4 = st.columns([1, 1, 1, 3])
-
-        with col1:
-            apply_filters = st.button("🔍 Apply Filters", type="primary", use_container_width=True)
-
-        with col2:
-            if st.button("🔄 Clear Filters", use_container_width=True):
-                for key in list(st.session_state.keys()):
-                    if key.startswith("filter_"):
-                        del st.session_state[key]
-                st.rerun()
+    if active_filters:
+        if st.button(f"🔄 Clear {len(set(active_filters))} filter(s)", type="secondary"):
+            for key in list(st.session_state.keys()):
+                if key.startswith("filter_"):
+                    del st.session_state[key]
+            st.rerun()
 
     st.markdown("---")
 
