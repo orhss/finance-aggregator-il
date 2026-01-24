@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-01-25 00:09
+# Auto-generated: 2026-01-25 00:32
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -14,6 +14,7 @@ scrapers → services → db → cli/streamlit_app
 
 ## cli/ - CLI interface for financial data aggregator
 - cli/commands/accounts.py: fn:list_accounts,show_account,account_summary
+- cli/commands/budget.py: fn:make_progress_bar,show_budget,set_budget,delete_budget
 - cli/commands/categories.py: fn:analyze_categories,list_mappings,unmapped_categories,map_category,unmap_category
 - cli/commands/config.py: fn:show,set,setup,manage_card_holder,list_card_holders
 - cli/commands/export.py: fn:serialize_date,export_transactions,export_transactions_csv,export_transactions_json,export_balances
@@ -63,6 +64,7 @@ scrapers → services → db → cli/streamlit_app
 - services/analytics_service.py: class:AnalyticsService | fn:get_effective_amount,effective_amount_expr,effective_category_expr
 - services/base_service.py: class:BaseSyncService
 - services/broker_service.py: class:BrokerSyncResult,BrokerService
+- services/budget_service.py: class:BudgetService
 - services/category_service.py: class:CategoryService
 - services/credit_card_service.py: class:CreditCardSyncResult,CreditCardService
 - services/pension_service.py: class:PensionSyncResult,PensionService
@@ -70,7 +72,7 @@ scrapers → services → db → cli/streamlit_app
 - services/tag_service.py: class:TagService
 
 ## streamlit_app/
-- streamlit_app/app.py: fn:load_custom_css,render_empty_state,render_header,render_hero_and_metrics,render_insight_banner
+- streamlit_app/app.py: fn:load_custom_css,render_empty_state,render_header,render_hero_and_metrics,render_budget_progress
 - streamlit_app/components/bulk_actions.py: fn:show_bulk_preview,show_bulk_confirmation,bulk_action_workflow,quick_bulk_preview
 - streamlit_app/components/cards.py: fn:render_card,render_metric_row,render_account_card,render_transaction_card,render_summary_card
 - streamlit_app/components/charts.py: fn:spending_donut,trend_line,category_bar,balance_history,spending_by_day
@@ -78,12 +80,14 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/components/filters.py: fn:date_range_filter,account_filter,institution_filter,status_filter,category_filter
 - streamlit_app/components/heatmap.py: fn:calendar_heatmap,monthly_heatmap
 - streamlit_app/components/loading.py: class:ProgressTracker | fn:show_progress_steps,contextual_spinner,skeleton_table,skeleton_metrics,show_loading_message
+- streamlit_app/components/mobile_ui.py: fn:apply_mobile_css,hero_balance_card,summary_card,transaction_list,bottom_navigation
 - streamlit_app/components/responsive.py: fn:responsive_columns,mobile_card,responsive_metrics,responsive_table_config,stacked_layout
 - streamlit_app/components/sidebar.py: fn:render_privacy_toggle,render_quick_stats,render_about,render_minimal_sidebar
 - streamlit_app/components/theme.py: fn:load_shared_css,init_theme,render_theme_switcher,apply_theme,format_category_badge_themed
 - streamlit_app/config/theme.py: class:ColorPalette,Theme | fn:get_theme,set_theme_mode
-- streamlit_app/pages/1_💳_Transactions.py: Transactions Browser Page - View, filter, search, and manage
-- streamlit_app/pages/2_📈_Analytics.py: fn:time_range_selector
+- streamlit_app/pages/0_📱_Mobile.py: fn:render_budget_progress,render_alerts,render_recent_transactions,main
+- streamlit_app/pages/1_💳_Transactions.py: fn:render_mobile_transactions
+- streamlit_app/pages/2_📈_Analytics.py: fn:render_mobile_analytics,time_range_selector
 - streamlit_app/pages/3_🏦_Accounts.py: fn:get_status_indicator,run_sync_in_thread,start_sync
 - streamlit_app/pages/4_🏷️_Organize.py: Organize Page - Unified management for Categories, Rules, an
 - streamlit_app/pages/5_⚙️_Settings.py: Settings Page - Application configuration and management
@@ -91,5 +95,6 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/utils/errors.py: class:ErrorBoundary | fn:safe_service_call,get_user_friendly_error,safe_call_with_spinner,handle_error_with_retry,safe_decorator
 - streamlit_app/utils/formatters.py: fn:format_currency,format_date,format_datetime,format_number,format_percentage
 - streamlit_app/utils/insights.py: fn:generate_spending_insight,generate_balance_insight,generate_pending_insight,generate_category_insight,get_time_greeting
+- streamlit_app/utils/mobile.py: fn:detect_mobile,is_mobile,mobile_page_config,force_mobile_mode,get_viewport_class
 - streamlit_app/utils/rtl.py: fn:has_hebrew,fix_rtl,format_description,mixed_rtl_ltr,clean_merchant_name
 - streamlit_app/utils/session.py: fn:format_amount_private,get_accounts_display,get_dashboard_stats_display,get_transactions_display,get_tags_display
