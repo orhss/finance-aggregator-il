@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-01-23 20:53
+# Auto-generated: 2026-01-24 20:13
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -70,15 +70,16 @@ scrapers → services → db → cli/streamlit_app
 - services/tag_service.py: class:TagService
 
 ## streamlit_app/
-- streamlit_app/app.py: fn:load_custom_css
+- streamlit_app/app.py: fn:load_custom_css,render_empty_state,render_header,render_hero_and_metrics,render_insight_banner
 - streamlit_app/components/bulk_actions.py: fn:show_bulk_preview,show_bulk_confirmation,bulk_action_workflow,quick_bulk_preview
+- streamlit_app/components/cards.py: fn:render_card,render_transaction_card,render_summary_card
 - streamlit_app/components/charts.py: fn:spending_donut,trend_line,category_bar,balance_history,spending_by_day
 - streamlit_app/components/empty_states.py: fn:empty_transactions_state,empty_search_results,empty_accounts_state,empty_analytics_state,empty_dashboard_state
 - streamlit_app/components/filters.py: fn:date_range_filter,account_filter,institution_filter,status_filter,category_filter
 - streamlit_app/components/heatmap.py: fn:calendar_heatmap,monthly_heatmap
 - streamlit_app/components/loading.py: class:ProgressTracker | fn:show_progress_steps,contextual_spinner,skeleton_table,skeleton_metrics,show_loading_message
 - streamlit_app/components/responsive.py: fn:responsive_columns,mobile_card,responsive_metrics,responsive_table_config,stacked_layout
-- streamlit_app/components/sidebar.py: fn:render_quick_stats,render_about,render_minimal_sidebar
+- streamlit_app/components/sidebar.py: fn:render_privacy_toggle,render_quick_stats,render_about,render_minimal_sidebar
 - streamlit_app/components/theme.py: fn:init_theme,render_theme_switcher,apply_theme,format_category_badge_themed,format_tags_themed
 - streamlit_app/config/theme.py: class:ColorPalette,Theme | fn:get_theme,set_theme_mode
 - streamlit_app/pages/10_📂_Categories.py: Categories Management Page - Manage category mappings for cr
