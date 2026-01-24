@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-01-24 22:42
+# Auto-generated: 2026-01-25 00:09
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -72,7 +72,7 @@ scrapers → services → db → cli/streamlit_app
 ## streamlit_app/
 - streamlit_app/app.py: fn:load_custom_css,render_empty_state,render_header,render_hero_and_metrics,render_insight_banner
 - streamlit_app/components/bulk_actions.py: fn:show_bulk_preview,show_bulk_confirmation,bulk_action_workflow,quick_bulk_preview
-- streamlit_app/components/cards.py: fn:render_card,render_transaction_card,render_summary_card
+- streamlit_app/components/cards.py: fn:render_card,render_metric_row,render_account_card,render_transaction_card,render_summary_card
 - streamlit_app/components/charts.py: fn:spending_donut,trend_line,category_bar,balance_history,spending_by_day
 - streamlit_app/components/empty_states.py: fn:empty_transactions_state,empty_search_results,empty_accounts_state,empty_analytics_state,empty_dashboard_state
 - streamlit_app/components/filters.py: fn:date_range_filter,account_filter,institution_filter,status_filter,category_filter
@@ -82,6 +82,7 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/components/sidebar.py: fn:render_privacy_toggle,render_quick_stats,render_about,render_minimal_sidebar
 - streamlit_app/components/theme.py: fn:load_shared_css,init_theme,render_theme_switcher,apply_theme,format_category_badge_themed
 - streamlit_app/config/theme.py: class:ColorPalette,Theme | fn:get_theme,set_theme_mode
+- streamlit_app/pages/1_💳_Transactions.py: Transactions Browser Page - View, filter, search, and manage
 - streamlit_app/pages/2_📈_Analytics.py: fn:time_range_selector
 - streamlit_app/pages/3_🏦_Accounts.py: fn:get_status_indicator,run_sync_in_thread,start_sync
 - streamlit_app/pages/4_🏷️_Organize.py: Organize Page - Unified management for Categories, Rules, an
