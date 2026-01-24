@@ -145,7 +145,7 @@ def generate_category_insight(category_data: Dict[str, float], top_n: int = 3) -
 
 def get_time_greeting() -> str:
     """
-    Get a time-appropriate greeting.
+    Get a time-appropriate greeting with emoji.
 
     Returns:
         Greeting string based on current time
@@ -153,11 +153,11 @@ def get_time_greeting() -> str:
     hour = datetime.now().hour
 
     if hour < 12:
-        return "Good morning"
+        return "☀️ Good morning"
     elif hour < 17:
-        return "Good afternoon"
+        return "👋 Good afternoon"
     else:
-        return "Good evening"
+        return "🌙 Good evening"
 
 
 def format_period_description(start_date: date, end_date: date) -> str:

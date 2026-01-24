@@ -48,10 +48,6 @@ st.set_page_config(
 # Mobile detection (automatic via viewport JS + User-Agent fallback)
 detect_mobile()
 
-# DEBUG
-st.sidebar.write(f"DEBUG: mobile param = {st.query_params.get('mobile', 'not set')}")
-st.sidebar.write(f"DEBUG: is_mobile = {st.session_state.get('is_mobile', 'not set')}")
-
 if is_mobile():
     from streamlit_app.mobile_dashboard import render_mobile_dashboard
     render_mobile_dashboard()
