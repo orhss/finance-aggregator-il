@@ -234,10 +234,11 @@ try:
                 percent = progress['percent_actual']
                 remaining = progress['remaining']
 
-                st.metric("Spent this month", f"₪{spent:,.0f}", delta=f"{percent:.1f}% of budget")
+                # Color: green if under 80%, neutral 80-100%, red if over
+                delta_color = "normal" if percent < 80 else ("inverse" if percent >= 100 else "off")
+                st.metric("Spent this month", f"₪{spent:,.0f}", delta=f"{percent:.1f}% of budget", delta_color=delta_color)
 
                 # Progress bar
-                progress_color = "normal" if percent < 80 else ("inverse" if percent >= 100 else "off")
                 st.progress(min(percent / 100, 1.0))
 
                 if progress['is_over_budget']:

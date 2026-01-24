@@ -1,72 +1,90 @@
 """
 Mobile detection utilities for Streamlit.
 
-Provides mobile device detection via JavaScript user-agent detection
-and query parameter fallback.
+Automatic mobile detection via:
+1. Query param (set by JS viewport detection)
+2. User-Agent header fallback (real mobile devices)
 """
 
 import streamlit as st
 import streamlit.components.v1 as components
 
+# Mobile user-agent patterns
+MOBILE_PATTERNS = [
+    'mobile', 'android', 'iphone', 'ipad', 'ipod',
+    'blackberry', 'windows phone', 'opera mini', 'iemobile'
+]
+
+MOBILE_BREAKPOINT = 768  # pixels
+
+
+def _detect_from_user_agent() -> bool:
+    """Detect mobile from User-Agent header."""
+    try:
+        headers = st.context.headers
+        user_agent = headers.get("User-Agent", "").lower()
+        return any(pattern in user_agent for pattern in MOBILE_PATTERNS)
+    except Exception:
+        return False
+
 
 def detect_mobile():
     """
-    Detect if user is on a mobile device using JavaScript user-agent detection.
+    Automatic mobile detection.
 
-    This injects a small JavaScript snippet that:
-    1. Checks the user agent for mobile patterns
-    2. Sets a query parameter if mobile is detected
-    3. Stores result in session state
-
-    Call this at the top of pages that need mobile-aware rendering.
+    Flow:
+    1. If ?mobile param exists → use it (was set by JS detection)
+    2. If no param → inject JS to detect viewport and redirect with param
+    3. User-Agent fallback for real mobile devices
     """
-    # Check if we already detected mobile in this session
-    if 'is_mobile' in st.session_state:
-        return
-
-    # Check query params first (for fallback/testing)
     query_params = st.query_params
+
+    # Already have mobile param (set by JS or manual)
     if 'mobile' in query_params:
         st.session_state.is_mobile = query_params['mobile'] == 'true'
         return
 
-    # Inject JavaScript for mobile detection
-    # This runs once and sets a query param that Streamlit can read
-    mobile_detection_js = """
-    <script>
-    (function() {
-        // Check if already detected
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('mobile')) return;
+    # Check User-Agent for real mobile devices
+    if _detect_from_user_agent():
+        st.session_state.is_mobile = True
+        return
 
-        // Mobile detection regex
-        const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
-        const isMobile = mobileRegex.test(navigator.userAgent);
+    # No param yet - inject JS to detect viewport and redirect
+    # This runs once, then redirects with ?mobile=true/false
+    components.html(
+        f"""
+        <script>
+            (function() {{
+                const isMobile = window.innerWidth < {MOBILE_BREAKPOINT};
+                const currentUrl = window.parent.location.href;
+                const url = new URL(currentUrl);
 
-        // Also check for small viewport (tablets in portrait, etc.)
-        const isSmallViewport = window.innerWidth <= 768;
+                // Only redirect if we don't already have the param
+                if (!url.searchParams.has('mobile')) {{
+                    url.searchParams.set('mobile', isMobile ? 'true' : 'false');
+                    window.parent.location.href = url.toString();
+                }}
+            }})();
+        </script>
+        """,
+        height=0,
+    )
 
-        if (isMobile || isSmallViewport) {
-            // Add mobile=true to query params
-            urlParams.set('mobile', 'true');
-            const newUrl = window.location.pathname + '?' + urlParams.toString();
-            window.history.replaceState({}, '', newUrl);
-            window.location.reload();
-        } else {
-            // Set mobile=false
-            urlParams.set('mobile', 'false');
-            const newUrl = window.location.pathname + '?' + urlParams.toString();
-            window.history.replaceState({}, '', newUrl);
-        }
-    })();
-    </script>
-    """
-
-    # Inject with minimal height
-    components.html(mobile_detection_js, height=0)
-
-    # Default to desktop until JS runs
+    # Default to desktop while JS redirects
     st.session_state.is_mobile = False
+
+
+def render_mobile_toggle():
+    """
+    Render a toggle link to switch between mobile and desktop views.
+    Shows in sidebar. Useful for manual override.
+    """
+    current_mobile = is_mobile()
+
+    if current_mobile:
+        st.sidebar.markdown("[🖥️ Switch to Desktop](?mobile=false)")
+    else:
+        st.sidebar.markdown("[📱 Switch to Mobile](?mobile=true)")
 
 
 def is_mobile() -> bool:

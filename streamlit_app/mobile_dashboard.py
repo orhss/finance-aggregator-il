@@ -1,31 +1,14 @@
 """
 Mobile Dashboard - Touch-friendly mobile-first experience.
 
-This page is designed for mobile devices with:
-- Hero balance card with gradient
-- Budget progress (if set)
-- Expandable alerts
-- Recent transactions as cards
-- Bottom navigation
+This module provides the mobile dashboard that can be rendered from app.py
+when mobile device is detected.
 """
 
 import streamlit as st
-from pathlib import Path
-import sys
+from datetime import date
 
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-# Mobile-optimized page config (must be first Streamlit call)
-st.set_page_config(
-    page_title="Fin Mobile",
-    page_icon="📱",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
-
-from streamlit_app.utils.session import init_session_state, format_amount_private
+from streamlit_app.utils.session import format_amount_private
 from streamlit_app.utils.cache import (
     get_dashboard_stats,
     get_recent_transactions,
@@ -39,14 +22,7 @@ from streamlit_app.components.mobile_ui import (
     summary_card,
     transaction_list,
     bottom_navigation,
-    alert_banner,
 )
-
-# Initialize session state
-init_session_state()
-
-# Apply mobile CSS
-apply_mobile_css()
 
 
 def render_budget_progress():
@@ -141,8 +117,14 @@ def render_recent_transactions():
         st.switch_page("pages/1_💳_Transactions.py")
 
 
-def main():
-    """Main mobile dashboard."""
+def render_mobile_dashboard():
+    """
+    Main mobile dashboard render function.
+    Call this from app.py when mobile is detected.
+    """
+    # Apply mobile CSS
+    apply_mobile_css()
+
     # Get stats
     stats = get_dashboard_stats()
 
@@ -203,7 +185,3 @@ def main():
 
     # Bottom navigation
     bottom_navigation(current="home")
-
-
-if __name__ == "__main__":
-    main()

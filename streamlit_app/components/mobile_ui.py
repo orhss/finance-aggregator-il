@@ -400,7 +400,7 @@ def bottom_navigation(current: str = "home"):
     cols = st.columns(4)
 
     nav_items = [
-        ("home", "🏠", "Home", "pages/0_📱_Mobile.py"),
+        ("home", "🏠", "Home", "app.py"),
         ("transactions", "💳", "Transactions", "pages/1_💳_Transactions.py"),
         ("analytics", "📈", "Analytics", "pages/2_📈_Analytics.py"),
         ("settings", "⚙️", "Settings", "pages/5_⚙️_Settings.py"),

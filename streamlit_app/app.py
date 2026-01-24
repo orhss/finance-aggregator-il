@@ -35,14 +35,27 @@ from services.budget_service import BudgetService
 from streamlit_app.utils.rtl import clean_merchant_name
 from streamlit_app.components.cards import render_transaction_card, render_summary_card
 from streamlit_app.components.sidebar import render_minimal_sidebar
+from streamlit_app.utils.mobile import detect_mobile, is_mobile
 
-# Page configuration
+# Page configuration - collapse sidebar if mobile detected via query param
 st.set_page_config(
     page_title="💰 Home",
     page_icon="💰",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed" if st.query_params.get("mobile") == "true" else "expanded",
 )
+
+# Mobile detection (automatic via viewport JS + User-Agent fallback)
+detect_mobile()
+
+# DEBUG
+st.sidebar.write(f"DEBUG: mobile param = {st.query_params.get('mobile', 'not set')}")
+st.sidebar.write(f"DEBUG: is_mobile = {st.session_state.get('is_mobile', 'not set')}")
+
+if is_mobile():
+    from streamlit_app.mobile_dashboard import render_mobile_dashboard
+    render_mobile_dashboard()
+    st.stop()
 
 
 def load_custom_css():
