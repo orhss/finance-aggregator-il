@@ -374,3 +374,255 @@ def invalidate_tag_cache():
     from streamlit_app.utils.session import get_all_tags
     get_tags_cached.clear()
     get_all_tags.clear()
+
+
+# =============================================================================
+# HUB PAGE CACHE FUNCTIONS
+# =============================================================================
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_recent_transactions(limit: int = 7) -> List[Dict[str, Any]]:
+    """
+    Get most recent transactions for hub display.
+
+    Args:
+        limit: Maximum number of transactions to return
+
+    Returns:
+        List of transaction dictionaries ordered by date (newest first)
+
+    Cache: 5 minutes TTL
+    """
+    from db.database import get_session
+    from db.models import Transaction, Account
+
+    session = get_session()
+    try:
+        transactions = (
+            session.query(Transaction)
+            .join(Account)
+            .order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+
+        result = []
+        for t in transactions:
+            result.append({
+                'id': t.id,
+                'transaction_date': t.transaction_date,
+                'description': t.description,
+                'original_amount': float(t.original_amount) if t.original_amount else 0.0,
+                'effective_category': t.effective_category,
+                'institution': t.account.institution if t.account else None,
+            })
+
+        return result
+    finally:
+        session.close()
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_stale_accounts(days: int = 3) -> List[Dict[str, Any]]:
+    """
+    Get accounts that haven't been synced in the specified number of days.
+
+    Args:
+        days: Number of days threshold for "stale"
+
+    Returns:
+        List of stale account info dicts with institution and days since sync
+
+    Cache: 1 minute TTL
+    """
+    from db.database import get_session
+    from db.models import Account
+
+    session = get_session()
+    try:
+        cutoff = datetime.now() - timedelta(days=days)
+
+        stale_accounts = (
+            session.query(Account)
+            .filter(
+                (Account.last_synced_at < cutoff) | (Account.last_synced_at.is_(None))
+            )
+            .all()
+        )
+
+        # Group by institution and find the most stale
+        by_institution = {}
+        for acc in stale_accounts:
+            inst = acc.institution
+            if inst not in by_institution:
+                by_institution[inst] = {
+                    'institution': inst,
+                    'last_synced_at': acc.last_synced_at,
+                }
+            elif acc.last_synced_at is None or (
+                by_institution[inst]['last_synced_at'] and
+                acc.last_synced_at < by_institution[inst]['last_synced_at']
+            ):
+                by_institution[inst]['last_synced_at'] = acc.last_synced_at
+
+        result = []
+        now = datetime.now()
+        for inst, data in by_institution.items():
+            if data['last_synced_at'] is None:
+                days_stale = 999  # Never synced
+            else:
+                days_stale = (now - data['last_synced_at']).days
+
+            result.append({
+                'institution': inst,
+                'days': days_stale,
+                'last_synced_at': data['last_synced_at'],
+            })
+
+        return sorted(result, key=lambda x: -x['days'])  # Most stale first
+    finally:
+        session.close()
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_unmapped_category_count() -> int:
+    """
+    Get count of unmapped categories (raw_category with no mapping).
+
+    Returns:
+        Count of unmapped categories
+
+    Cache: 1 minute TTL
+    """
+    from db.database import get_session
+    from db.models import Transaction, CategoryMapping
+    from sqlalchemy import distinct, and_
+
+    session = get_session()
+    try:
+        # Get distinct (provider, raw_category) pairs with no mapping
+        # First, get all distinct raw categories from transactions
+        raw_cats = (
+            session.query(
+                Transaction.account.has(),  # Placeholder for join
+                distinct(Transaction.raw_category)
+            )
+            .join(Transaction.account)
+            .filter(
+                and_(
+                    Transaction.raw_category.isnot(None),
+                    Transaction.raw_category != '',
+                    Transaction.category.is_(None)  # No normalized category yet
+                )
+            )
+            .count()
+        )
+        return raw_cats
+    except Exception:
+        return 0
+    finally:
+        session.close()
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_uncategorized_transaction_count() -> Dict[str, Any]:
+    """
+    Get count and total amount of uncategorized transactions.
+
+    Returns:
+        Dict with 'count' and 'amount' keys
+
+    Cache: 1 minute TTL
+    """
+    from db.database import get_session
+    from db.models import Transaction
+    from sqlalchemy import func, and_
+
+    session = get_session()
+    try:
+        result = (
+            session.query(
+                func.count(Transaction.id).label('count'),
+                func.sum(Transaction.original_amount).label('amount')
+            )
+            .filter(
+                and_(
+                    Transaction.user_category.is_(None),
+                    Transaction.category.is_(None),
+                    Transaction.raw_category.is_(None)
+                )
+            )
+            .first()
+        )
+
+        return {
+            'count': result.count or 0,
+            'amount': abs(float(result.amount)) if result.amount else 0.0
+        }
+    finally:
+        session.close()
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_hub_alerts() -> List[Dict[str, Any]]:
+    """
+    Get actionable alerts for the hub page.
+
+    Returns alerts for:
+    - Stale syncs (accounts not synced in 3+ days)
+    - Unmapped categories
+    - Uncategorized transactions
+
+    Returns:
+        List of alert dictionaries sorted by priority
+
+    Cache: 1 minute TTL (alerts should be fresh)
+    """
+    from streamlit_app.utils.session import format_amount_private
+
+    alerts = []
+
+    # 1. Stale syncs
+    stale_accounts = get_stale_accounts(days=3)
+    for acc in stale_accounts[:3]:  # Limit to 3 stale alerts
+        if acc['days'] >= 3:
+            if acc['days'] >= 999:
+                message = f"{acc['institution'].upper()} has never been synced"
+            else:
+                message = f"{acc['institution'].upper()} hasn't synced in {acc['days']} days"
+            alerts.append({
+                'icon': '🔄',
+                'message': message,
+                'action_label': 'Sync',
+                'page': 'pages/2_🔄_Sync.py',
+                'key': f"alert_sync_{acc['institution']}",
+                'priority': 1
+            })
+
+    # 2. Unmapped categories
+    unmapped = get_unmapped_category_count()
+    if unmapped > 0:
+        alerts.append({
+            'icon': '📂',
+            'message': f"{unmapped} unmapped categories from last sync",
+            'action_label': 'Map',
+            'page': 'pages/10_📂_Categories.py',
+            'key': 'alert_unmapped',
+            'priority': 2
+        })
+
+    # 3. Uncategorized transactions
+    uncategorized = get_uncategorized_transaction_count()
+    if uncategorized['count'] > 0:
+        amount_str = format_amount_private(uncategorized['amount'])
+        alerts.append({
+            'icon': '🏷️',
+            'message': f"{uncategorized['count']} uncategorized transactions ({amount_str})",
+            'action_label': 'Categorize',
+            'page': 'pages/10_📂_Categories.py',
+            'key': 'alert_uncategorized',
+            'priority': 3
+        })
+
+    # Sort by priority and limit to 5
+    return sorted(alerts, key=lambda x: x['priority'])[:5]

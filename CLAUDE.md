@@ -155,6 +155,8 @@ For detailed file/function navigation, see `.claude/codemap.md`
 ### Streamlit UI Patterns
 - **Privacy-aware formatting**: Always use `format_amount_private()` from `session.py` for financial amounts (balances, totals, transactions). Never use `format_currency()` directly - it ignores the `mask_balances` privacy setting.
 - **Display wrappers**: Use `get_accounts_display()`, `get_dashboard_stats_display()` etc. from `session.py` - they combine cached data with pre-formatted `_display` fields.
+- **Shared sidebar**: Use `render_minimal_sidebar()` from `components/sidebar.py` - ensures consistent privacy toggle and stats across all pages.
+- **Complex HTML rendering**: Don't use `st.markdown(unsafe_allow_html=True)` for nested HTML - Streamlit's sanitizer corrupts it. Use `streamlit.components.v1.html()` instead. See `components/cards.py` for reusable card components.
 
 ### Category System
 Three-field hierarchy with `effective_category` property returning first non-null:

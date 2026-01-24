@@ -195,3 +195,70 @@ def format_period_description(start_date: date, end_date: date) -> str:
         return "Last year"
     else:
         return f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
+
+
+def generate_hub_insight(stats: Dict[str, Any], monthly_trend: Optional[list] = None) -> Optional[Dict[str, str]]:
+    """
+    Generate a contextual insight for the hub landing page.
+
+    Compares current spending patterns to historical averages and
+    provides actionable, positive-focused insights.
+
+    Args:
+        stats: Dictionary containing financial statistics with keys:
+            - monthly_spending: Current month's total spending
+            - transaction_count: Number of transactions
+            - pending_count: Number of pending transactions
+        monthly_trend: Optional list of monthly data from get_monthly_trend_cached()
+            Each item has 'amount' key with that month's spending
+
+    Returns:
+        Dictionary with 'message', 'type' (positive/neutral/warning), and 'icon',
+        or None if no meaningful insight can be generated
+    """
+    monthly_spending = stats.get('monthly_spending', 0)
+    transaction_count = stats.get('transaction_count', 0)
+    pending_count = stats.get('pending_count', 0)
+
+    # Not enough data for insights
+    if transaction_count < 10:
+        return None
+
+    # Calculate average from monthly trend if available
+    monthly_avg = None
+    if monthly_trend and len(monthly_trend) >= 2:
+        # Exclude current month (last item) from average
+        past_months = monthly_trend[:-1] if len(monthly_trend) > 1 else monthly_trend
+        if past_months:
+            monthly_avg = sum(m.get('amount', 0) for m in past_months) / len(past_months)
+
+    # Monthly comparison
+    if monthly_avg and monthly_avg > 0:
+        month_diff_pct = ((monthly_spending - monthly_avg) / monthly_avg) * 100
+
+        # Only show meaningful insights past the first week
+        day_of_month = datetime.now().day
+        if day_of_month >= 7:
+            if month_diff_pct <= -15:
+                return {
+                    'message': f"Spending is {abs(month_diff_pct):.0f}% below your monthly average. Nice!",
+                    'type': 'positive',
+                    'icon': '💡'
+                }
+            elif month_diff_pct >= 30 and day_of_month >= 15:
+                return {
+                    'message': f"Spending is {month_diff_pct:.0f}% above your monthly average.",
+                    'type': 'warning',
+                    'icon': '📊'
+                }
+
+    # Pending transactions insight
+    if pending_count >= 5:
+        return {
+            'message': f"You have {pending_count} pending transactions awaiting clearance.",
+            'type': 'neutral',
+            'icon': '⏳'
+        }
+
+    # No significant insight to show
+    return None

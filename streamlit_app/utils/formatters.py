@@ -3,7 +3,7 @@ Formatting utilities for display
 Currency, dates, numbers, etc.
 """
 
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Optional, Union
 
 
@@ -601,6 +601,116 @@ def format_tags(tags: list[str]) -> str:
         badges.append(f"<span style='{style}'>🏷️ {tag}</span>")
 
     return " ".join(badges)
+
+
+def format_relative_time(dt: Optional[datetime]) -> str:
+    """
+    Format datetime as relative time (e.g., '2 hrs ago', 'Yesterday').
+
+    Args:
+        dt: Datetime to format
+
+    Returns:
+        Human-readable relative time string
+    """
+    if not dt:
+        return "Never"
+
+    now = datetime.now()
+
+    # Handle timezone-naive vs timezone-aware datetimes
+    if dt.tzinfo is not None and now.tzinfo is None:
+        now = now.replace(tzinfo=dt.tzinfo)
+    elif dt.tzinfo is None and now.tzinfo is not None:
+        dt = dt.replace(tzinfo=now.tzinfo)
+
+    diff = now - dt
+
+    if diff.days == 0:
+        hours = diff.seconds // 3600
+        if hours == 0:
+            minutes = diff.seconds // 60
+            return f"{minutes} min ago" if minutes > 1 else "Just now"
+        return f"{hours} hr ago" if hours == 1 else f"{hours} hrs ago"
+    elif diff.days == 1:
+        return "Yesterday"
+    elif diff.days < 7:
+        return f"{diff.days} days ago"
+    else:
+        return dt.strftime("%b %d")
+
+
+def format_date_relative(dt: Optional[Union[datetime, date]]) -> str:
+    """
+    Format date as relative date (Today, Yesterday, or date).
+
+    Args:
+        dt: Date/datetime to format
+
+    Returns:
+        Human-readable relative date string
+    """
+    if not dt:
+        return ""
+
+    today = date.today()
+
+    if isinstance(dt, datetime):
+        dt = dt.date()
+
+    if dt == today:
+        return "Today"
+    elif dt == today - timedelta(days=1):
+        return "Yesterday"
+    elif dt.year == today.year:
+        return dt.strftime("%b %d")
+    else:
+        return dt.strftime("%b %d, %Y")
+
+
+# Category icons mapping for visual display
+CATEGORY_ICONS = {
+    'groceries': '🛒',
+    'restaurants': '🍕',
+    'fuel': '⛽',
+    'transportation': '🚗',
+    'utilities': '💡',
+    'healthcare': '🏥',
+    'entertainment': '🎬',
+    'shopping': '🛍️',
+    'travel': '✈️',
+    'education': '📚',
+    'insurance': '🛡️',
+    'subscriptions': '📺',
+    'home': '🏠',
+    'clothing': '👕',
+    'electronics': '📱',
+    'gifts': '🎁',
+    'fees': '💳',
+    'other': '📋',
+    # Hebrew categories (common from providers)
+    'סופרמרקט': '🛒',
+    'מסעדות': '🍕',
+    'דלק': '⛽',
+    'תחבורה': '🚗',
+    'בילוי': '🎬',
+    'קניות': '🛍️',
+}
+
+
+def get_category_icon(category: Optional[str]) -> str:
+    """
+    Get emoji icon for a category.
+
+    Args:
+        category: Category name (English or Hebrew)
+
+    Returns:
+        Emoji icon for the category, or default icon if not found
+    """
+    if not category:
+        return '📋'
+    return CATEGORY_ICONS.get(category.lower(), CATEGORY_ICONS.get(category, '📋'))
 
 
 # CSS for monospace amount styling (use in Streamlit pages)
