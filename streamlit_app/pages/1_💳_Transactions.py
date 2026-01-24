@@ -25,16 +25,161 @@ from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.empty_states import empty_transactions_state
 # Filters are now inline for better coherence
 from streamlit_app.components.theme import apply_theme, render_theme_switcher
+from streamlit_app.utils.mobile import detect_mobile, is_mobile
+from streamlit_app.components.mobile_ui import (
+    apply_mobile_css,
+    transaction_list,
+    bottom_navigation,
+    filter_chips,
+)
+from streamlit_app.utils.formatters import get_category_icon
 
 # Page config
 st.set_page_config(
     page_title="Transactions - Financial Aggregator",
     page_icon="💳",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed" if 'mobile' in st.query_params else "expanded"
 )
 
 # Initialize session state
 init_session_state()
+
+# Mobile detection
+detect_mobile()
+
+
+def render_mobile_transactions():
+    """Render mobile-optimized transactions view."""
+    from db.database import get_session
+    from db.models import Account, Transaction
+    from sqlalchemy import func, and_, desc
+
+    # Apply mobile CSS
+    apply_mobile_css()
+
+    session = get_session()
+
+    # Check for data
+    transaction_count = session.query(func.count(Transaction.id)).scalar()
+    if not transaction_count:
+        st.info("No transactions yet. Sync your accounts to see transactions.")
+        bottom_navigation(current="transactions")
+        return
+
+    # Header
+    st.markdown("### 💳 Transactions")
+
+    # Search bar
+    search = st.text_input(
+        "Search",
+        placeholder="Search transactions...",
+        key="mobile_search",
+        label_visibility="collapsed"
+    )
+
+    # Date filter presets
+    today = date.today()
+    date_presets = {
+        "This Month": (today.replace(day=1), today),
+        "Last Month": ((today.replace(day=1) - timedelta(days=1)).replace(day=1), today.replace(day=1) - timedelta(days=1)),
+        "Last 3 Months": (today - timedelta(days=90), today),
+        "All Time": (today - timedelta(days=365*5), today),
+    }
+
+    selected_preset = st.selectbox(
+        "Date Range",
+        options=list(date_presets.keys()),
+        index=0,
+        key="mobile_date_preset",
+        label_visibility="collapsed"
+    )
+
+    start_date, end_date = date_presets[selected_preset]
+
+    # Quick filter chips for transaction type
+    st.markdown("**Quick Filters**")
+    filter_cols = st.columns(4)
+
+    type_filter = st.session_state.get('mobile_type_filter', 'All')
+    with filter_cols[0]:
+        if st.button("All", type="primary" if type_filter == "All" else "secondary", use_container_width=True):
+            st.session_state.mobile_type_filter = "All"
+            st.rerun()
+    with filter_cols[1]:
+        if st.button("Expenses", type="primary" if type_filter == "Expenses" else "secondary", use_container_width=True):
+            st.session_state.mobile_type_filter = "Expenses"
+            st.rerun()
+    with filter_cols[2]:
+        if st.button("Income", type="primary" if type_filter == "Income" else "secondary", use_container_width=True):
+            st.session_state.mobile_type_filter = "Income"
+            st.rerun()
+    with filter_cols[3]:
+        if st.button("Pending", type="primary" if type_filter == "Pending" else "secondary", use_container_width=True):
+            st.session_state.mobile_type_filter = "Pending"
+            st.rerun()
+
+    type_filter = st.session_state.get('mobile_type_filter', 'All')
+
+    # Build query
+    query = session.query(Transaction).filter(
+        and_(
+            Transaction.transaction_date >= start_date,
+            Transaction.transaction_date <= end_date
+        )
+    )
+
+    # Apply type filter
+    if type_filter == "Expenses":
+        query = query.filter(Transaction.original_amount < 0)
+    elif type_filter == "Income":
+        query = query.filter(Transaction.original_amount > 0)
+    elif type_filter == "Pending":
+        query = query.filter(Transaction.status == "pending")
+
+    # Apply search
+    if search:
+        query = query.filter(Transaction.description.ilike(f"%{search}%"))
+
+    # Order and limit
+    query = query.order_by(desc(Transaction.transaction_date)).limit(50)
+    transactions = query.all()
+
+    # Display count
+    st.caption(f"Showing {len(transactions)} transactions")
+
+    # Convert to mobile transaction list format
+    mobile_txns = []
+    for txn in transactions:
+        merchant = txn.description
+        if len(merchant) > 30:
+            merchant = merchant[:27] + "..."
+
+        category = txn.effective_category
+        amount = txn.original_amount
+
+        mobile_txns.append({
+            'date': txn.transaction_date,
+            'icon': get_category_icon(category),
+            'merchant': merchant,
+            'category': category,
+            'amount': format_amount_private(amount),
+            'is_positive': amount > 0,
+        })
+
+    # Render transaction cards
+    transaction_list(mobile_txns)
+
+    session.close()
+
+    # Bottom navigation
+    bottom_navigation(current="transactions")
+
+
+# Check if mobile and render mobile view
+if is_mobile():
+    render_mobile_transactions()
+    st.stop()
 
 # Apply theme (must be called before any content)
 theme = apply_theme()

@@ -277,3 +277,26 @@ class MerchantMapping(Base):
 
     def __repr__(self):
         return f"<MerchantMapping(pattern={self.pattern}, category={self.category}, provider={self.provider})>"
+
+
+class Budget(Base):
+    """
+    Monthly budget configuration.
+    Simple year/month/amount model - no category budgets (KISS).
+    """
+    __tablename__ = "budgets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)  # 1-12
+    amount = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('year', 'month', name='uq_budget_period'),
+        Index('idx_budget_period', 'year', 'month'),
+    )
+
+    def __repr__(self):
+        return f"<Budget(year={self.year}, month={self.month}, amount={self.amount})>"

@@ -352,3 +352,55 @@ iframe {
     font-weight: 500;
     margin-right: 0.25rem;
 }
+
+/* ===== BUDGET PROGRESS ===== */
+.budget-progress {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    border: 1px solid #f0f0f0;
+    margin-bottom: 1rem;
+}
+.budget-progress .budget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.budget-progress .budget-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+.budget-progress .budget-status {
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+.budget-progress .budget-status.good {
+    color: #10B981;
+}
+.budget-progress .budget-status.warning {
+    color: #F59E0B;
+}
+.budget-progress .budget-status.over {
+    color: #EF4444;
+}
+.budget-progress .budget-bar-container {
+    height: 8px;
+    background: #E5E7EB;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+.budget-progress .budget-bar {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+.budget-progress .budget-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #6b7280;
+}

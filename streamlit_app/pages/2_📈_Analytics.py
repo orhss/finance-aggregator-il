@@ -41,16 +41,136 @@ from streamlit_app.components.charts import (
 from streamlit_app.components.heatmap import calendar_heatmap, monthly_heatmap
 from streamlit_app.components.theme import apply_theme, render_theme_switcher
 from streamlit_app.components.cards import render_metric_row
+from streamlit_app.utils.mobile import detect_mobile, is_mobile
+from streamlit_app.components.mobile_ui import apply_mobile_css, summary_card, bottom_navigation
 
 # Page config
 st.set_page_config(
     page_title="Analytics - Financial Aggregator",
     page_icon="📈",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed" if 'mobile' in st.query_params else "expanded"
 )
 
 # Initialize session state
 init_session_state()
+
+# Mobile detection
+detect_mobile()
+
+
+def render_mobile_analytics():
+    """Render simplified mobile analytics view."""
+    # Apply mobile CSS
+    apply_mobile_css()
+
+    st.markdown("### 📈 Analytics")
+
+    # Period selector
+    today = date.today()
+    period_options = {
+        "This Month": (today.replace(day=1), today),
+        "Last Month": ((today.replace(day=1) - timedelta(days=1)).replace(day=1), today.replace(day=1) - timedelta(days=1)),
+        "Last 3 Months": (today - timedelta(days=90), today),
+    }
+
+    selected_period = st.selectbox(
+        "Period",
+        options=list(period_options.keys()),
+        index=0,
+        key="mobile_analytics_period",
+        label_visibility="collapsed"
+    )
+
+    start_date, end_date = period_options[selected_period]
+
+    # Get category spending data
+    try:
+        df_spending = get_category_spending_cached(start_date, end_date, top_n=5)
+
+        if not df_spending.empty:
+            total_spent = df_spending['amount'].sum()
+
+            # Summary card for total spending
+            summary_card(
+                title=f"Total Spent ({selected_period})",
+                value=format_amount_private(total_spent),
+            )
+
+            st.markdown("---")
+
+            # Top categories as horizontal bar chart
+            st.markdown("**Top Categories**")
+
+            fig = px.bar(
+                df_spending.head(5),
+                x='amount',
+                y='category',
+                orientation='h',
+                color='category',
+                color_discrete_sequence=px.colors.qualitative.Set2,
+            )
+            fig.update_layout(
+                showlegend=False,
+                height=250,
+                margin=dict(l=0, r=0, t=10, b=0),
+                xaxis_title="",
+                yaxis_title="",
+                yaxis={'categoryorder': 'total ascending'},
+            )
+            fig.update_traces(
+                texttemplate='₪%{x:,.0f}',
+                textposition='outside'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        else:
+            st.info("No spending data for this period")
+
+    except Exception as e:
+        st.warning(f"Could not load category data: {str(e)}")
+
+    st.markdown("---")
+
+    # Monthly trend (last 6 months)
+    st.markdown("**Monthly Trend**")
+
+    try:
+        df_trend = get_monthly_trend_cached(months_back=6)
+
+        if not df_trend.empty:
+            fig = px.line(
+                df_trend,
+                x='month_name',
+                y='amount',
+                markers=True,
+            )
+            fig.update_layout(
+                showlegend=False,
+                height=200,
+                margin=dict(l=0, r=0, t=10, b=0),
+                xaxis_title="",
+                yaxis_title="",
+            )
+            fig.update_traces(
+                line_color='#667eea',
+                marker_color='#667eea',
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No trend data available")
+
+    except Exception as e:
+        st.warning(f"Could not load trend data: {str(e)}")
+
+    # Bottom navigation
+    bottom_navigation(current="analytics")
+
+
+# Check if mobile and render mobile view
+if is_mobile():
+    render_mobile_analytics()
+    st.stop()
 
 # Apply theme (must be called before any content)
 theme = apply_theme()

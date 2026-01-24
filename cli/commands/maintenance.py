@@ -11,7 +11,7 @@ from rich.table import Table
 from rich import box
 from sqlalchemy import func
 
-from db.database import get_db, get_db_path, migrate_tags_schema, migrate_category_normalization_schema, migrate_merchant_mapping_schema
+from db.database import get_db, get_db_path, migrate_tags_schema, migrate_category_normalization_schema, migrate_merchant_mapping_schema, migrate_budget_schema
 from db.models import Account, Transaction, Balance, SyncHistory
 from services.analytics_service import AnalyticsService
 
@@ -316,6 +316,14 @@ def migrate():
         merchant_results = migrate_merchant_mapping_schema(db_path)
         if merchant_results["created_tables"]:
             console.print(f"  [green]Created tables:[/green] {', '.join(merchant_results['created_tables'])}")
+        else:
+            console.print("  [dim]Already up to date[/dim]")
+
+        # Run budget migrations
+        console.print("\n[bold]4. Budget migrations:[/bold]")
+        budget_results = migrate_budget_schema(db_path)
+        if budget_results["created_tables"]:
+            console.print(f"  [green]Created tables:[/green] {', '.join(budget_results['created_tables'])}")
         else:
             console.print("  [dim]Already up to date[/dim]")
 

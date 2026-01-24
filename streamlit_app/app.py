@@ -31,6 +31,7 @@ from streamlit_app.utils.formatters import (
     get_category_icon,
 )
 from streamlit_app.utils.insights import get_time_greeting, generate_hub_insight
+from services.budget_service import BudgetService
 from streamlit_app.utils.rtl import clean_merchant_name
 from streamlit_app.components.cards import render_transaction_card, render_summary_card
 from streamlit_app.components.sidebar import render_minimal_sidebar
@@ -144,6 +145,59 @@ def render_hero_and_metrics(stats: dict):
                 f'</div>',
                 unsafe_allow_html=True
             )
+
+
+def render_budget_progress():
+    """Render budget progress bar below hero metrics if budget is set."""
+    try:
+        budget_service = BudgetService()
+        progress = budget_service.get_current_progress()
+        budget_service.close()
+
+        if progress['budget'] is None:
+            return  # No budget set, don't show anything
+
+        spent = progress['spent']
+        budget = progress['budget']
+        percent = progress['percent_actual']
+        remaining = progress['remaining']
+
+        # Determine color and status
+        if progress['is_over_budget']:
+            bar_color = "#EF4444"  # red
+            status_text = f"₪{abs(remaining):,.0f} over budget"
+            status_class = "over"
+        elif percent >= 80:
+            bar_color = "#F59E0B"  # yellow
+            status_text = f"₪{remaining:,.0f} remaining"
+            status_class = "warning"
+        else:
+            bar_color = "#10B981"  # green
+            status_text = f"₪{remaining:,.0f} remaining"
+            status_class = "good"
+
+        # Cap display percent at 100 for the bar
+        display_percent = min(percent, 100)
+
+        st.markdown(
+            f'<div class="budget-progress">'
+            f'<div class="budget-header">'
+            f'<span class="budget-label">Monthly Budget</span>'
+            f'<span class="budget-status {status_class}">{status_text}</span>'
+            f'</div>'
+            f'<div class="budget-bar-container">'
+            f'<div class="budget-bar" style="width: {display_percent}%; background: {bar_color};"></div>'
+            f'</div>'
+            f'<div class="budget-details">'
+            f'<span>₪{spent:,.0f} of ₪{budget:,.0f}</span>'
+            f'<span>{percent:.0f}%</span>'
+            f'</div>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+
+    except Exception:
+        pass  # Silently fail if budget table doesn't exist yet
 
 
 def render_insight_banner(stats: dict):
@@ -357,6 +411,9 @@ def main():
 
     # Hero balance + metrics row
     render_hero_and_metrics(stats)
+
+    # Budget progress bar (if budget is set)
+    render_budget_progress()
 
     # Contextual insight banner
     render_insight_banner(stats)

@@ -400,3 +400,51 @@ def migrate_merchant_mapping_schema(db_path: Path = DEFAULT_DB_PATH) -> dict:
         logger.info("Merchant mapping schema already up to date")
 
     return results
+
+
+def migrate_budget_schema(db_path: Path = DEFAULT_DB_PATH) -> dict:
+    """
+    Migrate database schema to add budget support.
+    Safe to run multiple times (idempotent).
+
+    Adds:
+    - budgets table
+
+    Args:
+        db_path: Path to SQLite database file
+
+    Returns:
+        Dict with migration results: {created_tables: []}
+    """
+    engine = get_engine(db_path)
+    results = {"created_tables": []}
+
+    with engine.connect() as conn:
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+
+        # Create budgets table if not exists
+        if 'budgets' not in existing_tables:
+            conn.execute(text("""
+                CREATE TABLE budgets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    year INTEGER NOT NULL,
+                    month INTEGER NOT NULL,
+                    amount REAL NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP,
+                    UNIQUE(year, month)
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_budget_period ON budgets(year, month)"))
+            results["created_tables"].append("budgets")
+            logger.info("Created budgets table")
+
+        conn.commit()
+
+    if results["created_tables"]:
+        logger.info(f"Budget migration completed: {results}")
+    else:
+        logger.info("Budget schema already up to date")
+
+    return results

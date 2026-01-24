@@ -191,6 +191,68 @@ try:
     st.markdown("---")
 
     # ============================================================================
+    # BUDGET SETTINGS
+    # ============================================================================
+    st.subheader("💰 Monthly Budget")
+
+    try:
+        from services.budget_service import BudgetService
+        from datetime import date
+
+        budget_service = BudgetService(session)
+        progress = budget_service.get_current_progress()
+        today = date.today()
+        month_name = today.strftime("%B %Y")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown(f"**Set Budget for {month_name}**")
+
+            # Current budget value for default
+            current_budget = progress['budget'] if progress['budget'] else 5000
+
+            new_budget = st.number_input(
+                "Monthly Budget (₪)",
+                min_value=0.0,
+                value=float(current_budget),
+                step=500.0,
+                key="budget_input"
+            )
+
+            if st.button("💾 Save Budget", use_container_width=True):
+                budget_service.set_current_budget(new_budget)
+                st.success(f"Budget set to ₪{new_budget:,.0f}")
+                st.rerun()
+
+        with col2:
+            st.markdown("**Current Progress**")
+
+            if progress['budget']:
+                spent = progress['spent']
+                budget = progress['budget']
+                percent = progress['percent_actual']
+                remaining = progress['remaining']
+
+                st.metric("Spent this month", f"₪{spent:,.0f}", delta=f"{percent:.1f}% of budget")
+
+                # Progress bar
+                progress_color = "normal" if percent < 80 else ("inverse" if percent >= 100 else "off")
+                st.progress(min(percent / 100, 1.0))
+
+                if progress['is_over_budget']:
+                    st.error(f"₪{abs(remaining):,.0f} over budget")
+                else:
+                    st.success(f"₪{remaining:,.0f} remaining")
+            else:
+                st.info("No budget set. Set a monthly budget to track your spending.")
+
+    except Exception as e:
+        st.warning(f"Could not load budget settings: {str(e)}")
+
+    st.markdown("---")
+
+    # ============================================================================
     # EXPORT SETTINGS
     # ============================================================================
     st.subheader("📤 Export Settings")
