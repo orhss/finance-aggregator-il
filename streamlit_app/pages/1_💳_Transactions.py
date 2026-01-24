@@ -23,7 +23,7 @@ from streamlit_app.utils.cache import get_transactions_cached, invalidate_transa
 from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, show_success, show_warning
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.empty_states import empty_transactions_state
-from streamlit_app.components.filters import date_range_filter_with_presets
+# Filters are now inline for better coherence
 from streamlit_app.components.theme import apply_theme, render_theme_switcher
 
 # Page config
@@ -112,31 +112,42 @@ try:
     latest_date = session.query(func.max(Transaction.transaction_date)).scalar()
 
     # ============================================================================
-s    # FILTER PANEL - Essential filters visible, advanced in "More Filters"
+    # FILTER PANEL - Compact, coherent layout
     # ============================================================================
 
-    # Essential Filters Row: Search, Date, Category
-    col1, col2, col3 = st.columns([2, 2, 2])
+    # Date range presets
+    today = date.today()
+    DATE_PRESETS = {
+        "Last 3 Months": (today - timedelta(days=90), today),
+        "This Month": (today.replace(day=1), today),
+        "Last Month": ((today.replace(day=1) - timedelta(days=1)).replace(day=1), today.replace(day=1) - timedelta(days=1)),
+        "This Year": (today.replace(month=1, day=1), today),
+        "Last Year": (date(today.year - 1, 1, 1), date(today.year - 1, 12, 31)),
+        "All Time": (earliest_date or today - timedelta(days=365), latest_date or today),
+        "Custom": None,
+    }
+
+    # Main filter row - 4 equal columns
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         search_query = st.text_input(
             "🔍 Search",
-            placeholder="merchant, description, or amount",
+            placeholder="merchant, description, amount",
             key="filter_search",
             help="Search by merchant name, description, or amount"
         )
 
     with col2:
-        # Simplified date range
-        start_date, end_date = date_range_filter_with_presets(
-            key_prefix="txn_filter",
-            default_months_back=3,
-            data_start=earliest_date,
-            data_end=latest_date
+        date_preset = st.selectbox(
+            "📅 Date Range",
+            options=list(DATE_PRESETS.keys()),
+            index=0,
+            key="filter_date_preset"
         )
 
     with col3:
-        # Get unique categories (user_category, normalized category, and raw_category)
+        # Get unique categories
         user_categories = session.query(Transaction.user_category).filter(
             Transaction.user_category.isnot(None)
         ).distinct().all()
@@ -147,7 +158,6 @@ s    # FILTER PANEL - Essential filters visible, advanced in "More Filters"
             Transaction.raw_category.isnot(None)
         ).distinct().all()
 
-        # Combine and deduplicate
         category_set = set()
         category_set.update([cat[0] for cat in user_categories if cat[0]])
         category_set.update([cat[0] for cat in source_categories if cat[0]])
@@ -155,39 +165,49 @@ s    # FILTER PANEL - Essential filters visible, advanced in "More Filters"
         category_list = sorted(list(category_set))
 
         selected_categories = st.multiselect(
-            "Category",
+            "📂 Category",
             options=category_list,
             key="filter_categories",
             placeholder="All categories"
         )
+
+    with col4:
+        # Account filter in main row
+        accounts = session.query(Account).all()
+        account_options = {f"{acc.institution} - {acc.account_type or 'Account'}": acc.id for acc in accounts}
+        selected_accounts = st.multiselect(
+            "🏦 Account",
+            options=list(account_options.keys()),
+            key="filter_accounts",
+            placeholder="All accounts"
+        )
+
+    # Handle date preset selection
+    if date_preset == "Custom":
+        custom_col1, custom_col2, _, _ = st.columns(4)
+        with custom_col1:
+            start_date = st.date_input(
+                "From",
+                value=st.session_state.get("txn_filter_custom_start", today - timedelta(days=90)),
+                max_value=today,
+                key="txn_filter_custom_start"
+            )
+        with custom_col2:
+            end_date = st.date_input(
+                "To",
+                value=st.session_state.get("txn_filter_custom_end", today),
+                max_value=today,
+                min_value=start_date,
+                key="txn_filter_custom_end"
+            )
+    else:
+        start_date, end_date = DATE_PRESETS[date_preset]
 
     # More Filters (collapsed by default)
     with st.expander("More Filters", expanded=False):
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            # Account and Institution Filter
-            accounts = session.query(Account).all()
-            account_options = {f"{acc.institution} - {acc.account_type or 'Account'}": acc.id for acc in accounts}
-
-            selected_accounts = st.multiselect(
-                "Accounts",
-                options=list(account_options.keys()),
-                key="filter_accounts",
-                placeholder="All accounts"
-            )
-
-            institutions = session.query(Account.institution).distinct().all()
-            institution_list = [inst[0] for inst in institutions if inst[0]]
-
-            selected_institutions = st.multiselect(
-                "Institutions",
-                options=institution_list,
-                key="filter_institutions",
-                placeholder="All institutions"
-            )
-
-        with col2:
             # Amount Range
             amount_col1, amount_col2 = st.columns(2)
             with amount_col1:
@@ -205,6 +225,7 @@ s    # FILTER PANEL - Essential filters visible, advanced in "More Filters"
                     key="filter_amount_max"
                 )
 
+        with col2:
             # Transaction Type
             transaction_type = st.radio(
                 "Type",
@@ -213,7 +234,6 @@ s    # FILTER PANEL - Essential filters visible, advanced in "More Filters"
                 horizontal=True
             )
 
-        with col3:
             # Status Filter
             status_filter = st.radio(
                 "Status",
@@ -222,6 +242,7 @@ s    # FILTER PANEL - Essential filters visible, advanced in "More Filters"
                 horizontal=True
             )
 
+        with col3:
             # Tags Filter
             tags = session.query(Tag).all()
             tag_list = [tag.name for tag in tags]
@@ -282,14 +303,6 @@ s    # FILTER PANEL - Essential filters visible, advanced in "More Filters"
     if selected_accounts:
         account_ids = [account_options[acc_name] for acc_name in selected_accounts]
         query = query.filter(Transaction.account_id.in_(account_ids))
-
-    # Apply institution filter
-    if selected_institutions:
-        institution_account_ids = session.query(Account.id).filter(
-            Account.institution.in_(selected_institutions)
-        ).all()
-        institution_account_ids = [acc_id[0] for acc_id in institution_account_ids]
-        query = query.filter(Transaction.account_id.in_(institution_account_ids))
 
     # Apply status filter
     if status_filter == "Completed":
@@ -504,7 +517,6 @@ s    # FILTER PANEL - Essential filters visible, advanced in "More Filters"
         # Count active filters for better feedback
         active_filters = 0
         if selected_accounts: active_filters += 1
-        if selected_institutions: active_filters += 1
         if status_filter != "All": active_filters += 1
         if selected_categories: active_filters += 1
         if unmapped_only: active_filters += 1
