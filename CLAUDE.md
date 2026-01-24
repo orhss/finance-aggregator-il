@@ -46,6 +46,10 @@ fin-cli categories analyze       # Check category mapping coverage
 fin-cli categories suggest       # Show uncategorized by merchant (Isracard)
 fin-cli categories assign-wizard # Interactive merchant categorization
 fin-cli categories merchants     # List saved merchant mappings
+
+# Budget management
+fin-cli budget show              # Show current month's budget progress
+fin-cli budget set <amount>      # Set monthly budget (e.g., 5000)
 ```
 
 ### Docker Deployment
@@ -158,6 +162,7 @@ For detailed file/function navigation, see `.claude/codemap.md`
 - **Display wrappers**: Use `get_accounts_display()`, `get_dashboard_stats_display()` etc. from `session.py` - they combine cached data with pre-formatted `_display` fields.
 - **Shared sidebar**: Use `render_minimal_sidebar()` from `components/sidebar.py` - ensures consistent privacy toggle and stats across all pages.
 - **Complex HTML rendering**: Don't use `st.markdown(unsafe_allow_html=True)` for nested HTML - Streamlit's sanitizer corrupts it. Use `streamlit.components.v1.html()` instead. See `components/cards.py` for reusable card components.
+- **Mobile support**: Use `detect_mobile()` and `is_mobile()` from `utils/mobile.py` at page top. Render mobile view with early `st.stop()` when mobile detected. Mobile components in `components/mobile_ui.py`.
 
 ### Category System
 Three-field hierarchy with `effective_category` property returning first non-null:
