@@ -131,12 +131,12 @@ def render_metric_row(metrics: List[Dict[str, str]]) -> None:
     for col, metric in zip(cols, metrics):
         with col:
             sublabel = metric.get('sublabel', '')
-            sublabel_html = f'<div class="sublabel">{sublabel}</div>' if sublabel else ''
+            # Always render sublabel div for consistent card height
             st.markdown(
                 f'<div class="metric-card">'
                 f'<div class="value">{metric["value"]}</div>'
                 f'<div class="label">{metric["label"]}</div>'
-                f'{sublabel_html}'
+                f'<div class="sublabel">{sublabel}</div>'
                 f'</div>',
                 unsafe_allow_html=True
             )

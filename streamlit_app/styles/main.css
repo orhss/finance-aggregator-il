@@ -44,7 +44,10 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     text-align: center;
     border: 1px solid #f0f0f0;
-    height: 100%;
+    min-height: 95px;  /* Fixed height for consistent card sizes */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 .metric-card .value {
     font-size: 1.4rem;
@@ -61,6 +64,7 @@
     font-size: 0.7rem;
     color: #9ca3af;
     margin-top: 0.25rem;
+    min-height: 1em;  /* Reserve space even when empty */
 }
 
 /* ===== SECTION CARDS ===== */
