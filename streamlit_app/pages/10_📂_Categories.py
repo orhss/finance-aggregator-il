@@ -314,11 +314,17 @@ try:
             # Display table
             unmapped_data = []
             for item in unmapped:
+                # Join multiple samples with comma
+                samples = item.get('sample_merchants', [])
+                if not samples and item.get('sample_merchant'):
+                    samples = [item['sample_merchant']]
+                samples_display = ', '.join(samples[:4]) if samples else '-'
+
                 unmapped_data.append({
                     'Provider': item['provider'].upper(),
                     'Raw Category': item['raw_category'],
                     'Transactions': f"{item['count']:,}",
-                    'Sample Merchant': item['sample_merchant'] or '-',
+                    'Sample Transactions': samples_display,
                     '_provider': item['provider'],
                     '_raw': item['raw_category'],
                     '_count': item['count']
@@ -343,7 +349,7 @@ try:
                 df_unmapped = df_unmapped.sort_values('Raw Category')
 
             st.dataframe(
-                df_unmapped[['Provider', 'Raw Category', 'Transactions', 'Sample Merchant']],
+                df_unmapped[['Provider', 'Raw Category', 'Transactions', 'Sample Transactions']],
                 use_container_width=True,
                 hide_index=True
             )
@@ -638,13 +644,18 @@ try:
                     progress = current_idx / total_items
                     st.progress(progress, text=f"Progress: {current_idx}/{total_items}")
 
-                    # Current item card
+                    # Current item card - show multiple samples
+                    samples = item.get('sample_merchants', [])
+                    if not samples and item.get('sample_merchant'):
+                        samples = [item['sample_merchant']]
+                    samples_html = '<br>'.join([f"• {s}" for s in samples[:4]]) if samples else 'N/A'
+
                     st.markdown(f"""
                     <div style="padding: 15px; background-color: #f0f2f6; border-radius: 8px; margin: 10px 0;">
                         <strong>Provider:</strong> {item['provider'].upper()}<br>
                         <strong>Raw Category:</strong> {item['raw_category']}<br>
                         <strong>Transactions:</strong> {item['count']:,}<br>
-                        <strong>Sample:</strong> {item['sample_merchant'] or 'N/A'}
+                        <strong>Sample Transactions:</strong><br>{samples_html}
                     </div>
                     """, unsafe_allow_html=True)
 

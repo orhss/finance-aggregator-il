@@ -177,15 +177,16 @@ class CategoryService:
 
     # ==================== Unmapped Detection ====================
 
-    def get_unmapped_categories(self, provider: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_unmapped_categories(self, provider: Optional[str] = None, max_samples: int = 4) -> List[Dict[str, Any]]:
         """
         Get all (provider, raw_category) pairs that have no mapping.
 
         Args:
             provider: Optional filter by provider
+            max_samples: Maximum number of sample merchants to return per category
 
         Returns:
-            List of dicts: [{provider, raw_category, count, sample_merchant}, ...]
+            List of dicts: [{provider, raw_category, count, sample_merchants}, ...]
         """
         # Subquery for mapped categories
         mapped_subq = self.session.query(
@@ -193,12 +194,11 @@ class CategoryService:
             CategoryMapping.raw_category
         ).subquery()
 
-        # Query transactions with raw_category that have no mapping
+        # First, get the grouped stats
         query = self.session.query(
             Account.institution.label('provider'),
             Transaction.raw_category,
-            func.count(Transaction.id).label('count'),
-            func.min(Transaction.description).label('sample_merchant')
+            func.count(Transaction.id).label('count')
         ).join(
             Account, Transaction.account_id == Account.id
         ).outerjoin(
@@ -219,17 +219,34 @@ class CategoryService:
         if provider:
             query = query.filter(Account.institution == provider.lower())
 
-        results = query.all()
+        grouped_results = query.all()
 
-        return [
-            {
+        # Now fetch sample merchants for each group
+        results = []
+        for r in grouped_results:
+            # Get distinct sample descriptions for this provider/category
+            samples_query = self.session.query(
+                distinct(Transaction.description)
+            ).join(
+                Account, Transaction.account_id == Account.id
+            ).filter(
+                Account.institution == r.provider,
+                Transaction.raw_category == r.raw_category
+            ).limit(max_samples)
+
+            sample_merchants = [s[0][:50] if s[0] else None for s in samples_query.all()]
+            sample_merchants = [s for s in sample_merchants if s]
+
+            results.append({
                 'provider': r.provider,
                 'raw_category': r.raw_category,
                 'count': r.count,
-                'sample_merchant': r.sample_merchant[:50] if r.sample_merchant else None
-            }
-            for r in results
-        ]
+                'sample_merchants': sample_merchants,
+                # Keep backward compatibility
+                'sample_merchant': sample_merchants[0] if sample_merchants else None
+            })
+
+        return results
 
     def get_unmapped_count(self, provider: Optional[str] = None) -> int:
         """
