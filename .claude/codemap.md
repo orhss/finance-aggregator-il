@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-01-25 00:32
+# Auto-generated: 2026-01-25 01:17
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -85,7 +85,7 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/components/sidebar.py: fn:render_privacy_toggle,render_quick_stats,render_about,render_minimal_sidebar
 - streamlit_app/components/theme.py: fn:load_shared_css,init_theme,render_theme_switcher,apply_theme,format_category_badge_themed
 - streamlit_app/config/theme.py: class:ColorPalette,Theme | fn:get_theme,set_theme_mode
-- streamlit_app/pages/0_📱_Mobile.py: fn:render_budget_progress,render_alerts,render_recent_transactions,main
+- streamlit_app/mobile_dashboard.py: fn:render_budget_progress,render_alerts,render_recent_transactions,render_mobile_dashboard
 - streamlit_app/pages/1_💳_Transactions.py: fn:render_mobile_transactions
 - streamlit_app/pages/2_📈_Analytics.py: fn:render_mobile_analytics,time_range_selector
 - streamlit_app/pages/3_🏦_Accounts.py: fn:get_status_indicator,run_sync_in_thread,start_sync
@@ -95,6 +95,6 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/utils/errors.py: class:ErrorBoundary | fn:safe_service_call,get_user_friendly_error,safe_call_with_spinner,handle_error_with_retry,safe_decorator
 - streamlit_app/utils/formatters.py: fn:format_currency,format_date,format_datetime,format_number,format_percentage
 - streamlit_app/utils/insights.py: fn:generate_spending_insight,generate_balance_insight,generate_pending_insight,generate_category_insight,get_time_greeting
-- streamlit_app/utils/mobile.py: fn:detect_mobile,is_mobile,mobile_page_config,force_mobile_mode,get_viewport_class
+- streamlit_app/utils/mobile.py: fn:detect_mobile,render_mobile_toggle,is_mobile,mobile_page_config,force_mobile_mode
 - streamlit_app/utils/rtl.py: fn:has_hebrew,fix_rtl,format_description,mixed_rtl_ltr,clean_merchant_name
 - streamlit_app/utils/session.py: fn:format_amount_private,get_accounts_display,get_dashboard_stats_display,get_transactions_display,get_tags_display
