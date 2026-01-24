@@ -24,6 +24,7 @@ from streamlit_app.utils.formatters import format_number, format_category_badge,
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.bulk_actions import show_bulk_preview, show_bulk_confirmation
 from streamlit_app.components.theme import apply_theme, render_theme_switcher
+from streamlit_app.components.cards import render_metric_row
 
 # Page config
 st.set_page_config(
@@ -84,21 +85,14 @@ try:
         coverage = category_service.get_category_coverage_stats()
         analysis = category_service.analyze_categories()
 
-        col1, col2, col3, col4 = st.columns(4)
+        categorized_pct = round(100 * coverage['with_unified_category'] / coverage['total'], 1) if coverage['total'] > 0 else 0
 
-        with col1:
-            st.metric("Total Transactions", f"{coverage['total']:,}")
-
-        with col2:
-            categorized_pct = round(100 * coverage['with_unified_category'] / coverage['total'], 1) if coverage['total'] > 0 else 0
-            st.metric("Categorized", f"{coverage['with_unified_category']:,}", delta=f"{categorized_pct}%")
-
-        with col3:
-            st.metric("From Provider", f"{coverage['with_provider_category']:,}")
-
-        with col4:
-            st.metric("Needs Attention", f"{coverage['needs_attention']:,}",
-                     delta_color="inverse" if coverage['needs_attention'] > 0 else "normal")
+        render_metric_row([
+            {"value": f"{coverage['total']:,}", "label": "Total Transactions"},
+            {"value": f"{coverage['with_unified_category']:,}", "label": "Categorized", "sublabel": f"{categorized_pct}%"},
+            {"value": f"{coverage['with_provider_category']:,}", "label": "From Provider"},
+            {"value": f"{coverage['needs_attention']:,}", "label": "Needs Attention"},
+        ])
 
         # Action hint
         if coverage['needs_attention'] > 0:

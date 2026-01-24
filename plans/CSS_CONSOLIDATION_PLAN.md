@@ -2,7 +2,7 @@
 
 **Goal**: Extend Hub's card-based design to other pages for visual consistency before implementing mobile.
 
-**Status**: Pending
+**Status**: ✅ Complete
 
 ---
 
@@ -289,12 +289,12 @@ def render_metric_row(metrics: List[Dict[str, str]]) -> None:
 ## Verification Checklist
 
 After implementation:
-- [ ] All pages load without CSS errors
-- [ ] Metric cards render consistently across all pages
-- [ ] Account cards in Accounts page match Hub style
-- [ ] No duplicate CSS (TABLE_STYLE_CSS removed from Transactions)
-- [ ] Privacy mode still works (amounts masked)
-- [ ] Dark mode still works (theme-aware)
+- [x] All pages load without CSS errors
+- [x] Metric cards render consistently across all pages
+- [x] Account cards in Accounts page match Hub style
+- [x] No duplicate CSS (TABLE_STYLE_CSS removed from Transactions)
+- [ ] Privacy mode still works (amounts masked) - needs manual testing
+- [ ] Dark mode still works (theme-aware) - needs manual testing
 
 ---
 

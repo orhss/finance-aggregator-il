@@ -45,6 +45,7 @@ from streamlit_app.utils.formatters import format_number, format_datetime, forma
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.charts import balance_history
 from streamlit_app.components.theme import apply_theme, render_theme_switcher
+from streamlit_app.components.cards import render_metric_row
 
 # Apply theme
 theme = apply_theme()
@@ -245,15 +246,13 @@ try:
         # Summary metrics
         total_balance = sum([item['balance'] for items in account_types.values() for item in items if item['balance']])
         total_accounts = len(accounts_with_balance)
+        active = sum([1 for items in account_types.values() for item in items if item['balance'] and item['balance'] > 0])
 
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Accounts", format_number(total_accounts))
-        with col2:
-            st.metric("Total Balance", format_amount_private(total_balance))
-        with col3:
-            active = sum([1 for items in account_types.values() for item in items if item['balance'] and item['balance'] > 0])
-            st.metric("Active Accounts", format_number(active))
+        render_metric_row([
+            {"value": format_number(total_accounts), "label": "Total Accounts"},
+            {"value": format_amount_private(total_balance), "label": "Total Balance"},
+            {"value": format_number(active), "label": "Active Accounts"},
+        ])
 
         st.markdown("---")
 
@@ -324,22 +323,37 @@ try:
                 txn_count = item['txn_count']
 
                 with cols[idx % 3]:
-                    st.markdown(f"**{status_icon} {account.institution}**")
-
-                    if not is_credit_card and balance is not None:
-                        st.metric("Balance", format_amount_private(balance))
-
+                    # Account number formatting
+                    account_info = ""
                     if account.account_number:
                         masked = st.session_state.get('mask_account_numbers', True)
-                        st.caption(f"Account: {format_account_number(account.account_number, masked=masked)}")
+                        account_info = format_account_number(account.account_number, masked=masked)
 
-                    st.caption(f"Transactions: {txn_count}")
+                    # Balance display (hide for credit cards)
+                    balance_display = format_amount_private(balance) if not is_credit_card and balance is not None else ""
+
+                    # Subtitle with transaction count and account number
+                    subtitle_parts = [f"{txn_count} transactions"]
+                    if account_info:
+                        subtitle_parts.append(account_info)
+                    subtitle = " · ".join(subtitle_parts)
+
+                    # Render account card using CSS from main.css
+                    st.markdown(
+                        f'<div class="account-card">'
+                        f'<div class="icon">🏦</div>'
+                        f'<div class="info">'
+                        f'<div class="name">{status_icon} {account.institution}</div>'
+                        f'<div class="subtitle">{subtitle}</div>'
+                        f'</div>'
+                        f'<div class="balance">{balance_display}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
 
                     if st.button("View Details", key=f"view_{account.id}", use_container_width=True):
                         st.session_state.selected_account_id = account.id
                         st.rerun()
-
-                    st.markdown("---")
 
     # ========================================================================
     # TAB 2: SYNC

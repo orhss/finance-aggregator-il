@@ -40,6 +40,7 @@ from streamlit_app.components.charts import (
 )
 from streamlit_app.components.heatmap import calendar_heatmap, monthly_heatmap
 from streamlit_app.components.theme import apply_theme, render_theme_switcher
+from streamlit_app.components.cards import render_metric_row
 
 # Page config
 st.set_page_config(
@@ -192,6 +193,21 @@ with ErrorBoundary("Failed to load analytics data"):
     df_expenses = df_all[df_all['is_expense']].copy()
     # Ensure date column is datetime in df_expenses as well
     df_expenses['date'] = pd.to_datetime(df_expenses['date'])
+
+    # Summary metrics row
+    total_spending = abs(df_expenses['amount'].sum()) if not df_expenses.empty else 0
+    transaction_count_display = len(df_all)
+    top_category = df_expenses.groupby('category')['amount'].sum().abs().idxmax() if not df_expenses.empty else "—"
+    avg_transaction = abs(df_expenses['amount'].mean()) if not df_expenses.empty else 0
+
+    render_metric_row([
+        {"value": format_amount_private(total_spending), "label": "Total Spending"},
+        {"value": f"{transaction_count_display:,}", "label": "Transactions"},
+        {"value": top_category, "label": "Top Category"},
+        {"value": format_amount_private(avg_transaction), "label": "Avg Transaction"},
+    ])
+
+    st.markdown("")  # Spacing
 
     # Create tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([

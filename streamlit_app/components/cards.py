@@ -5,10 +5,16 @@ Uses streamlit.components.v1.html() to render custom HTML cards that bypass
 Streamlit's markdown sanitizer. Each component is self-contained with embedded styles.
 
 Usage:
-    from streamlit_app.components.cards import render_card, render_list_card
+    from streamlit_app.components.cards import render_card, render_metric_row
 
     # Simple card with custom content
     render_card("My Title", "<p>Content here</p>", height=100)
+
+    # Metric cards row (uses CSS from main.css)
+    render_metric_row([
+        {"value": "₪50,000", "label": "Total Balance"},
+        {"value": "12", "label": "Accounts"},
+    ])
 
     # List card with items
     items = [
@@ -18,6 +24,7 @@ Usage:
     render_list_card("My List", items, height=200)
 """
 
+import streamlit as st
 import streamlit.components.v1 as components
 from typing import List, Dict, Any, Optional
 
@@ -99,6 +106,77 @@ def render_card(
     </div>
     """
     components.html(html, height=height, scrolling=False)
+
+
+def render_metric_row(metrics: List[Dict[str, str]]) -> None:
+    """
+    Render a row of metric cards using shared CSS from main.css.
+
+    This function uses st.markdown with the .metric-card class from main.css,
+    ensuring consistent styling across all pages.
+
+    Args:
+        metrics: List of dicts with keys:
+            - value: The metric value (string)
+            - label: The metric label
+            - sublabel: Optional sublabel text (e.g., delta or description)
+
+    Example:
+        render_metric_row([
+            {"value": "₪50,000", "label": "Total Balance"},
+            {"value": "12", "label": "Accounts", "sublabel": "3 active"},
+        ])
+    """
+    cols = st.columns(len(metrics))
+    for col, metric in zip(cols, metrics):
+        with col:
+            sublabel = metric.get('sublabel', '')
+            sublabel_html = f'<div class="sublabel">{sublabel}</div>' if sublabel else ''
+            st.markdown(
+                f'<div class="metric-card">'
+                f'<div class="value">{metric["value"]}</div>'
+                f'<div class="label">{metric["label"]}</div>'
+                f'{sublabel_html}'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
+
+def render_account_card(
+    institution: str,
+    balance: str,
+    subtitle: str,
+    status_icon: str = "✅",
+    on_click_key: str = None
+) -> bool:
+    """
+    Render an account card using shared CSS from main.css.
+
+    Args:
+        institution: Institution name (e.g., "CAL", "Excellence")
+        balance: Formatted balance string
+        subtitle: Subtitle text (e.g., "2 cards", "15 transactions")
+        status_icon: Status emoji (default "✅")
+        on_click_key: Optional key for a "View Details" button
+
+    Returns:
+        True if the button was clicked, False otherwise
+    """
+    st.markdown(
+        f'<div class="account-card">'
+        f'<div class="icon">🏦</div>'
+        f'<div class="info">'
+        f'<div class="name">{status_icon} {institution}</div>'
+        f'<div class="subtitle">{subtitle}</div>'
+        f'</div>'
+        f'<div class="balance">{balance}</div>'
+        f'</div>',
+        unsafe_allow_html=True
+    )
+
+    if on_click_key:
+        return st.button("View Details", key=on_click_key, use_container_width=True)
+    return False
 
 
 def render_transaction_card(

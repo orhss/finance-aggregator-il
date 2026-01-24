@@ -52,43 +52,7 @@ st.markdown("Browse, filter, and manage your financial transactions")
 # Inject amount styling CSS
 st.markdown(AMOUNT_STYLE_CSS, unsafe_allow_html=True)
 
-# Table styling CSS for better readability
-TABLE_STYLE_CSS = """
-<style>
-/* Zebra striping for better readability */
-[data-testid="stDataFrame"] tbody tr:nth-child(even) {
-    background-color: #f8f9fa !important;
-}
-
-/* Hover effect */
-[data-testid="stDataFrame"] tbody tr:hover {
-    background-color: #e3f2fd !important;
-    cursor: pointer;
-    transition: background-color 0.15s ease;
-}
-
-/* Column headers */
-[data-testid="stDataFrame"] thead th {
-    background-color: #1976d2 !important;
-    color: white !important;
-    font-weight: 600 !important;
-    text-align: left !important;
-}
-
-/* Compact and readable table */
-[data-testid="stDataFrame"] {
-    font-size: 14px !important;
-    line-height: 1.4 !important;
-}
-
-/* Amount column styling */
-[data-testid="stDataFrame"] td:nth-child(3) {
-    font-family: 'SF Mono', 'Roboto Mono', Consolas, monospace !important;
-    font-weight: 500 !important;
-}
-</style>
-"""
-st.markdown(TABLE_STYLE_CSS, unsafe_allow_html=True)
+# Table styling is now in styles/main.css (loaded via apply_theme())
 
 st.markdown("---")
 
