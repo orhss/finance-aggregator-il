@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-01-25 01:17
+# Auto-generated: 2026-01-28 21:19
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -14,6 +14,7 @@ scrapers → services → db → cli/streamlit_app
 
 ## cli/ - CLI interface for financial data aggregator
 - cli/commands/accounts.py: fn:list_accounts,show_account,account_summary
+- cli/commands/auth.py: fn:status,enable,disable,add_user_cmd,remove_user_cmd
 - cli/commands/budget.py: fn:make_progress_bar,show_budget,set_budget,delete_budget
 - cli/commands/categories.py: fn:analyze_categories,list_mappings,unmapped_categories,map_category,unmap_category
 - cli/commands/config.py: fn:show,set,setup,manage_card_holder,list_card_holders
@@ -73,6 +74,7 @@ scrapers → services → db → cli/streamlit_app
 
 ## streamlit_app/
 - streamlit_app/app.py: fn:load_custom_css,render_empty_state,render_header,render_hero_and_metrics,render_budget_progress
+- streamlit_app/auth.py: fn:check_authentication,get_logout_button,require_auth
 - streamlit_app/components/bulk_actions.py: fn:show_bulk_preview,show_bulk_confirmation,bulk_action_workflow,quick_bulk_preview
 - streamlit_app/components/cards.py: fn:render_card,render_metric_row,render_account_card,render_transaction_card,render_summary_card
 - streamlit_app/components/charts.py: fn:spending_donut,trend_line,category_bar,balance_history,spending_by_day
