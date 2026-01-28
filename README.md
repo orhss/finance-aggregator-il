@@ -1,5 +1,7 @@
 # finance-aggregator-il
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
 Python automation framework for extracting financial data from Israeli institutions (brokers, pension funds, and credit cards).
 
 ## Features
@@ -490,4 +492,16 @@ For detailed development guidelines, see:
 
 ## License
 
-Private project - All rights reserved.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+This means you are free to:
+- Use, modify, and distribute this software
+- Run it for any purpose
+
+Under the following conditions:
+- **Source code disclosure**: If you modify and deploy this software (including as a network service), you must make your source code available under the same license
+- **License preservation**: Derivative works must also be licensed under AGPL-3.0
+
+For commercial licensing options (e.g., using this in proprietary software without open-sourcing), please contact the maintainer.
+
+See the [LICENSE](LICENSE) file for the full license text.
