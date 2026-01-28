@@ -19,6 +19,7 @@ CONFIG_DIR = Path.home() / ".fin"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 CREDENTIALS_FILE = CONFIG_DIR / "credentials.enc"
 KEY_FILE = CONFIG_DIR / ".key"
+AUTH_USERS_FILE = CONFIG_DIR / "users.yaml"
 
 
 class BrokerCredentials(BaseModel):
@@ -696,3 +697,153 @@ def select_pension_accounts_to_sync(
         selected.append((idx, accounts[idx]))
 
     return selected
+
+
+# ============================================================================
+# Authentication Configuration (for Streamlit UI)
+# ============================================================================
+
+def is_auth_enabled() -> bool:
+    """
+    Check if authentication is enabled for Streamlit UI.
+
+    Returns:
+        True if authentication is enabled
+    """
+    config = load_config()
+    return config.get("auth_enabled", False)
+
+
+def set_auth_enabled(enabled: bool):
+    """
+    Enable or disable authentication for Streamlit UI.
+
+    Args:
+        enabled: Whether to enable authentication
+    """
+    config = load_config()
+    config["auth_enabled"] = enabled
+    save_config(config)
+
+
+def get_auth_users_file() -> Path:
+    """
+    Get the path to the users.yaml file for authentication.
+
+    Returns:
+        Path to users.yaml file
+    """
+    config = load_config()
+    custom_path = config.get("auth_users_file")
+    if custom_path:
+        return Path(custom_path).expanduser()
+    return AUTH_USERS_FILE
+
+
+def load_auth_users() -> Dict[str, Any]:
+    """
+    Load user credentials from users.yaml file.
+
+    Returns:
+        Dictionary with usernames as keys and user data as values
+    """
+    import yaml
+
+    users_file = get_auth_users_file()
+    if not users_file.exists():
+        return {}
+
+    with open(users_file, 'r') as f:
+        data = yaml.safe_load(f) or {}
+
+    return data.get("credentials", {}).get("usernames", {})
+
+
+def save_auth_users(users: Dict[str, Any]):
+    """
+    Save user credentials to users.yaml file.
+
+    Args:
+        users: Dictionary with usernames as keys and user data as values
+    """
+    import yaml
+
+    users_file = get_auth_users_file()
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+    data = {
+        "credentials": {
+            "usernames": users
+        },
+        "cookie": {
+            "expiry_days": 30,
+            "key": "fin_auth_cookie_key",
+            "name": "fin_auth_cookie"
+        }
+    }
+
+    with open(users_file, 'w') as f:
+        yaml.dump(data, f, default_flow_style=False)
+
+    # Set restrictive permissions
+    os.chmod(users_file, 0o600)
+
+
+def add_auth_user(username: str, name: str, hashed_password: str) -> bool:
+    """
+    Add a new user for authentication.
+
+    Args:
+        username: Unique username
+        name: Display name
+        hashed_password: Bcrypt hashed password
+
+    Returns:
+        True if user was added, False if already exists
+    """
+    users = load_auth_users()
+
+    if username in users:
+        return False
+
+    users[username] = {
+        "name": name,
+        "password": hashed_password
+    }
+
+    save_auth_users(users)
+    return True
+
+
+def remove_auth_user(username: str) -> bool:
+    """
+    Remove a user from authentication.
+
+    Args:
+        username: Username to remove
+
+    Returns:
+        True if user was removed, False if not found
+    """
+    users = load_auth_users()
+
+    if username not in users:
+        return False
+
+    del users[username]
+    save_auth_users(users)
+    return True
+
+
+def list_auth_users() -> List[Dict[str, str]]:
+    """
+    List all configured users.
+
+    Returns:
+        List of user dictionaries with username and name
+    """
+    users = load_auth_users()
+    return [
+        {"username": username, "name": data.get("name", username)}
+        for username, data in users.items()
+    ]

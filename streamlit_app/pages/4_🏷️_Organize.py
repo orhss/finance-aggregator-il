@@ -19,6 +19,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from streamlit_app.utils.session import init_session_state, format_amount_private, get_all_categories, get_all_tags
+from streamlit_app.auth import check_authentication
 from streamlit_app.utils.cache import invalidate_transaction_cache, invalidate_tag_cache
 from streamlit_app.utils.formatters import format_number, format_category_badge, format_tags, format_transaction_with_currency
 from streamlit_app.components.sidebar import render_minimal_sidebar
@@ -35,6 +36,10 @@ st.set_page_config(
 
 # Initialize session state
 init_session_state()
+
+# Check authentication (if enabled)
+if not check_authentication():
+    st.stop()
 
 # Apply theme
 theme = apply_theme()

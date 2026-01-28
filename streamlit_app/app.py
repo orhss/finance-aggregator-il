@@ -42,6 +42,7 @@ from streamlit_app.utils.rtl import clean_merchant_name
 from streamlit_app.components.cards import render_transaction_card, render_summary_card
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.utils.mobile import detect_mobile, is_mobile
+from streamlit_app.auth import check_authentication, get_logout_button
 
 # Page configuration - collapse sidebar if mobile detected via query param
 st.set_page_config(
@@ -403,6 +404,10 @@ def calculate_card_heights():
 
 def main():
     """Main hub page entry point."""
+    # Check authentication (if enabled)
+    if not check_authentication():
+        st.stop()
+
     # Initialize session state
     init_session_state()
 
@@ -411,6 +416,9 @@ def main():
 
     # Render sidebar
     render_minimal_sidebar()
+
+    # Add logout button if auth is enabled
+    get_logout_button()
 
     # Get stats to check if we have data
     stats = get_dashboard_stats()

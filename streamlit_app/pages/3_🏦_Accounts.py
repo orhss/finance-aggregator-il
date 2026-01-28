@@ -33,9 +33,14 @@ sys.path.insert(0, str(project_root))
 
 # Session imports
 from streamlit_app.utils.session import init_session_state, format_amount_private
+from streamlit_app.auth import check_authentication
 
 # Initialize session state
 init_session_state()
+
+# Check authentication (if enabled)
+if not check_authentication():
+    st.stop()
 
 from db.database import get_session
 from db.models import Account, Transaction, Balance

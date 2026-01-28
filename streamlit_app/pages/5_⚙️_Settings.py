@@ -15,6 +15,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from streamlit_app.utils.session import init_session_state
+from streamlit_app.auth import check_authentication
 from streamlit_app.utils.formatters import format_number
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.theme import apply_theme, render_theme_switcher
@@ -28,6 +29,10 @@ st.set_page_config(
 
 # Initialize session state
 init_session_state()
+
+# Check authentication (if enabled)
+if not check_authentication():
+    st.stop()
 
 # Apply theme (must be called before any content)
 theme = apply_theme()
@@ -326,6 +331,144 @@ try:
     - Your credentials are always encrypted - these settings only affect display
     - All data stays local on your device
     """)
+
+    st.markdown("---")
+
+    # ============================================================================
+    # AUTHENTICATION SETTINGS
+    # ============================================================================
+    st.subheader("🔑 Authentication")
+
+    try:
+        from config.settings import (
+            is_auth_enabled, set_auth_enabled, list_auth_users,
+            add_auth_user, remove_auth_user
+        )
+        import bcrypt
+
+        auth_enabled = is_auth_enabled()
+        users = list_auth_users()
+        user_count = len(users)
+
+        # Status and toggle
+        col1, col2 = st.columns([2, 1])
+
+        with col1:
+            if auth_enabled:
+                st.success(f"✅ Authentication is **enabled** ({user_count} user{'s' if user_count != 1 else ''})")
+            else:
+                st.warning("⚠️ Authentication is **disabled** — anyone with network access can view your data")
+
+        with col2:
+            if user_count > 0:
+                new_auth_state = st.toggle(
+                    "Require login",
+                    value=auth_enabled,
+                    key="auth_toggle",
+                    help="When enabled, users must log in to access the app"
+                )
+
+                if new_auth_state != auth_enabled:
+                    set_auth_enabled(new_auth_state)
+                    st.rerun()
+
+        # Two columns: User list and Add user form
+        col_users, col_add = st.columns(2)
+
+        with col_users:
+            st.markdown("**Configured Users**")
+
+            if users:
+                for user in users:
+                    user_col1, user_col2 = st.columns([3, 1])
+                    with user_col1:
+                        st.markdown(f"👤 **{user['username']}** ({user['name']})")
+                    with user_col2:
+                        if st.button("🗑️", key=f"del_{user['username']}", help=f"Remove {user['username']}"):
+                            st.session_state[f"confirm_delete_{user['username']}"] = True
+
+                        # Confirmation dialog
+                        if st.session_state.get(f"confirm_delete_{user['username']}"):
+                            st.warning(f"Remove **{user['username']}**?")
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                if st.button("Yes", key=f"yes_{user['username']}", type="primary"):
+                                    remove_auth_user(user['username'])
+                                    # Disable auth if no users left
+                                    if len(list_auth_users()) == 0:
+                                        set_auth_enabled(False)
+                                    st.session_state[f"confirm_delete_{user['username']}"] = False
+                                    st.rerun()
+                            with c2:
+                                if st.button("No", key=f"no_{user['username']}"):
+                                    st.session_state[f"confirm_delete_{user['username']}"] = False
+                                    st.rerun()
+            else:
+                st.info("No users configured. Add a user to enable authentication.")
+
+        with col_add:
+            st.markdown("**Add User**")
+
+            with st.form("add_user_form", clear_on_submit=True):
+                new_username = st.text_input(
+                    "Username",
+                    placeholder="admin",
+                    help="Used for login"
+                )
+                new_name = st.text_input(
+                    "Display Name",
+                    placeholder="Administrator",
+                    help="Shown after login (optional, defaults to username)"
+                )
+                new_password = st.text_input(
+                    "Password",
+                    type="password",
+                    placeholder="Enter password"
+                )
+                confirm_password = st.text_input(
+                    "Confirm Password",
+                    type="password",
+                    placeholder="Confirm password"
+                )
+
+                submitted = st.form_submit_button("Add User", use_container_width=True)
+
+                if submitted:
+                    # Validation
+                    if not new_username:
+                        st.error("Username is required")
+                    elif not new_username.isalnum():
+                        st.error("Username must be alphanumeric")
+                    elif any(u['username'] == new_username for u in users):
+                        st.error(f"User '{new_username}' already exists")
+                    elif not new_password:
+                        st.error("Password is required")
+                    elif len(new_password) < 4:
+                        st.error("Password must be at least 4 characters")
+                    elif new_password != confirm_password:
+                        st.error("Passwords do not match")
+                    else:
+                        # Hash password and add user
+                        hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+                        display_name = new_name if new_name else new_username
+
+                        if add_auth_user(new_username, display_name, hashed):
+                            st.success(f"User '{new_username}' created")
+                            st.rerun()
+                        else:
+                            st.error("Failed to create user")
+
+        # Help text for new users
+        if not auth_enabled and user_count == 0:
+            st.info("""
+            💡 **Recommended for network access**: If you access this app from other devices
+            (phone, tablet, other computers), add a user and enable authentication to protect your financial data.
+            """)
+
+    except ImportError:
+        st.warning("bcrypt package required for authentication. Install with: `pip install bcrypt`")
+    except Exception as e:
+        st.warning(f"Could not load authentication settings: {str(e)}")
 
     st.markdown("---")
 

@@ -50,6 +50,13 @@ fin-cli categories merchants     # List saved merchant mappings
 # Budget management
 fin-cli budget show              # Show current month's budget progress
 fin-cli budget set <amount>      # Set monthly budget (e.g., 5000)
+
+# Authentication (for network access)
+fin-cli auth add-user <username> # Add user for Streamlit login
+fin-cli auth enable              # Enable authentication
+fin-cli auth disable             # Disable authentication
+fin-cli auth list-users          # List configured users
+fin-cli auth status              # Show auth status
 ```
 
 ### Docker Deployment

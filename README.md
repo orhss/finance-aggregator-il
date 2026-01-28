@@ -171,6 +171,73 @@ volumes:
   - /custom/path:/root/.fin  # Change left side to your preferred path
 ```
 
+## Self-Hosting Guide
+
+### Network Access
+
+To access the app from other devices on your local network (phones, tablets, other computers):
+
+**Option 1: Docker (Recommended)**
+Docker deployment is already configured for network access. Access via:
+- This machine: http://localhost:8501
+- Local network: http://YOUR_IP:8501
+
+Find your IP with `hostname -I` (Linux) or `ipconfig getifaddr en0` (macOS).
+
+**Option 2: Direct Streamlit**
+```bash
+# Run with network access
+./scripts/run_server.sh
+
+# Or manually
+streamlit run streamlit_app/app.py --server.address=0.0.0.0 --server.port=8501
+```
+
+### Authentication (Recommended for Network Access)
+
+When exposing the app on your local network, enable password protection:
+
+```bash
+# 1. Add a user
+fin-cli auth add-user admin
+
+# 2. Enable authentication
+fin-cli auth enable
+
+# Done! Users must now log in to access the app
+```
+
+**Managing Users**:
+```bash
+fin-cli auth list-users        # List all users
+fin-cli auth add-user <name>   # Add new user
+fin-cli auth remove-user <name> # Remove user
+fin-cli auth change-password <name>  # Change password
+fin-cli auth disable           # Disable authentication
+fin-cli auth status            # Show current status
+```
+
+### Mobile Access
+
+Access from your phone or tablet:
+1. Connect to the same WiFi network
+2. Open browser and navigate to `http://YOUR_SERVER_IP:8501`
+3. The app automatically detects mobile devices and shows a touch-optimized UI
+
+Bookmark the page for quick access, or add to your home screen:
+- **iOS**: Share → Add to Home Screen
+- **Android**: Menu → Add to Home Screen
+
+### Security Recommendations
+
+| Scenario | Recommendation |
+|----------|----------------|
+| Local-only (localhost) | Auth optional |
+| Home network | Enable auth (multi-user households) |
+| Port forwarded / Internet | Use VPN or reverse proxy with HTTPS |
+
+**Important**: This app is designed for local/home network use. If you need internet access, use a VPN or set up a reverse proxy (nginx, Caddy) with HTTPS.
+
 ### Option 3: Manual Installation (for development)
 
 1. **Clone the repository**:

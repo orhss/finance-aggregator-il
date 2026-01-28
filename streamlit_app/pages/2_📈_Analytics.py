@@ -43,6 +43,7 @@ from streamlit_app.components.theme import apply_theme, render_theme_switcher
 from streamlit_app.components.cards import render_metric_row
 from streamlit_app.utils.mobile import detect_mobile, is_mobile
 from streamlit_app.components.mobile_ui import apply_mobile_css, summary_card, bottom_navigation
+from streamlit_app.auth import check_authentication
 
 # Page config
 st.set_page_config(
@@ -54,6 +55,10 @@ st.set_page_config(
 
 # Initialize session state
 init_session_state()
+
+# Check authentication (if enabled)
+if not check_authentication():
+    st.stop()
 
 # Mobile detection
 detect_mobile()

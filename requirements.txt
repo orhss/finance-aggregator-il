@@ -24,8 +24,10 @@ python-bidi>=0.4.2
 
 # Secure credential storage
 cryptography>=41.0.0
+bcrypt>=4.0.0
 
 # Streamlit UI dependencies
 streamlit>=1.35.0
+streamlit-authenticator>=0.4.0
 plotly>=5.17.0
 pandas>=2.0.0
