@@ -142,14 +142,14 @@ MOBILE_CSS = """
     letter-spacing: 0.5px;
 }
 
-/* Bottom navigation */
+/* Bottom navigation - fixed to viewport */
 .mobile-bottom-nav {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    background: white;
-    border-top: 1px solid #E5E7EB;
+    background: var(--color-surface, white);
+    border-top: 1px solid var(--color-border, #E5E7EB);
     display: flex;
     justify-content: space-around;
     padding: 0.5rem 0 calc(0.5rem + env(safe-area-inset-bottom, 0));
@@ -160,13 +160,16 @@ MOBILE_CSS = """
     flex-direction: column;
     align-items: center;
     padding: 0.5rem 1rem;
-    color: #6b7280;
+    color: var(--color-text-secondary, #6b7280);
     text-decoration: none;
     font-size: 0.7rem;
     transition: color 0.15s ease;
 }
+.mobile-nav-item:hover {
+    color: var(--color-primary, #667eea);
+}
 .mobile-nav-item.active {
-    color: #667eea;
+    color: var(--color-primary, #667eea);
 }
 .mobile-nav-item .icon {
     font-size: 1.5rem;
@@ -261,9 +264,14 @@ MOBILE_CSS = """
     color: white;
 }
 
-/* Spacing for bottom nav */
+/* Spacing for bottom nav - apply to all content */
 .mobile-content {
     padding-bottom: 80px;
+}
+
+/* Global bottom padding when mobile nav is present */
+[data-testid="stMainBlockContainer"] {
+    padding-bottom: 80px !important;
 }
 </style>
 """
@@ -388,30 +396,35 @@ def transaction_list(transactions: List[Dict[str, Any]], date_formatter: Optiona
 
 def bottom_navigation(current: str = "home"):
     """
-    Render bottom navigation bar.
-
-    Note: Due to Streamlit constraints, this uses buttons rather than fixed HTML.
-    Call this at the end of mobile pages.
+    Render fixed bottom navigation bar that stays visible while scrolling.
 
     Args:
         current: Current active page ("home", "transactions", "analytics", "settings")
     """
-    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)  # Spacer
-
-    cols = st.columns(4)
-
     nav_items = [
-        ("home", "🏠", "Home", "app.py"),
-        ("transactions", "💳", "Transactions", "pages/1_💳_Transactions.py"),
-        ("analytics", "📈", "Analytics", "pages/2_📈_Analytics.py"),
-        ("settings", "⚙️", "Settings", "pages/5_⚙️_Settings.py"),
+        ("home", "🏠", "Home", "/"),
+        ("transactions", "💳", "Transactions", "/Transactions"),
+        ("analytics", "📈", "Analytics", "/Analytics"),
+        ("settings", "⚙️", "Settings", "/Settings"),
     ]
 
-    for idx, (key, icon, label, page) in enumerate(nav_items):
-        with cols[idx]:
-            btn_type = "primary" if current == key else "secondary"
-            if st.button(f"{icon}\n{label}", key=f"nav_{key}", use_container_width=True, type=btn_type):
-                st.switch_page(page)
+    nav_html_items = []
+    for key, icon, label, href in nav_items:
+        active_class = "active" if current == key else ""
+        nav_html_items.append(
+            f'<a href="{href}" class="mobile-nav-item {active_class}">'
+            f'<span class="icon">{icon}</span>'
+            f'<span>{label}</span>'
+            f'</a>'
+        )
+
+    nav_html = f'''
+    <div class="mobile-bottom-nav">
+        {''.join(nav_html_items)}
+    </div>
+    '''
+
+    st.markdown(nav_html, unsafe_allow_html=True)
 
 
 def alert_banner(message: str, alert_type: str = "warning"):
