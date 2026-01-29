@@ -24,7 +24,7 @@ from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, sh
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.empty_states import empty_transactions_state
 # Filters are now inline for better coherence
-from streamlit_app.components.theme import apply_theme
+from streamlit_app.components.theme import apply_theme, render_page_header
 from streamlit_app.utils.mobile import detect_mobile, is_mobile
 from streamlit_app.auth import check_authentication
 from streamlit_app.components.mobile_ui import (
@@ -76,7 +76,7 @@ def render_mobile_transactions():
         return
 
     # Header
-    st.markdown("### 💳 Transactions")
+    render_page_header("💳 Transactions")
 
     # Search bar
     search = st.text_input(
@@ -199,6 +199,9 @@ render_minimal_sidebar()
 st.markdown(AMOUNT_STYLE_CSS, unsafe_allow_html=True)
 
 # Table styling is now in styles/main.css (loaded via apply_theme())
+
+# Page header
+render_page_header("💳 Transactions")
 
 # Get database session
 try:

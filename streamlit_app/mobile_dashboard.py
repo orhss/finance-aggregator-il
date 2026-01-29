@@ -16,6 +16,7 @@ from streamlit_app.utils.cache import (
 )
 from streamlit_app.utils.formatters import format_relative_time, format_date_relative, get_category_icon
 from streamlit_app.utils.rtl import clean_merchant_name
+from streamlit_app.utils.insights import get_time_greeting
 from streamlit_app.components.mobile_ui import (
     apply_mobile_css,
     hero_balance_card,
@@ -23,7 +24,7 @@ from streamlit_app.components.mobile_ui import (
     transaction_list,
     bottom_navigation,
 )
-from streamlit_app.components.theme import apply_theme
+from streamlit_app.components.theme import apply_theme, render_page_header
 
 
 def render_budget_progress():
@@ -134,13 +135,17 @@ def render_mobile_dashboard():
 
     # Empty state
     if not stats or stats.get('account_count', 0) == 0:
-        st.title("📱 Fin Mobile")
+        render_page_header("💰 Welcome")
         st.markdown("---")
         st.info("No accounts configured yet. Set up your accounts to get started.")
 
         if st.button("Go to Accounts", use_container_width=True, type="primary"):
             st.switch_page("pages/3_🏦_Accounts.py")
         return
+
+    # Page header with greeting
+    greeting = get_time_greeting()
+    render_page_header(f"💰 {greeting}")
 
     # Hero balance card
     balance = format_amount_private(stats.get('total_balance', 0))

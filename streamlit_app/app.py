@@ -41,7 +41,7 @@ from services.budget_service import BudgetService
 from streamlit_app.utils.rtl import clean_merchant_name
 from streamlit_app.components.cards import render_transaction_card, render_summary_card
 from streamlit_app.components.sidebar import render_minimal_sidebar
-from streamlit_app.components.theme import apply_theme, render_theme_switcher
+from streamlit_app.components.theme import apply_theme, render_theme_switcher, render_page_header
 from streamlit_app.utils.mobile import detect_mobile, is_mobile
 from streamlit_app.auth import check_authentication, get_logout_button
 
@@ -91,7 +91,8 @@ def render_header():
     """Render header with greeting and sync button."""
     col1, col2 = st.columns([4, 1])
     with col1:
-        st.title(f"{get_time_greeting()}")
+        greeting = get_time_greeting()
+        render_page_header(f"💰 {greeting}")
     with col2:
         if st.button("Sync Now", use_container_width=True, type="secondary"):
             st.switch_page("pages/3_🏦_Accounts.py")

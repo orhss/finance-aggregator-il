@@ -24,7 +24,7 @@ from streamlit_app.utils.cache import invalidate_transaction_cache, invalidate_t
 from streamlit_app.utils.formatters import format_number, format_category_badge, format_tags, format_transaction_with_currency
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.bulk_actions import show_bulk_preview, show_bulk_confirmation
-from streamlit_app.components.theme import apply_theme
+from streamlit_app.components.theme import apply_theme, render_page_header
 from streamlit_app.components.cards import render_metric_row
 
 # Page config
@@ -47,13 +47,8 @@ theme = apply_theme()
 # Render sidebar
 render_minimal_sidebar()
 
-# Page header with new design
-st.markdown("""
-<div class="page-header">
-    <h1>🏷️ Organize Transactions</h1>
-    <p class="subtitle">Manage categories, rules, and tags for your transactions</p>
-</div>
-""", unsafe_allow_html=True)
+# Page header
+render_page_header("🏷️ Organize")
 
 # Get services
 try:

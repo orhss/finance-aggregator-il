@@ -567,14 +567,6 @@ def generate_css_variables(theme: Theme) -> str:
         color: {p.text_primary} !important;
     }}
 
-    /* Page header */
-    .page-header h1 {{
-        color: {p.text_primary} !important;
-    }}
-    .page-header .subtitle {{
-        color: {p.text_secondary} !important;
-    }}
-
     /* Filter panel */
     .filter-panel {{
         background: {p.bg_secondary} !important;
@@ -703,6 +695,29 @@ def apply_theme() -> Theme:
     st.markdown(theme.generate_global_css(), unsafe_allow_html=True)
 
     return theme
+
+
+def render_page_header(title: str, theme: Theme = None) -> None:
+    """
+    Render a styled page header with correct colors for light/dark mode.
+
+    Args:
+        title: Page title (can include emoji, e.g., "💳 Transactions")
+        theme: Theme instance (if None, uses current theme from session)
+    """
+    if theme is None:
+        theme = init_theme()
+
+    # Use #FAFAFA for dark mode to match Streamlit's native heading color
+    is_dark = theme.mode == "dark"
+    heading_color = "#FAFAFA" if is_dark else theme.palette.text_primary
+
+    # Use st.html for better control over styling (bypasses markdown sanitization)
+    st.html(
+        f'<div class="page-header" style="margin-bottom: 1.5rem;">'
+        f'<h1 style="color: {heading_color} !important; font-size: 1.75rem; font-weight: 700; margin: 0;">{title}</h1>'
+        f'</div>'
+    )
 
 
 def format_category_badge_themed(category: str, theme: Theme) -> str:

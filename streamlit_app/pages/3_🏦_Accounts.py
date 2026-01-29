@@ -49,7 +49,7 @@ from services.analytics_service import AnalyticsService
 from streamlit_app.utils.formatters import format_number, format_datetime, format_account_number
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.charts import balance_history
-from streamlit_app.components.theme import apply_theme
+from streamlit_app.components.theme import apply_theme, render_page_header
 from streamlit_app.components.cards import render_metric_row
 
 # Apply theme
@@ -58,13 +58,8 @@ theme = apply_theme()
 # Render sidebar
 render_minimal_sidebar()
 
-# Page header with new design
-st.markdown("""
-<div class="page-header">
-    <h1>🏦 Accounts & Sync</h1>
-    <p class="subtitle">Manage accounts and synchronize financial data</p>
-</div>
-""", unsafe_allow_html=True)
+# Page header
+render_page_header("🏦 Accounts")
 
 # ============================================================================
 # SYNC HELPER FUNCTIONS (moved from Sync page)

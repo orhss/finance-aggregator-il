@@ -39,7 +39,7 @@ from streamlit_app.components.charts import (
     CATEGORY_COLORS
 )
 from streamlit_app.components.heatmap import calendar_heatmap, monthly_heatmap
-from streamlit_app.components.theme import apply_theme
+from streamlit_app.components.theme import apply_theme, render_page_header
 from streamlit_app.components.cards import render_metric_row
 from streamlit_app.utils.mobile import detect_mobile, is_mobile
 from streamlit_app.components.mobile_ui import apply_mobile_css, summary_card, bottom_navigation
@@ -72,7 +72,7 @@ def render_mobile_analytics():
     # Apply mobile CSS
     apply_mobile_css()
 
-    st.markdown("### 📈 Analytics")
+    render_page_header("📈 Analytics")
 
     # Period selector
     today = date.today()
@@ -186,13 +186,8 @@ theme = apply_theme()
 # Render minimal sidebar
 render_minimal_sidebar()
 
-# Page header with new design
-st.markdown("""
-<div class="page-header">
-    <h1>📈 Analytics & Reports</h1>
-    <p class="subtitle">Comprehensive financial insights and visualizations</p>
-</div>
-""", unsafe_allow_html=True)
+# Page header
+render_page_header("📈 Analytics")
 
 
 def time_range_selector() -> Tuple[date, date]:
