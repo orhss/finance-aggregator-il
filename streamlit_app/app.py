@@ -41,6 +41,7 @@ from services.budget_service import BudgetService
 from streamlit_app.utils.rtl import clean_merchant_name
 from streamlit_app.components.cards import render_transaction_card, render_summary_card
 from streamlit_app.components.sidebar import render_minimal_sidebar
+from streamlit_app.components.theme import apply_theme, render_theme_switcher
 from streamlit_app.utils.mobile import detect_mobile, is_mobile
 from streamlit_app.auth import check_authentication, get_logout_button
 
@@ -59,12 +60,6 @@ if is_mobile():
     from streamlit_app.mobile_dashboard import render_mobile_dashboard
     render_mobile_dashboard()
     st.stop()
-
-
-def load_custom_css():
-    """Load shared CSS styling from styles/main.css"""
-    from streamlit_app.components.theme import load_shared_css
-    load_shared_css()
 
 
 def render_empty_state():
@@ -103,64 +98,59 @@ def render_header():
 
 
 def render_hero_and_metrics(stats: dict):
-    """Render hero balance card with supporting metric cards."""
-    # Layout: Hero (left) + 3 metrics (right)
-    col_hero, col_metrics = st.columns([1.2, 1])
+    """Render hero balance card (full width) with metrics row below."""
+    # Hero balance card - full width
+    balance = format_amount_private(stats.get('total_balance', 0))
+    last_sync = stats.get('last_sync')
+    sync_text = format_relative_time(last_sync) if last_sync else "Never"
 
-    with col_hero:
-        # Hero balance card
-        balance = format_amount_private(stats.get('total_balance', 0))
-        last_sync = stats.get('last_sync')
-        sync_text = format_relative_time(last_sync) if last_sync else "Never"
+    st.markdown(
+        f'<div class="hero-card">'
+        f'<div class="hero-label">Net Worth</div>'
+        f'<div class="hero-amount">{balance}</div>'
+        f'<div class="hero-sync">Last synced {sync_text}</div>'
+        f'</div>',
+        unsafe_allow_html=True
+    )
 
+    # Three metric cards in a row below
+    m1, m2, m3 = st.columns(3)
+
+    with m1:
+        monthly = format_amount_private(stats.get('monthly_spending', 0))
         st.markdown(
-            f'<div class="hero-balance">'
-            f'<div class="label">Net Worth</div>'
-            f'<div class="amount">{balance}</div>'
-            f'<div class="sublabel">Last synced {sync_text}</div>'
+            f'<div class="metric-card">'
+            f'<div class="metric-value">{monthly}</div>'
+            f'<div class="metric-label">This Month</div>'
+            f'<div class="metric-sublabel">spent</div>'
             f'</div>',
             unsafe_allow_html=True
         )
 
-    with col_metrics:
-        # Three metric cards in a row
-        m1, m2, m3 = st.columns(3)
+    with m2:
+        pending_count = stats.get('pending_count', 0)
+        pending_amount = stats.get('pending_amount', 0)
+        pending_text = format_amount_private(pending_amount) if pending_amount else "—"
+        st.markdown(
+            f'<div class="metric-card">'
+            f'<div class="metric-value">{pending_count}</div>'
+            f'<div class="metric-label">Pending</div>'
+            f'<div class="metric-sublabel">{pending_text}</div>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
 
-        with m1:
-            monthly = format_amount_private(stats.get('monthly_spending', 0))
-            st.markdown(
-                f'<div class="metric-card">'
-                f'<div class="value">{monthly}</div>'
-                f'<div class="label">This Month</div>'
-                f'<div class="sublabel">spent</div>'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-
-        with m2:
-            pending_count = stats.get('pending_count', 0)
-            pending_amount = stats.get('pending_amount', 0)
-            pending_text = format_amount_private(pending_amount) if pending_amount else "—"
-            st.markdown(
-                f'<div class="metric-card">'
-                f'<div class="value">{pending_count}</div>'
-                f'<div class="label">Pending</div>'
-                f'<div class="sublabel">{pending_text}</div>'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-
-        with m3:
-            account_count = stats.get('account_count', 0)
-            txn_count = stats.get('transaction_count', 0)
-            st.markdown(
-                f'<div class="metric-card">'
-                f'<div class="value">{account_count}</div>'
-                f'<div class="label">Accounts</div>'
-                f'<div class="sublabel">{txn_count:,} txns</div>'
-                f'</div>',
-                unsafe_allow_html=True
-            )
+    with m3:
+        account_count = stats.get('account_count', 0)
+        txn_count = stats.get('transaction_count', 0)
+        st.markdown(
+            f'<div class="metric-card">'
+            f'<div class="metric-value">{account_count}</div>'
+            f'<div class="metric-label">Accounts</div>'
+            f'<div class="metric-sublabel">{txn_count:,} txns</div>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
 
 
 def render_budget_progress():
@@ -178,34 +168,31 @@ def render_budget_progress():
         percent = progress['percent_actual']
         remaining = progress['remaining']
 
-        # Determine color and status
+        # Determine status class for both text and bar
         if progress['is_over_budget']:
-            bar_color = "#EF4444"  # red
-            status_text = f"₪{abs(remaining):,.0f} over budget"
+            status_text = f"{abs(remaining):,.0f} over budget"
             status_class = "over"
         elif percent >= 80:
-            bar_color = "#F59E0B"  # yellow
-            status_text = f"₪{remaining:,.0f} remaining"
+            status_text = f"{remaining:,.0f} remaining"
             status_class = "warning"
         else:
-            bar_color = "#10B981"  # green
-            status_text = f"₪{remaining:,.0f} remaining"
+            status_text = f"{remaining:,.0f} remaining"
             status_class = "good"
 
         # Cap display percent at 100 for the bar
         display_percent = min(percent, 100)
 
         st.markdown(
-            f'<div class="budget-progress">'
+            f'<div class="budget-card">'
             f'<div class="budget-header">'
-            f'<span class="budget-label">Monthly Budget</span>'
-            f'<span class="budget-status {status_class}">{status_text}</span>'
+            f'<span class="budget-title">Monthly Budget</span>'
+            f'<span class="budget-remaining {status_class}">{status_text}</span>'
             f'</div>'
-            f'<div class="budget-bar-container">'
-            f'<div class="budget-bar" style="width: {display_percent}%; background: {bar_color};"></div>'
+            f'<div class="budget-bar-bg">'
+            f'<div class="budget-bar {status_class}" style="width: {display_percent}%;"></div>'
             f'</div>'
             f'<div class="budget-details">'
-            f'<span>₪{spent:,.0f} of ₪{budget:,.0f}</span>'
+            f'<span>{spent:,.0f} of {budget:,.0f}</span>'
             f'<span>{percent:.0f}%</span>'
             f'</div>'
             f'</div>',
@@ -234,8 +221,8 @@ def render_insight_banner(stats: dict):
 
         st.markdown(
             f'<div class="insight-banner {insight_type}">'
-            f'<span class="icon">{icon}</span>'
-            f'<span class="message">{message}</span>'
+            f'<span class="insight-icon">{icon}</span>'
+            f'<span class="insight-message">{message}</span>'
             f'</div>',
             unsafe_allow_html=True
         )
@@ -248,7 +235,7 @@ def render_alerts():
     if not alerts:
         return
 
-    st.markdown("#### Needs Attention")
+    st.markdown('<div class="section-title">Needs Attention</div>', unsafe_allow_html=True)
 
     for alert in alerts:
         # Determine alert type for styling
@@ -259,18 +246,18 @@ def render_alerts():
         else:
             alert_type = 'uncategorized'
 
-        col1, col2 = st.columns([5, 1])
+        # Alert card with button inside using columns for layout
+        col1, col2 = st.columns([6, 1], gap="small")
         with col1:
             st.markdown(
                 f'<div class="alert-card {alert_type}">'
-                f'<div class="alert-content">'
-                f'<span class="alert-icon">{alert["icon"]}</span>'
+                f'<span>{alert["icon"]}</span>'
                 f'<span class="alert-message">{alert["message"]}</span>'
-                f'</div></div>',
+                f'</div>',
                 unsafe_allow_html=True
             )
         with col2:
-            if st.button(alert['action_label'], key=alert['key'], use_container_width=True):
+            if st.button(alert['action_label'], key=alert['key'], use_container_width=True, type="secondary"):
                 st.switch_page(alert['page'])
 
 
@@ -411,11 +398,12 @@ def main():
     # Initialize session state
     init_session_state()
 
-    # Load custom CSS
-    load_custom_css()
+    # Apply theme (loads CSS + theme-specific styles)
+    apply_theme()
 
     # Render sidebar
     render_minimal_sidebar()
+    render_theme_switcher("sidebar")
 
     # Add logout button if auth is enabled
     get_logout_button()

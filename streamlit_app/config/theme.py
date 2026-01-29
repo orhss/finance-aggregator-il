@@ -53,112 +53,112 @@ class ColorPalette:
     category_colors: Dict[str, str]
 
 
-# Light Mode Color Palette
+# Light Mode Color Palette - Hybrid Material + Glassmorphism
 LIGHT_PALETTE = ColorPalette(
-    # Brand colors
-    primary="#1976d2",
-    secondary="#00897b",
-    accent="#f9ca24",
+    # Brand colors (indigo/violet gradient base)
+    primary="#6366f1",
+    secondary="#8b5cf6",
+    accent="#f59e0b",
 
     # Status colors
-    success="#00897b",
-    warning="#f57c00",
-    error="#c62828",
-    info="#1976d2",
+    success="#10b981",
+    warning="#f59e0b",
+    error="#ef4444",
+    info="#3b82f6",
 
     # Background colors
-    bg_primary="#ffffff",
-    bg_secondary="#f5f5f5",
-    bg_tertiary="#e0e0e0",
+    bg_primary="#f8fafc",
+    bg_secondary="#ffffff",
+    bg_tertiary="#f3f4f6",
 
     # Text colors
-    text_primary="#212121",
-    text_secondary="#424242",
-    text_muted="#757575",
+    text_primary="#1f2937",
+    text_secondary="#6b7280",
+    text_muted="#9ca3af",
 
     # Border colors
-    border_light="#e0e0e0",
-    border_medium="#bdbdbd",
-    border_heavy="#9e9e9e",
+    border_light="#f3f4f6",
+    border_medium="#e5e7eb",
+    border_heavy="#e5e7eb",  # Used for button hover
 
     # Financial colors
-    income_color="#00897b",
-    expense_color="#c62828",
-    neutral_color="#757575",
+    income_color="#16a34a",
+    expense_color="#dc2626",
+    neutral_color="#6b7280",
 
     # Chart colors
-    chart_primary="#1976d2",
-    chart_secondary="#00897b",
-    chart_tertiary="#f57c00",
-    chart_quaternary="#f9ca24",
+    chart_primary="#6366f1",
+    chart_secondary="#8b5cf6",
+    chart_tertiary="#10b981",
+    chart_quaternary="#f59e0b",
 
     # Category colors
     category_colors={
-        'Food & Dining': '#ff6b6b',
-        'Transportation': '#4ecdc4',
-        'Shopping': '#45b7d1',
-        'Entertainment': '#f9ca24',
-        'Bills & Utilities': '#6c5ce7',
-        'Healthcare': '#fd79a8',
-        'Groceries': '#00b894',
-        'Salary': '#00897b',
-        'Investment': '#1976d2',
-        'Transfer': '#95a5a6',
+        'Food & Dining': '#ef4444',
+        'Transportation': '#06b6d4',
+        'Shopping': '#3b82f6',
+        'Entertainment': '#f59e0b',
+        'Bills & Utilities': '#8b5cf6',
+        'Healthcare': '#ec4899',
+        'Groceries': '#10b981',
+        'Salary': '#16a34a',
+        'Investment': '#6366f1',
+        'Transfer': '#6b7280',
     }
 )
 
-# Dark Mode Color Palette (Following UX Best Practices)
-# Based on: https://www.uxdesigninstitute.com/blog/dark-mode-design-practical-guide/
+# Dark Mode Color Palette - Hybrid Material + Glassmorphism
+# Based on UX best practices: avoid pure black, use desaturated colors
 DARK_PALETTE = ColorPalette(
-    # Brand colors (desaturated for dark mode - avoid visual jarring)
-    primary="#5a9fd4",      # Subdued blue (from #1976d2 light mode)
-    secondary="#5a9a94",    # Muted teal (from #00897b light mode)
-    accent="#d4b95a",       # Muted gold (from #f9ca24 light mode)
+    # Brand colors (lighter for dark mode visibility)
+    primary="#818cf8",      # Lighter indigo
+    secondary="#a78bfa",    # Lighter violet
+    accent="#fbbf24",       # Lighter amber
 
-    # Status colors (significantly desaturated)
-    success="#5a9a94",      # Muted teal (success should be calm)
-    warning="#c98850",      # Muted orange (from #f57c00)
-    error="#b85858",        # Muted red (from #c62828)
-    info="#5a9fd4",         # Subdued blue (consistent with primary)
+    # Status colors (desaturated for dark mode)
+    success="#34d399",      # Lighter green
+    warning="#fbbf24",      # Lighter amber
+    error="#f87171",        # Lighter red
+    info="#60a5fa",         # Lighter blue
 
-    # Background colors (avoid pure black #000000 - use dark grey)
-    bg_primary="#121212",   # Dark grey (UX best practice, not pure black)
-    bg_secondary="#1e1e1e", # Slightly lighter grey
-    bg_tertiary="#2a2a2a",  # Medium grey for elevation
+    # Background colors (dark slate tones, not pure black)
+    bg_primary="#0f172a",   # Slate 900
+    bg_secondary="#1e293b", # Slate 800
+    bg_tertiary="#334155",  # Slate 700
 
-    # Text colors (avoid pure white #FFFFFF - use off-white)
-    text_primary="#e0e0e0", # Off-white (UX best practice)
-    text_secondary="#b0b0b0",  # Light grey for secondary text
-    text_muted="#808080",   # Medium grey for muted text
+    # Text colors (off-white for reduced eye strain)
+    text_primary="#f1f5f9", # Slate 100
+    text_secondary="#94a3b8",  # Slate 400
+    text_muted="#64748b",   # Slate 500
 
     # Border colors (subtle but visible)
-    border_light="#2a2a2a",
-    border_medium="#404040",
-    border_heavy="#5a5a5a",
+    border_light="#1e293b",
+    border_medium="#334155",
+    border_heavy="#475569",
 
-    # Financial colors (desaturated for better readability)
-    income_color="#5a9a94",  # Muted teal (calm, positive)
-    expense_color="#b85858", # Muted red (not aggressive)
-    neutral_color="#808080", # Grey
+    # Financial colors (brighter for dark mode visibility)
+    income_color="#34d399",  # Emerald 400
+    expense_color="#f87171", # Red 400
+    neutral_color="#64748b", # Slate 500
 
-    # Chart colors (desaturated, harmonious palette)
-    chart_primary="#5a9fd4",   # Subdued blue
-    chart_secondary="#5a9a94",  # Muted teal
-    chart_tertiary="#c98850",   # Muted orange
-    chart_quaternary="#d4b95a", # Muted gold
+    # Chart colors (harmonious, visible on dark)
+    chart_primary="#818cf8",   # Indigo 400
+    chart_secondary="#a78bfa", # Violet 400
+    chart_tertiary="#34d399",  # Emerald 400
+    chart_quaternary="#fbbf24", # Amber 400
 
-    # Category colors (desaturated versions - avoid bright/jarring colors)
+    # Category colors (brighter for dark mode)
     category_colors={
-        'Food & Dining': '#c97676',      # Muted red (from #ff6b6b)
-        'Transportation': '#6ba8a0',     # Muted teal (from #4ecdc4)
-        'Shopping': '#6197ad',           # Muted blue (from #45b7d1)
-        'Entertainment': '#d4b95a',      # Muted gold (from #ffd93d)
-        'Bills & Utilities': '#8b7fc7',  # Muted purple (from #a78bfa)
-        'Healthcare': '#c988a6',         # Muted pink (from #f687b3)
-        'Groceries': '#5fa888',          # Muted green (from #34d399)
-        'Salary': '#5a9a94',             # Muted teal
-        'Investment': '#5a9fd4',         # Subdued blue
-        'Transfer': '#8a939e',           # Muted grey-blue
+        'Food & Dining': '#f87171',      # Red 400
+        'Transportation': '#22d3ee',     # Cyan 400
+        'Shopping': '#60a5fa',           # Blue 400
+        'Entertainment': '#fbbf24',      # Amber 400
+        'Bills & Utilities': '#a78bfa',  # Violet 400
+        'Healthcare': '#f472b6',         # Pink 400
+        'Groceries': '#34d399',          # Emerald 400
+        'Salary': '#4ade80',             # Green 400
+        'Investment': '#818cf8',         # Indigo 400
+        'Transfer': '#94a3b8',           # Slate 400
     }
 )
 

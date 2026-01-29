@@ -114,14 +114,316 @@ def render_theme_switcher(location: str = "sidebar") -> None:
             st.rerun()
 
 
+def generate_css_variables(theme: Theme) -> str:
+    """
+    Generate CSS custom properties based on current theme.
+
+    This injects the correct colors into :root so main.css can use them.
+    """
+    p = theme.palette
+    is_dark = theme.mode == "dark"
+
+    # Generate hero gradient based on theme
+    if is_dark:
+        hero_gradient = f"linear-gradient(135deg, {p.primary} 0%, {p.secondary} 100%)"
+        hero_shadow = f"0 25px 50px -12px {p.primary}40"
+    else:
+        hero_gradient = f"linear-gradient(135deg, {p.primary} 0%, {p.secondary} 100%)"
+        hero_shadow = f"0 25px 50px -12px {p.primary}40"
+
+    return f"""
+    <style>
+    :root {{
+        /* Primary brand colors */
+        --color-primary: {p.primary};
+        --color-primary-light: {p.secondary};
+        --color-primary-dark: {p.primary};
+        --color-secondary: {p.secondary};
+
+        /* Semantic colors */
+        --color-success: {p.success};
+        --color-success-light: {p.success};
+        --color-success-bg: {p.success}20;
+        --color-success-text: {p.success};
+
+        --color-warning: {p.warning};
+        --color-warning-light: {p.warning};
+        --color-warning-bg: {p.warning}20;
+        --color-warning-text: {p.warning};
+
+        --color-error: {p.error};
+        --color-error-light: {p.error};
+        --color-error-bg: {p.error}20;
+        --color-error-text: {p.error};
+
+        --color-info: {p.info};
+        --color-info-bg: {p.info}20;
+        --color-info-text: {p.info};
+
+        /* Text colors */
+        --color-text-primary: {p.text_primary};
+        --color-text-secondary: {p.text_secondary};
+        --color-text-muted: {p.text_muted};
+
+        /* Surface colors */
+        --color-background: {p.bg_primary};
+        --color-surface: {p.bg_secondary};
+        --color-surface-hover: {p.bg_tertiary};
+        --color-surface-subtle: {p.bg_secondary};
+
+        /* Border colors - using semi-transparent for polished look */
+        --color-border: {'rgba(255,255,255,0.1)' if is_dark else 'rgba(0,0,0,0.08)'};
+        --color-border-light: {'rgba(255,255,255,0.05)' if is_dark else 'rgba(0,0,0,0.05)'};
+        --color-border-heavy: {p.border_heavy};
+
+        /* Financial colors */
+        --color-expense: {p.expense_color};
+        --color-income: {p.income_color};
+
+        /* Gradients */
+        --gradient-hero: {hero_gradient};
+        --gradient-hero-overlay: radial-gradient(circle at top right, rgba(255,255,255,0.15) 0%, transparent 70%);
+        --gradient-success: linear-gradient(90deg, {p.success}, {p.success});
+
+        /* Shadows */
+        --shadow-sm: 0 1px 2px rgba(0,0,0,{'0.2' if is_dark else '0.05'});
+        --shadow-md: 0 4px 6px -1px rgba(0,0,0,{'0.3' if is_dark else '0.07'}), 0 2px 4px -1px rgba(0,0,0,{'0.2' if is_dark else '0.04'});
+        --shadow-lg: 0 10px 15px -3px rgba(0,0,0,{'0.3' if is_dark else '0.08'}), 0 4px 6px -2px rgba(0,0,0,{'0.2' if is_dark else '0.04'});
+        --shadow-hero: {hero_shadow};
+
+        /* Glass effect */
+        --glass-background: rgba({'30, 41, 59' if is_dark else '255, 255, 255'}, 0.85);
+        --glass-blur: 12px;
+        --glass-border: rgba(255, 255, 255, {'0.1' if is_dark else '0.3'});
+    }}
+
+    /* Dark mode specific overrides */
+    {f'''
+    .stApp {{
+        background-color: {p.bg_primary};
+    }}
+    [data-testid="stSidebar"] {{
+        background-color: {p.bg_secondary};
+    }}
+
+    /* Hero card - darker gradient for dark mode */
+    .hero-card {{
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+        box-shadow: 0 25px 50px -12px rgba(79, 70, 229, 0.3) !important;
+    }}
+    .hero-card::before {{
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%) !important;
+    }}
+
+    /* Metric cards */
+    .metric-card {{
+        background: {p.bg_secondary} !important;
+        border: 1px solid rgba(255,255,255,0.05) !important;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2) !important;
+    }}
+    .metric-value {{
+        color: {p.text_primary} !important;
+    }}
+    .metric-label {{
+        color: {p.text_secondary} !important;
+    }}
+    .metric-sublabel {{
+        color: {p.text_muted} !important;
+    }}
+
+    /* Budget card */
+    .budget-card {{
+        background: {p.bg_secondary} !important;
+        border: 1px solid rgba(255,255,255,0.05) !important;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2) !important;
+    }}
+    .budget-title {{
+        color: {p.text_primary} !important;
+    }}
+    .budget-bar-bg {{
+        background: {p.bg_tertiary} !important;
+    }}
+    .budget-details {{
+        color: #94a3b8 !important;
+    }}
+    .budget-details span {{
+        color: #94a3b8 !important;
+    }}
+
+    /* Insight banner */
+    .insight-banner.positive {{
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(52, 211, 153, 0.1) 100%) !important;
+        border: 1px solid rgba(16, 185, 129, 0.2) !important;
+    }}
+    .insight-banner.positive .insight-message {{
+        color: #6ee7b7 !important;
+    }}
+    .insight-banner.neutral {{
+        background: {p.bg_secondary} !important;
+        border: 1px solid rgba(255,255,255,0.05) !important;
+    }}
+    .insight-banner.neutral .insight-message {{
+        color: {p.text_primary} !important;
+    }}
+    .insight-banner.warning {{
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(251, 191, 36, 0.1) 100%) !important;
+        border: 1px solid rgba(245, 158, 11, 0.2) !important;
+    }}
+    .insight-banner.warning .insight-message {{
+        color: #fcd34d !important;
+    }}
+
+    /* Alert cards - preserve border-left accent */
+    .alert-card {{
+        background: {p.bg_secondary} !important;
+        border-top: 1px solid rgba(255,255,255,0.05) !important;
+        border-right: 1px solid rgba(255,255,255,0.05) !important;
+        border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+    }}
+    .alert-card.sync {{
+        border-left: 4px solid #f59e0b !important;
+    }}
+    .alert-card.category {{
+        border-left: 4px solid {p.primary} !important;
+    }}
+    .alert-card.uncategorized {{
+        border-left: 4px solid {p.secondary} !important;
+    }}
+    .alert-message {{
+        color: {p.text_primary} !important;
+    }}
+
+    /* Section headings (h4) and titles */
+    h4, .section-title {{
+        color: {p.text_primary} !important;
+    }}
+
+    /* Section cards */
+    .section-card {{
+        background: {p.bg_secondary} !important;
+        border: 1px solid rgba(255,255,255,0.05) !important;
+    }}
+    .section-card .header {{
+        color: {p.text_primary} !important;
+        border-bottom-color: {p.bg_tertiary} !important;
+    }}
+
+    /* Account cards */
+    .account-card {{
+        background: {p.bg_secondary} !important;
+        border: 1px solid rgba(255,255,255,0.05) !important;
+    }}
+    .account-card .name {{
+        color: {p.text_primary} !important;
+    }}
+    .account-card .subtitle {{
+        color: {p.text_muted} !important;
+    }}
+    .account-card .balance {{
+        color: {p.text_primary} !important;
+    }}
+
+    /* Summary items */
+    .summary-item {{
+        background: {p.bg_primary} !important;
+    }}
+    .summary-item:hover {{
+        background: {p.bg_tertiary} !important;
+    }}
+    .summary-item .name {{
+        color: {p.text_primary} !important;
+    }}
+    .summary-item .subtitle {{
+        color: {p.text_muted} !important;
+    }}
+    .summary-item .value {{
+        color: {p.text_primary} !important;
+    }}
+
+    /* Transaction rows */
+    .transaction-row {{
+        border-bottom-color: {p.bg_tertiary} !important;
+    }}
+    .transaction-row:hover {{
+        background-color: {p.bg_tertiary} !important;
+    }}
+    .transaction-row .merchant {{
+        color: {p.text_primary} !important;
+    }}
+    .transaction-row .category {{
+        color: {p.text_secondary} !important;
+    }}
+
+    /* Date headers */
+    .date-header {{
+        color: {p.text_muted} !important;
+    }}
+
+    /* Category badge */
+    .category-badge {{
+        background: rgba(129, 140, 248, 0.15) !important;
+        color: #a5b4fc !important;
+    }}
+
+    /* Buttons - dark mode styling matching preview */
+    .stButton > button,
+    div[data-testid="stButton"] button {{
+        background: #334155 !important;
+        color: #94a3b8 !important;
+        border: none !important;
+        border-radius: 8px !important;
+    }}
+    .stButton > button:hover,
+    div[data-testid="stButton"] button:hover {{
+        background: #475569 !important;
+        color: {p.text_primary} !important;
+    }}
+    .stButton > button p,
+    .stButton > button span,
+    div[data-testid="stButton"] button p,
+    div[data-testid="stButton"] button span {{
+        color: inherit !important;
+    }}
+
+    /* Primary buttons keep their color */
+    .stButton > button[kind="primary"],
+    div[data-testid="stButton"] button[kind="primary"] {{
+        background: {p.primary} !important;
+        color: white !important;
+        border: none !important;
+    }}
+    .stButton > button[kind="primary"]:hover,
+    div[data-testid="stButton"] button[kind="primary"]:hover {{
+        opacity: 0.9;
+    }}
+
+    /* View all buttons after card iframes - dark mode */
+    iframe + div .stButton > button,
+    iframe + div div[data-testid="stButton"] button {{
+        background: #334155 !important;
+        color: #94a3b8 !important;
+    }}
+    iframe + div .stButton > button:hover,
+    iframe + div div[data-testid="stButton"] button:hover {{
+        background: #475569 !important;
+        color: {p.text_primary} !important;
+    }}
+    ''' if is_dark else ''}
+    </style>
+    """
+
+
 def apply_theme() -> Theme:
     """
     Apply theme to the current page
 
     This function should be called at the top of each page to:
     1. Initialize theme from session state
-    2. Apply global CSS (including shared styles)
-    3. Return theme instance for use in page
+    2. Inject CSS variables for current theme
+    3. Apply shared CSS styles
+    4. Apply theme-specific overrides
+    5. Return theme instance for use in page
 
     Returns:
         Current theme instance
@@ -134,10 +436,13 @@ def apply_theme() -> Theme:
     # Initialize theme
     theme = init_theme()
 
-    # Load shared CSS styles
+    # Inject CSS variables FIRST (so main.css can use them)
+    st.markdown(generate_css_variables(theme), unsafe_allow_html=True)
+
+    # Load shared CSS styles (uses the CSS variables we just set)
     load_shared_css()
 
-    # Apply theme-specific CSS
+    # Apply additional theme-specific CSS overrides
     st.markdown(theme.generate_global_css(), unsafe_allow_html=True)
 
     return theme

@@ -4,6 +4,11 @@ Reusable card components for Streamlit UI.
 Uses streamlit.components.v1.html() to render custom HTML cards that bypass
 Streamlit's markdown sanitizer. Each component is self-contained with embedded styles.
 
+Design System: Hybrid Material + Glassmorphism
+- Solid cards with subtle shadows for main content (high readability)
+- Gradient hero with glass overlay for visual focus
+- Glass effects reserved for floating elements
+
 Usage:
     from streamlit_app.components.cards import render_card, render_metric_row
 
@@ -12,14 +17,14 @@ Usage:
 
     # Metric cards row (uses CSS from main.css)
     render_metric_row([
-        {"value": "₪50,000", "label": "Total Balance"},
+        {"value": "50,000", "label": "Total Balance"},
         {"value": "12", "label": "Accounts"},
     ])
 
     # List card with items
     items = [
-        {"icon": "🛒", "title": "Item 1", "subtitle": "Details", "value": "$10"},
-        {"icon": "⛽", "title": "Item 2", "subtitle": "More details", "value": "$20"},
+        {"icon": "cart", "title": "Item 1", "subtitle": "Details", "value": "$10"},
+        {"icon": "fuel", "title": "Item 2", "subtitle": "More details", "value": "$20"},
     ]
     render_list_card("My List", items, height=200)
 """
@@ -30,50 +35,137 @@ from typing import List, Dict, Any, Optional
 
 
 # ============================================================================
-# SHARED STYLES
+# DESIGN TOKENS - Single source of truth for card component styling
+# Aligned with streamlit_app/styles/design_tokens.py and main.css
 # ============================================================================
 
-# Design tokens - single source of truth for colors, fonts, spacing
-TOKENS = {
-    # Colors
+# Light mode tokens
+TOKENS_LIGHT = {
+    # Colors - Light mode
+    "color_primary": "#6366f1",
+    "color_primary_light": "#818cf8",
     "color_text_primary": "#1f2937",
     "color_text_secondary": "#6b7280",
     "color_text_muted": "#9ca3af",
-    "color_background": "white",
-    "color_background_subtle": "#fafafa",
-    "color_border": "#f0f0f0",
-    "color_border_light": "#f3f4f6",
+    "color_background": "#ffffff",
+    "color_surface": "#ffffff",
+    "color_surface_subtle": "#fafafa",
+    "color_surface_hover": "#f9fafb",
+    "color_border": "rgba(0,0,0,0.08)",
+    "color_border_light": "rgba(0,0,0,0.05)",
+    "color_border_divider": "#f3f4f6",  # For card header borders
+    "color_border_subtle": "#f9fafb",    # For transaction item borders
     "color_expense": "#dc2626",
     "color_income": "#16a34a",
+    "color_category_bg": "#eef2ff",
+
     # Typography
-    "font_family": '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    "font_mono": "'SF Mono', 'Roboto Mono', monospace",
+    "font_family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font_mono": "'SF Mono', 'Roboto Mono', Consolas, monospace",
+
     # Spacing & Sizing
-    "border_radius_card": "16px",
-    "border_radius_item": "10px",
-    "shadow_card": "0 2px 8px rgba(0,0,0,0.06)",
-    "padding_card": "1.25rem 1.5rem",
+    "radius_sm": "6px",
+    "radius_md": "12px",
+    "radius_lg": "16px",
+    "radius_full": "9999px",
+
+    # Shadows
+    "shadow_sm": "0 1px 2px rgba(0,0,0,0.05)",
+    "shadow_md": "0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04)",
+
+    # Transitions
+    "transition_fast": "150ms ease",
+    "transition_normal": "200ms ease",
 }
 
-# Base card styles (shared across all card types)
-BASE_CARD_CSS = f"""
+# Dark mode tokens
+TOKENS_DARK = {
+    # Colors - Dark mode
+    "color_primary": "#818cf8",
+    "color_primary_light": "#a5b4fc",
+    "color_text_primary": "#f1f5f9",
+    "color_text_secondary": "#94a3b8",
+    "color_text_muted": "#64748b",
+    "color_background": "#0f172a",
+    "color_surface": "#1e293b",
+    "color_surface_subtle": "#0f172a",
+    "color_surface_hover": "#334155",
+    "color_border": "rgba(255,255,255,0.1)",
+    "color_border_light": "rgba(255,255,255,0.05)",
+    "color_border_divider": "#334155",  # For card header borders
+    "color_border_subtle": "#1e293b",    # For transaction item borders
+    "color_expense": "#f87171",
+    "color_income": "#34d399",
+    "color_category_bg": "rgba(129, 140, 248, 0.15)",
+
+    # Typography (same as light)
+    "font_family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font_mono": "'SF Mono', 'Roboto Mono', Consolas, monospace",
+
+    # Spacing & Sizing (same as light)
+    "radius_sm": "6px",
+    "radius_md": "12px",
+    "radius_lg": "16px",
+    "radius_full": "9999px",
+
+    # Shadows (darker for dark mode)
+    "shadow_sm": "0 1px 2px rgba(0,0,0,0.2)",
+    "shadow_md": "0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -1px rgba(0,0,0,0.2)",
+
+    # Transitions (same as light)
+    "transition_fast": "150ms ease",
+    "transition_normal": "200ms ease",
+}
+
+
+def get_tokens() -> dict:
+    """Get the appropriate tokens based on current theme mode."""
+    theme_mode = st.session_state.get('theme_mode', 'light')
+    return TOKENS_DARK if theme_mode == 'dark' else TOKENS_LIGHT
+
+
+# Backwards compatibility - TOKENS defaults to light mode
+TOKENS = TOKENS_LIGHT
+
+
+# ============================================================================
+# BASE CARD STYLES
+# ============================================================================
+
+def get_base_card_css() -> str:
+    """Generate base card CSS with current theme tokens."""
+    tokens = get_tokens()
+    return f"""
+* {{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}}
+body {{
+    font-family: {tokens['font_family']};
+    background: transparent;
+    line-height: 1.5;
+}}
 .card {{
-    background: {TOKENS['color_background']};
-    border-radius: {TOKENS['border_radius_card']};
-    padding: {TOKENS['padding_card']};
-    box-shadow: {TOKENS['shadow_card']};
-    border: 1px solid {TOKENS['color_border']};
-    font-family: {TOKENS['font_family']};
+    background: {tokens['color_surface']};
+    border-radius: {tokens['radius_lg']};
+    padding: 1.25rem 1.5rem;
+    box-shadow: {tokens['shadow_md']};
+    border: 1px solid {tokens['color_border_light']};
 }}
 .card-header {{
     font-size: 1rem;
     font-weight: 600;
-    color: {TOKENS['color_text_primary']};
+    color: {tokens['color_text_primary']};
     margin-bottom: 1rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid {TOKENS['color_border_light']};
+    border-bottom: 1px solid {tokens['color_border_divider']};
 }}
 """
+
+
+# Keep BASE_CARD_CSS for backwards compatibility (uses light mode)
+BASE_CARD_CSS = get_base_card_css.__doc__  # Placeholder, actual CSS generated dynamically
 
 
 # ============================================================================
@@ -95,15 +187,23 @@ def render_card(
         height: Iframe height in pixels
         extra_css: Additional CSS rules to inject
     """
+    base_css = get_base_card_css()
     html = f"""
-    <style>
-    {BASE_CARD_CSS}
-    {extra_css}
-    </style>
-    <div class="card">
-        <div class="card-header">{title}</div>
-        <div class="card-content">{content_html}</div>
-    </div>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+        {base_css}
+        {extra_css}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="card-header">{title}</div>
+            <div class="card-content">{content_html}</div>
+        </div>
+    </body>
+    </html>
     """
     components.html(html, height=height, scrolling=False)
 
@@ -123,7 +223,7 @@ def render_metric_row(metrics: List[Dict[str, str]]) -> None:
 
     Example:
         render_metric_row([
-            {"value": "₪50,000", "label": "Total Balance"},
+            {"value": "50,000", "label": "Total Balance"},
             {"value": "12", "label": "Accounts", "sublabel": "3 active"},
         ])
     """
@@ -134,9 +234,9 @@ def render_metric_row(metrics: List[Dict[str, str]]) -> None:
             # Always render sublabel div for consistent card height
             st.markdown(
                 f'<div class="metric-card">'
-                f'<div class="value">{metric["value"]}</div>'
-                f'<div class="label">{metric["label"]}</div>'
-                f'<div class="sublabel">{sublabel}</div>'
+                f'<div class="metric-value">{metric["value"]}</div>'
+                f'<div class="metric-label">{metric["label"]}</div>'
+                f'<div class="metric-sublabel">{sublabel}</div>'
                 f'</div>',
                 unsafe_allow_html=True
             )
@@ -146,7 +246,7 @@ def render_account_card(
     institution: str,
     balance: str,
     subtitle: str,
-    status_icon: str = "✅",
+    status_icon: str = "",
     on_click_key: str = None
 ) -> bool:
     """
@@ -156,12 +256,15 @@ def render_account_card(
         institution: Institution name (e.g., "CAL", "Excellence")
         balance: Formatted balance string
         subtitle: Subtitle text (e.g., "2 cards", "15 transactions")
-        status_icon: Status emoji (default "✅")
+        status_icon: Status emoji (default "")
         on_click_key: Optional key for a "View Details" button
 
     Returns:
         True if the button was clicked, False otherwise
     """
+    # Determine if balance is negative for styling
+    balance_class = "balance negative" if balance.startswith("-") or balance.startswith("-") else "balance"
+
     st.markdown(
         f'<div class="account-card">'
         f'<div class="icon">🏦</div>'
@@ -169,7 +272,7 @@ def render_account_card(
         f'<div class="name">{status_icon} {institution}</div>'
         f'<div class="subtitle">{subtitle}</div>'
         f'</div>'
-        f'<div class="balance">{balance}</div>'
+        f'<div class="{balance_class}">{balance}</div>'
         f'</div>',
         unsafe_allow_html=True
     )
@@ -235,11 +338,14 @@ def render_transaction_card(
             f'</div>'
         )
 
+    # Get theme-aware tokens
+    tokens = get_tokens()
+
     extra_css = f"""
     .date-header {{
         font-size: 0.7rem;
         font-weight: 600;
-        color: {TOKENS['color_text_muted']};
+        color: {tokens['color_text_muted']};
         text-transform: uppercase;
         letter-spacing: 0.05em;
         margin: 0.75rem 0 0.25rem 0;
@@ -253,7 +359,11 @@ def render_transaction_card(
         display: flex;
         align-items: center;
         padding: 0.6rem 0;
-        border-bottom: 1px solid {TOKENS['color_border_light']};
+        border-bottom: 1px solid {tokens['color_border_subtle']};
+        transition: background-color {tokens['transition_fast']};
+    }}
+    .txn-item:hover {{
+        background-color: {tokens['color_surface_hover']};
     }}
     .txn-item:last-child {{
         border-bottom: none;
@@ -270,7 +380,7 @@ def render_transaction_card(
     }}
     .txn-merchant {{
         font-weight: 500;
-        color: {TOKENS['color_text_primary']};
+        color: {tokens['color_text_primary']};
         font-size: 0.9rem;
         white-space: nowrap;
         overflow: hidden;
@@ -278,23 +388,24 @@ def render_transaction_card(
     }}
     .txn-category {{
         display: inline-block;
-        font-size: 0.7rem;
+        font-size: 0.65rem;
         padding: 0.1rem 0.5rem;
-        border-radius: 9999px;
-        background: {TOKENS['color_border_light']};
-        color: {TOKENS['color_text_secondary']};
+        border-radius: {tokens['radius_full']};
+        background: {tokens['color_category_bg']};
+        color: {tokens['color_primary']};
         margin-top: 0.2rem;
+        font-weight: 500;
     }}
     .txn-amount {{
-        font-family: {TOKENS['font_mono']};
+        font-family: {tokens['font_mono']};
         font-weight: 500;
         font-size: 0.9rem;
-        color: {TOKENS['color_expense']};
+        color: {tokens['color_expense']};
         text-align: right;
         min-width: 80px;
     }}
     .txn-amount.positive {{
-        color: {TOKENS['color_income']};
+        color: {tokens['color_income']};
     }}
     """
 
@@ -337,42 +448,56 @@ def render_summary_card(
     """
     items_html = []
     for item in items:
+        # Check if value is negative for styling
+        value = item.get("value", "")
+        value_class = "summary-value negative" if "-" in str(value) and "" in str(value) else "summary-value"
+
         items_html.append(
             f'<div class="summary-item">'
             f'<div>'
             f'<div class="summary-name">{item["name"]}</div>'
             f'<div class="summary-subtitle">{item["subtitle"]}</div>'
             f'</div>'
-            f'<div class="summary-value">{item["value"]}</div>'
+            f'<div class="{value_class}">{value}</div>'
             f'</div>'
         )
+
+    # Get theme-aware tokens
+    tokens = get_tokens()
 
     extra_css = f"""
     .summary-item {{
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 0.75rem;
-        background: {TOKENS['color_background_subtle']};
-        border-radius: {TOKENS['border_radius_item']};
+        padding: 0.75rem 1rem;
+        background: {tokens['color_surface_subtle']};
+        border-radius: {tokens['radius_md']};
         margin-bottom: 0.5rem;
+        transition: background-color {tokens['transition_fast']};
+    }}
+    .summary-item:hover {{
+        background: {tokens['color_surface_hover']};
     }}
     .summary-item:last-child {{
         margin-bottom: 0;
     }}
     .summary-name {{
         font-weight: 600;
-        color: {TOKENS['color_text_primary']};
+        color: {tokens['color_text_primary']};
         font-size: 0.95rem;
     }}
     .summary-subtitle {{
         font-size: 0.8rem;
-        color: {TOKENS['color_text_secondary']};
+        color: {tokens['color_text_secondary']};
     }}
     .summary-value {{
-        font-family: {TOKENS['font_mono']};
+        font-family: {tokens['font_mono']};
         font-weight: 500;
-        color: {TOKENS['color_text_primary']};
+        color: {tokens['color_text_primary']};
+    }}
+    .summary-value.negative {{
+        color: {tokens['color_expense']};
     }}
     """
 
@@ -386,3 +511,60 @@ def render_summary_card(
 
     render_card(title, ''.join(items_html), height=height, extra_css=extra_css)
     return height
+
+
+def render_alert_card(
+    icon: str,
+    message: str,
+    alert_type: str = "info",
+    action_label: Optional[str] = None,
+    action_key: Optional[str] = None
+) -> bool:
+    """
+    Render an alert card with optional action button.
+
+    Args:
+        icon: Emoji icon for the alert
+        message: Alert message text
+        alert_type: Type of alert ('sync', 'category', 'uncategorized', 'info')
+        action_label: Optional button label
+        action_key: Optional key for button
+
+    Returns:
+        True if action button was clicked, False otherwise
+    """
+    col1, col2 = st.columns([5, 1])
+    with col1:
+        st.markdown(
+            f'<div class="alert-card {alert_type}">'
+            f'<span>{icon}</span>'
+            f'<span class="alert-message">{message}</span>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+    with col2:
+        if action_label and action_key:
+            return st.button(action_label, key=action_key, use_container_width=True)
+    return False
+
+
+def render_insight_banner(
+    icon: str,
+    message: str,
+    insight_type: str = "neutral"
+) -> None:
+    """
+    Render an insight banner.
+
+    Args:
+        icon: Emoji icon for the insight
+        message: Insight message text
+        insight_type: Type of insight ('positive', 'neutral', 'warning')
+    """
+    st.markdown(
+        f'<div class="insight-banner {insight_type}">'
+        f'<span class="insight-icon">{icon}</span>'
+        f'<span class="insight-message">{message}</span>'
+        f'</div>',
+        unsafe_allow_html=True
+    )
