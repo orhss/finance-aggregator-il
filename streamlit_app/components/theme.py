@@ -320,17 +320,42 @@ def generate_css_variables(theme: Theme) -> str:
     [data-testid="stTabs"] {{
         background: transparent !important;
     }}
-    [data-testid="stTabs"] [data-baseweb="tab-list"] {{
+    [data-baseweb="tab-list"] {{
         background: transparent !important;
+        background-color: transparent !important;
     }}
-    [data-testid="stTabs"] [data-baseweb="tab"] {{
+    /* Tab buttons */
+    [data-testid="stTab"] {{
+        background: transparent !important;
+        background-color: transparent !important;
+    }}
+    [data-testid="stTab"] p {{
         color: {p.text_secondary} !important;
     }}
-    [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] {{
+    [data-testid="stTab"][aria-selected="true"] {{
+        background: transparent !important;
+        background-color: transparent !important;
+    }}
+    [data-testid="stTab"][aria-selected="true"] p {{
         color: {p.text_primary} !important;
     }}
-    [data-testid="stTabs"] [data-baseweb="tab-panel"] {{
+    /* Tab panel content area */
+    [data-baseweb="tab-panel"] {{
         background: transparent !important;
+        background-color: transparent !important;
+    }}
+    [role="tabpanel"] {{
+        background: transparent !important;
+        background-color: transparent !important;
+    }}
+    /* Fix any white background containers inside tabs */
+    [data-testid="stTabs"] > div {{
+        background: transparent !important;
+        background-color: transparent !important;
+    }}
+    [data-testid="stTabs"] [data-testid="stVerticalBlock"] {{
+        background: transparent !important;
+        background-color: transparent !important;
     }}
     /* Fix tab content text and headings */
     [data-testid="stTabs"] h1,
@@ -342,11 +367,15 @@ def generate_css_variables(theme: Theme) -> str:
     [data-testid="stTabs"] label {{
         color: {p.text_primary} !important;
     }}
-    [data-testid="stTabs"] .stMarkdown p {{
+    [data-testid="stMarkdownContainer"] p {{
         color: {p.text_primary} !important;
     }}
     /* Streamlit subheader inside tabs */
     [data-testid="stTabs"] [data-testid="stSubheader"] {{
+        color: {p.text_primary} !important;
+    }}
+    /* Checkbox labels */
+    [data-testid="stCheckbox"] label span {{
         color: {p.text_primary} !important;
     }}
 

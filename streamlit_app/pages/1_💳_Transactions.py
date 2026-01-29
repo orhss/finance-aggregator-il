@@ -954,8 +954,7 @@ try:
                     )
 
                 # --- Save/Reset Buttons ---
-                st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
-                btn_col1, btn_col2 = st.columns(2)
+                btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 3])
 
                 with btn_col1:
                     save_clicked = st.button("💾 Save Changes", type="primary", use_container_width=True)
