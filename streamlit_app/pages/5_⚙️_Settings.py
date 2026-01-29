@@ -47,21 +47,29 @@ def render_theme_settings():
     """Render theme settings section."""
     from streamlit_app.config.theme import set_theme_mode
 
+    def on_theme_change():
+        """Callback when user clicks the toggle - only fires on actual clicks."""
+        new_mode = 'dark' if st.session_state.setting_dark_mode else 'light'
+        st.session_state.theme_mode = new_mode
+        set_theme_mode(new_mode)
+
     current_mode = st.session_state.get('theme_mode', 'light')
     is_dark = current_mode == 'dark'
 
-    dark_mode = st.toggle(
-        "Dark Mode",
-        value=is_dark,
-        key="setting_dark_mode",
-        help="Switch between light and dark theme"
-    )
+    # Sync toggle key with theme_mode to handle external changes (e.g., sidebar button)
+    # Must happen before toggle renders so widget shows correct state
+    if 'setting_dark_mode' not in st.session_state:
+        st.session_state.setting_dark_mode = is_dark
+    elif st.session_state.setting_dark_mode != is_dark:
+        # External change detected (sidebar button) - sync the toggle
+        st.session_state.setting_dark_mode = is_dark
 
-    if dark_mode != is_dark:
-        new_mode = 'dark' if dark_mode else 'light'
-        st.session_state.theme_mode = new_mode
-        set_theme_mode(new_mode)
-        st.rerun()
+    st.toggle(
+        "Dark Mode",
+        key="setting_dark_mode",
+        help="Switch between light and dark theme",
+        on_change=on_theme_change
+    )
 
     st.caption("🌙 Easier on the eyes in low light")
 

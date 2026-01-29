@@ -127,6 +127,8 @@ def render_theme_toggle():
         if st.button(icon, key="theme_toggle_sidebar", help="Toggle dark mode"):
             new_mode = 'light' if is_dark else 'dark'
             st.session_state.theme_mode = new_mode
+            # Sync with settings page toggle key to prevent state conflicts
+            st.session_state.setting_dark_mode = (new_mode == 'dark')
             set_theme_mode(new_mode)
             st.rerun()
 
