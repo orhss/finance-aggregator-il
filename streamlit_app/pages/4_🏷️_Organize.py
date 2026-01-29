@@ -26,7 +26,6 @@ from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.bulk_actions import show_bulk_preview, show_bulk_confirmation
 from streamlit_app.components.theme import apply_theme
 from streamlit_app.components.cards import render_metric_row
-from streamlit_app.components.mobile_ui import mobile_quick_settings
 
 # Page config
 st.set_page_config(
@@ -44,9 +43,6 @@ if not check_authentication():
 
 # Apply theme
 theme = apply_theme()
-
-# Mobile quick settings (for pages without dedicated mobile views)
-mobile_quick_settings()
 
 # Render sidebar
 render_minimal_sidebar()

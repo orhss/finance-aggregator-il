@@ -504,37 +504,3 @@ def quick_categorize_card(
             on_skip()
 
 
-def mobile_quick_settings():
-    """
-    Render quick settings bar for mobile - Privacy & Dark Mode.
-
-    Shows compact toggle buttons at the top of mobile pages since the sidebar
-    is collapsed by default on mobile devices.
-
-    Only renders when on mobile. Call at the top of page content after theme application.
-    """
-    if not is_mobile():
-        return
-
-    from streamlit_app.config.theme import set_theme_mode
-
-    is_private = st.session_state.get('mask_balances', False)
-    current_mode = st.session_state.get('theme_mode', 'light')
-    is_dark = current_mode == 'dark'
-
-    # Create right-aligned compact buttons
-    _, col_privacy, col_theme = st.columns([4, 1, 1])
-
-    with col_privacy:
-        privacy_icon = "🙈" if is_private else "👁️"
-        if st.button(privacy_icon, key="mobile_privacy_toggle", help="Toggle privacy mode"):
-            st.session_state.mask_balances = not is_private
-            st.rerun()
-
-    with col_theme:
-        theme_icon = "🌙" if is_dark else "☀️"
-        if st.button(theme_icon, key="mobile_theme_toggle", help="Toggle dark mode"):
-            new_mode = 'light' if is_dark else 'dark'
-            st.session_state.theme_mode = new_mode
-            set_theme_mode(new_mode)
-            st.rerun()

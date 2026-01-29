@@ -20,7 +20,6 @@ from streamlit_app.utils.formatters import format_number
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.theme import apply_theme
 from streamlit_app.components.cards import render_metric_row
-from streamlit_app.components.mobile_ui import mobile_quick_settings
 
 # Page config
 st.set_page_config(
@@ -38,9 +37,6 @@ if not check_authentication():
 
 # Apply theme (must be called before any content)
 theme = apply_theme()
-
-# Mobile quick settings (for pages without dedicated mobile views)
-mobile_quick_settings()
 
 # Render sidebar
 render_minimal_sidebar()
@@ -61,6 +57,182 @@ try:
     import json
 
     session = get_session()
+
+    # ============================================================================
+    # THEME SETTINGS (most frequently used)
+    # ============================================================================
+    st.subheader("🌓 Theme")
+
+    from streamlit_app.config.theme import set_theme_mode
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("**Appearance**")
+
+        current_mode = st.session_state.get('theme_mode', 'light')
+        is_dark = current_mode == 'dark'
+
+        dark_mode = st.toggle(
+            "Dark Mode",
+            value=is_dark,
+            key="setting_dark_mode",
+            help="Switch between light and dark theme"
+        )
+
+        if dark_mode != is_dark:
+            new_mode = 'dark' if dark_mode else 'light'
+            st.session_state.theme_mode = new_mode
+            set_theme_mode(new_mode)
+            st.rerun()
+
+        st.caption("🌙 Easier on the eyes in low light")
+
+    with col2:
+        st.markdown("**Tips**")
+        st.caption("On desktop, you can also toggle dark mode from the sidebar.")
+
+    st.markdown("")  # Spacing
+
+    # ============================================================================
+    # PRIVACY SETTINGS
+    # ============================================================================
+    st.subheader("🔒 Privacy & Security")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("**Balance Visibility**")
+
+        # Use the session state value directly - toggle writes back to session state via key
+        mask_balances = st.toggle(
+            "Hide All Balances",
+            value=st.session_state.get('mask_balances', False),
+            key="setting_mask_balances",
+            help="Hide all financial amounts for privacy (shows ••••••)"
+        )
+        # Sync back to the main session state key used by other components
+        st.session_state.mask_balances = mask_balances
+
+        st.caption("🔒 Useful when sharing screen or in public")
+
+    with col2:
+        st.markdown("**Sensitive Data Masking**")
+
+        # Use the session state value directly - toggle writes back to session state via key
+        mask_accounts = st.toggle(
+            "Mask Account Numbers",
+            value=st.session_state.get('mask_account_numbers', True),
+            key="setting_mask_account_numbers",
+            help="Show account/card numbers as ••••1234"
+        )
+        # Sync back to the main session state key used by other components
+        st.session_state.mask_account_numbers = mask_accounts
+
+        st.caption("📋 Account numbers show as ••••1234")
+
+    st.markdown("")  # Spacing
+
+    # ============================================================================
+    # DISPLAY SETTINGS
+    # ============================================================================
+    st.subheader("🎨 Display Settings")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("**Table Settings**")
+
+        rows_per_page = st.selectbox(
+            "Default Rows Per Page",
+            [25, 50, 100, 200],
+            index=1,
+            key="rows_per_page"
+        )
+
+        st.caption("Default number of rows in tables")
+
+    with col2:
+        st.markdown("**Format Settings**")
+
+        currency_format = st.selectbox(
+            "Currency Display",
+            ["₪1,234.56", "1,234.56 ₪", "1234.56"],
+            key="currency_format"
+        )
+
+        date_format = st.selectbox(
+            "Date Format",
+            ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d %b %Y"],
+            key="date_format"
+        )
+
+    st.info("💡 **Note**: Display settings are currently for preview only. Settings persistence will be added in a future update.")
+
+    st.markdown("")  # Spacing
+
+    # ============================================================================
+    # BUDGET SETTINGS
+    # ============================================================================
+    st.subheader("💰 Monthly Budget")
+
+    try:
+        from services.budget_service import BudgetService
+        from datetime import date
+
+        budget_service = BudgetService(session)
+        progress = budget_service.get_current_progress()
+        today = date.today()
+        month_name = today.strftime("%B %Y")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown(f"**Set Budget for {month_name}**")
+
+            # Current budget value for default
+            current_budget = progress['budget'] if progress['budget'] else 5000
+
+            new_budget = st.number_input(
+                "Monthly Budget (₪)",
+                min_value=0.0,
+                value=float(current_budget),
+                step=500.0,
+                key="budget_input"
+            )
+
+            if st.button("💾 Save Budget", use_container_width=True):
+                budget_service.set_current_budget(new_budget)
+                st.success(f"Budget set to ₪{new_budget:,.0f}")
+                st.rerun()
+
+        with col2:
+            st.markdown("**Current Progress**")
+
+            if progress['budget']:
+                spent = progress['spent']
+                budget = progress['budget']
+                percent = progress['percent_actual']
+                remaining = progress['remaining']
+
+                # Color: green if under 80%, neutral 80-100%, red if over
+                delta_color = "normal" if percent < 80 else ("inverse" if percent >= 100 else "off")
+                st.metric("Spent this month", f"₪{spent:,.0f}", delta=f"{percent:.1f}% of budget", delta_color=delta_color)
+
+                # Progress bar
+                st.progress(min(percent / 100, 1.0))
+
+                if progress['is_over_budget']:
+                    st.error(f"₪{abs(remaining):,.0f} over budget")
+                else:
+                    st.success(f"₪{remaining:,.0f} remaining")
+            else:
+                st.info("No budget set. Set a monthly budget to track your spending.")
+
+    except Exception as e:
+        st.warning(f"Could not load budget settings: {str(e)}")
+
+    st.markdown("")  # Spacing
 
     # ============================================================================
     # CREDENTIALS MANAGEMENT
@@ -191,145 +363,6 @@ try:
             else:
                 st.session_state.confirm_reset_db = True
                 st.warning("⚠️ Click again to confirm reset")
-
-    st.markdown("")  # Spacing
-
-    # ============================================================================
-    # BUDGET SETTINGS
-    # ============================================================================
-    st.subheader("💰 Monthly Budget")
-
-    try:
-        from services.budget_service import BudgetService
-        from datetime import date
-
-        budget_service = BudgetService(session)
-        progress = budget_service.get_current_progress()
-        today = date.today()
-        month_name = today.strftime("%B %Y")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.markdown(f"**Set Budget for {month_name}**")
-
-            # Current budget value for default
-            current_budget = progress['budget'] if progress['budget'] else 5000
-
-            new_budget = st.number_input(
-                "Monthly Budget (₪)",
-                min_value=0.0,
-                value=float(current_budget),
-                step=500.0,
-                key="budget_input"
-            )
-
-            if st.button("💾 Save Budget", use_container_width=True):
-                budget_service.set_current_budget(new_budget)
-                st.success(f"Budget set to ₪{new_budget:,.0f}")
-                st.rerun()
-
-        with col2:
-            st.markdown("**Current Progress**")
-
-            if progress['budget']:
-                spent = progress['spent']
-                budget = progress['budget']
-                percent = progress['percent_actual']
-                remaining = progress['remaining']
-
-                # Color: green if under 80%, neutral 80-100%, red if over
-                delta_color = "normal" if percent < 80 else ("inverse" if percent >= 100 else "off")
-                st.metric("Spent this month", f"₪{spent:,.0f}", delta=f"{percent:.1f}% of budget", delta_color=delta_color)
-
-                # Progress bar
-                st.progress(min(percent / 100, 1.0))
-
-                if progress['is_over_budget']:
-                    st.error(f"₪{abs(remaining):,.0f} over budget")
-                else:
-                    st.success(f"₪{remaining:,.0f} remaining")
-            else:
-                st.info("No budget set. Set a monthly budget to track your spending.")
-
-    except Exception as e:
-        st.warning(f"Could not load budget settings: {str(e)}")
-
-    st.markdown("")  # Spacing
-
-    # ============================================================================
-    # EXPORT SETTINGS
-    # ============================================================================
-    st.subheader("📤 Export Settings")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("**Default Export Format**")
-        export_format = st.selectbox(
-            "Format",
-            ["CSV", "JSON"],
-            key="export_format"
-        )
-        st.caption("Default format for exporting data")
-
-    with col2:
-        st.markdown("**Default Date Range**")
-        default_range = st.selectbox(
-            "Range",
-            ["Last Month", "Last 3 Months", "Last 6 Months", "This Year", "All Time"],
-            index=1,
-            key="default_range"
-        )
-        st.caption("Default time range for reports")
-
-    st.markdown("")  # Spacing
-
-    # ============================================================================
-    # PRIVACY SETTINGS
-    # ============================================================================
-    st.subheader("🔒 Privacy & Security Settings")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("**Sensitive Data Masking**")
-
-        # Use the session state value directly - toggle writes back to session state via key
-        mask_accounts = st.toggle(
-            "Mask Account Numbers",
-            value=st.session_state.get('mask_account_numbers', True),
-            key="setting_mask_account_numbers",
-            help="Show account/card numbers as ••••1234"
-        )
-        # Sync back to the main session state key used by other components
-        st.session_state.mask_account_numbers = mask_accounts
-
-        st.caption("📋 Account numbers show as ••••1234")
-
-    with col2:
-        st.markdown("**Balance Visibility**")
-
-        # Use the session state value directly - toggle writes back to session state via key
-        mask_balances = st.toggle(
-            "Hide All Balances",
-            value=st.session_state.get('mask_balances', False),
-            key="setting_mask_balances",
-            help="Hide all financial amounts for privacy (shows ••••••)"
-        )
-        # Sync back to the main session state key used by other components
-        st.session_state.mask_balances = mask_balances
-
-        st.caption("🔒 Useful when sharing screen or in public")
-
-    # Security reminder
-    st.info("""
-    🛡️ **Security Best Practices:**
-    - Use account number masking when presenting or sharing screenshots
-    - Enable balance hiding in public spaces or during video calls
-    - Your credentials are always encrypted - these settings only affect display
-    - All data stays local on your device
-    """)
 
     st.markdown("")  # Spacing
 
@@ -472,40 +505,30 @@ try:
     st.markdown("")  # Spacing
 
     # ============================================================================
-    # DISPLAY SETTINGS
+    # EXPORT SETTINGS
     # ============================================================================
-    st.subheader("🎨 Display Settings")
+    st.subheader("📤 Export Settings")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("**Table Settings**")
-
-        rows_per_page = st.selectbox(
-            "Default Rows Per Page",
-            [25, 50, 100, 200],
-            index=1,
-            key="rows_per_page"
+        st.markdown("**Default Export Format**")
+        export_format = st.selectbox(
+            "Format",
+            ["CSV", "JSON"],
+            key="export_format"
         )
-
-        st.caption("Default number of rows in tables")
+        st.caption("Default format for exporting data")
 
     with col2:
-        st.markdown("**Format Settings**")
-
-        currency_format = st.selectbox(
-            "Currency Display",
-            ["₪1,234.56", "1,234.56 ₪", "1234.56"],
-            key="currency_format"
+        st.markdown("**Default Date Range**")
+        default_range = st.selectbox(
+            "Range",
+            ["Last Month", "Last 3 Months", "Last 6 Months", "This Year", "All Time"],
+            index=1,
+            key="default_range"
         )
-
-        date_format = st.selectbox(
-            "Date Format",
-            ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d %b %Y"],
-            key="date_format"
-        )
-
-    st.info("💡 **Note**: Display settings are currently for preview only. Settings persistence will be added in a future update.")
+        st.caption("Default time range for reports")
 
     st.markdown("")  # Spacing
 

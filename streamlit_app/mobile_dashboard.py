@@ -22,8 +22,8 @@ from streamlit_app.components.mobile_ui import (
     summary_card,
     transaction_list,
     bottom_navigation,
-    mobile_quick_settings,
 )
+from streamlit_app.components.theme import apply_theme
 
 
 def render_budget_progress():
@@ -123,11 +123,11 @@ def render_mobile_dashboard():
     Main mobile dashboard render function.
     Call this from app.py when mobile is detected.
     """
+    # Apply theme (for dark mode support)
+    apply_theme()
+
     # Apply mobile CSS
     apply_mobile_css()
-
-    # Mobile quick settings (Privacy & Theme toggles)
-    mobile_quick_settings()
 
     # Get stats
     stats = get_dashboard_stats()

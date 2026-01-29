@@ -32,7 +32,6 @@ from streamlit_app.components.mobile_ui import (
     transaction_list,
     bottom_navigation,
     filter_chips,
-    mobile_quick_settings,
 )
 from streamlit_app.utils.formatters import get_category_icon
 
@@ -61,11 +60,11 @@ def render_mobile_transactions():
     from db.models import Account, Transaction
     from sqlalchemy import func, and_, desc
 
+    # Apply theme (for dark mode support)
+    apply_theme()
+
     # Apply mobile CSS
     apply_mobile_css()
-
-    # Mobile quick settings (Privacy & Theme toggles)
-    mobile_quick_settings()
 
     session = get_session()
 

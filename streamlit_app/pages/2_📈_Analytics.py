@@ -42,7 +42,7 @@ from streamlit_app.components.heatmap import calendar_heatmap, monthly_heatmap
 from streamlit_app.components.theme import apply_theme
 from streamlit_app.components.cards import render_metric_row
 from streamlit_app.utils.mobile import detect_mobile, is_mobile
-from streamlit_app.components.mobile_ui import apply_mobile_css, summary_card, bottom_navigation, mobile_quick_settings
+from streamlit_app.components.mobile_ui import apply_mobile_css, summary_card, bottom_navigation
 from streamlit_app.auth import check_authentication
 
 # Page config
@@ -66,11 +66,11 @@ detect_mobile()
 
 def render_mobile_analytics():
     """Render simplified mobile analytics view."""
+    # Apply theme (for dark mode support)
+    apply_theme()
+
     # Apply mobile CSS
     apply_mobile_css()
-
-    # Mobile quick settings (Privacy & Theme toggles)
-    mobile_quick_settings()
 
     st.markdown("### 📈 Analytics")
 
