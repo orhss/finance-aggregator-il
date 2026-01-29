@@ -18,7 +18,9 @@ from streamlit_app.utils.session import init_session_state
 from streamlit_app.auth import check_authentication
 from streamlit_app.utils.formatters import format_number
 from streamlit_app.components.sidebar import render_minimal_sidebar
-from streamlit_app.components.theme import apply_theme, render_theme_switcher
+from streamlit_app.components.theme import apply_theme
+from streamlit_app.components.cards import render_metric_row
+from streamlit_app.components.mobile_ui import mobile_quick_settings
 
 # Page config
 st.set_page_config(
@@ -37,16 +39,19 @@ if not check_authentication():
 # Apply theme (must be called before any content)
 theme = apply_theme()
 
+# Mobile quick settings (for pages without dedicated mobile views)
+mobile_quick_settings()
+
 # Render sidebar
 render_minimal_sidebar()
 
-# Render theme switcher in sidebar
-render_theme_switcher("sidebar")
-
-# Page header
-st.title("⚙️ Settings")
-st.markdown("Application configuration and management")
-st.markdown("---")
+# Page header with new design
+st.markdown("""
+<div class="page-header">
+    <h1>⚙️ Settings</h1>
+    <p class="subtitle">Application configuration and management</p>
+</div>
+""", unsafe_allow_html=True)
 
 try:
     from db.database import get_session
@@ -113,7 +118,7 @@ try:
         st.code("fin-cli config show", language="bash")
         st.caption("Show current configuration (masked)")
 
-    st.markdown("---")
+    st.markdown("")  # Spacing
 
     # ============================================================================
     # DATABASE MANAGEMENT
@@ -129,29 +134,23 @@ try:
         st.success(f"✅ Database: `{db_path}` ({db_size:.2f} MB)")
 
         # Database statistics
-        col1, col2, col3, col4 = st.columns(4)
+        account_count = session.query(func.count(Account.id)).scalar()
+        txn_count = session.query(func.count(Transaction.id)).scalar()
+        balance_count = session.query(func.count(Balance.id)).scalar()
+        tag_count = session.query(func.count(Tag.id)).scalar()
 
-        with col1:
-            account_count = session.query(func.count(Account.id)).scalar()
-            st.metric("Accounts", format_number(account_count))
-
-        with col2:
-            txn_count = session.query(func.count(Transaction.id)).scalar()
-            st.metric("Transactions", format_number(txn_count))
-
-        with col3:
-            balance_count = session.query(func.count(Balance.id)).scalar()
-            st.metric("Balance Records", format_number(balance_count))
-
-        with col4:
-            tag_count = session.query(func.count(Tag.id)).scalar()
-            st.metric("Tags", format_number(tag_count))
+        render_metric_row([
+            {"value": format_number(account_count), "label": "Accounts"},
+            {"value": format_number(txn_count), "label": "Transactions"},
+            {"value": format_number(balance_count), "label": "Balance Records"},
+            {"value": format_number(tag_count), "label": "Tags"},
+        ])
     else:
         st.warning(f"⚠️ Database not found at `{db_path}`")
         st.markdown("Run the following command to initialize:")
         st.code("fin-cli init", language="bash")
 
-    st.markdown("---")
+    st.markdown("")  # Spacing
 
     # Database actions
     st.markdown("**Database Actions**")
@@ -193,7 +192,7 @@ try:
                 st.session_state.confirm_reset_db = True
                 st.warning("⚠️ Click again to confirm reset")
 
-    st.markdown("---")
+    st.markdown("")  # Spacing
 
     # ============================================================================
     # BUDGET SETTINGS
@@ -256,7 +255,7 @@ try:
     except Exception as e:
         st.warning(f"Could not load budget settings: {str(e)}")
 
-    st.markdown("---")
+    st.markdown("")  # Spacing
 
     # ============================================================================
     # EXPORT SETTINGS
@@ -284,7 +283,7 @@ try:
         )
         st.caption("Default time range for reports")
 
-    st.markdown("---")
+    st.markdown("")  # Spacing
 
     # ============================================================================
     # PRIVACY SETTINGS
@@ -332,7 +331,7 @@ try:
     - All data stays local on your device
     """)
 
-    st.markdown("---")
+    st.markdown("")  # Spacing
 
     # ============================================================================
     # AUTHENTICATION SETTINGS
@@ -470,7 +469,7 @@ try:
     except Exception as e:
         st.warning(f"Could not load authentication settings: {str(e)}")
 
-    st.markdown("---")
+    st.markdown("")  # Spacing
 
     # ============================================================================
     # DISPLAY SETTINGS
@@ -508,7 +507,7 @@ try:
 
     st.info("💡 **Note**: Display settings are currently for preview only. Settings persistence will be added in a future update.")
 
-    st.markdown("---")
+    st.markdown("")  # Spacing
 
     # ============================================================================
     # APPLICATION INFO
@@ -549,7 +548,7 @@ try:
             else:
                 st.markdown(f"- ❌ `{file}` (not found)")
 
-    st.markdown("---")
+    st.markdown("")  # Spacing
 
     # ============================================================================
     # SYSTEM INFORMATION

@@ -22,6 +22,7 @@ from streamlit_app.components.mobile_ui import (
     summary_card,
     transaction_list,
     bottom_navigation,
+    mobile_quick_settings,
 )
 
 
@@ -124,6 +125,9 @@ def render_mobile_dashboard():
     """
     # Apply mobile CSS
     apply_mobile_css()
+
+    # Mobile quick settings (Privacy & Theme toggles)
+    mobile_quick_settings()
 
     # Get stats
     stats = get_dashboard_stats()

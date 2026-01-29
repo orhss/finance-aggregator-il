@@ -197,6 +197,40 @@ def generate_css_variables(theme: Theme) -> str:
         --glass-border: rgba(255, 255, 255, {'0.1' if is_dark else '0.3'});
     }}
 
+    /* Base styles for sidebar toggle labels */
+    .sidebar-toggle-label {{
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: var(--color-text-primary);
+    }}
+
+    /* Base styles for edit panel elements */
+    .edit-section-header {{
+        color: var(--color-text-primary);
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+    }}
+    .edit-section-hint {{
+        color: var(--color-text-muted);
+        font-weight: 400;
+        font-size: 0.85rem;
+        font-style: italic;
+    }}
+    .edit-info-text {{
+        color: var(--color-text-secondary);
+        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
+        font-family: monospace;
+    }}
+    .edit-field-label {{
+        color: var(--color-text-primary);
+        font-weight: 600;
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+        margin-bottom: 0.25rem;
+    }}
+
     /* Dark mode specific overrides */
     {f'''
     .stApp {{
@@ -229,6 +263,91 @@ def generate_css_variables(theme: Theme) -> str:
     }}
     .metric-sublabel {{
         color: {p.text_muted} !important;
+    }}
+
+    /* Sidebar metric cards - use bg_tertiary for contrast against bg_secondary sidebar */
+    [data-testid="stSidebar"] .metric-card {{
+        background: #334155 !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+    }}
+
+    /* Sidebar section headers - more visible separator */
+    [data-testid="stSidebar"] .sidebar-section-header {{
+        border-bottom-color: rgba(255,255,255,0.15) !important;
+    }}
+
+    /* Sidebar about card - same treatment */
+    [data-testid="stSidebar"] .sidebar-about-card {{
+        background: #334155 !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+    }}
+
+    /* Sidebar toggle labels (Privacy Mode, Dark Mode) - ensure visibility */
+    .sidebar-toggle-label {{
+        color: {p.text_primary} !important;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }}
+
+    /* Edit panel section headers and text - ensure visibility in dark mode */
+    .edit-section-header {{
+        color: {p.text_primary} !important;
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+    }}
+    .edit-section-hint {{
+        color: {p.text_muted} !important;
+        font-weight: 400;
+        font-size: 0.85rem;
+        font-style: italic;
+    }}
+    .edit-info-text {{
+        color: {p.text_secondary} !important;
+        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
+        font-family: monospace;
+    }}
+    .edit-field-label {{
+        color: {p.text_primary} !important;
+        font-weight: 600;
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+        margin-bottom: 0.25rem;
+    }}
+
+    /* Streamlit tabs - fix dark mode background and text */
+    [data-testid="stTabs"] {{
+        background: transparent !important;
+    }}
+    [data-testid="stTabs"] [data-baseweb="tab-list"] {{
+        background: transparent !important;
+    }}
+    [data-testid="stTabs"] [data-baseweb="tab"] {{
+        color: {p.text_secondary} !important;
+    }}
+    [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] {{
+        color: {p.text_primary} !important;
+    }}
+    [data-testid="stTabs"] [data-baseweb="tab-panel"] {{
+        background: transparent !important;
+    }}
+    /* Fix tab content text and headings */
+    [data-testid="stTabs"] h1,
+    [data-testid="stTabs"] h2,
+    [data-testid="stTabs"] h3,
+    [data-testid="stTabs"] h4,
+    [data-testid="stTabs"] p,
+    [data-testid="stTabs"] span,
+    [data-testid="stTabs"] label {{
+        color: {p.text_primary} !important;
+    }}
+    [data-testid="stTabs"] .stMarkdown p {{
+        color: {p.text_primary} !important;
+    }}
+    /* Streamlit subheader inside tabs */
+    [data-testid="stTabs"] [data-testid="stSubheader"] {{
+        color: {p.text_primary} !important;
     }}
 
     /* Budget card */
@@ -407,6 +526,106 @@ def generate_css_variables(theme: Theme) -> str:
     iframe + div .stButton > button:hover,
     iframe + div div[data-testid="stButton"] button:hover {{
         background: #475569 !important;
+        color: {p.text_primary} !important;
+    }}
+
+    /* Page header */
+    .page-header h1 {{
+        color: {p.text_primary} !important;
+    }}
+    .page-header .subtitle {{
+        color: {p.text_secondary} !important;
+    }}
+
+    /* Filter panel */
+    .filter-panel {{
+        background: {p.bg_secondary} !important;
+        border: 1px solid rgba(255,255,255,0.05) !important;
+    }}
+    .filter-panel .filter-title {{
+        color: {p.text_secondary} !important;
+    }}
+
+    /* Content card */
+    .content-card {{
+        background: {p.bg_secondary} !important;
+        border: 1px solid rgba(255,255,255,0.05) !important;
+    }}
+    .content-card .card-header {{
+        color: {p.text_primary} !important;
+        border-bottom-color: {p.bg_tertiary} !important;
+    }}
+
+    /* Stat cards */
+    .stat-card {{
+        background: {p.bg_secondary} !important;
+        border: 1px solid rgba(255,255,255,0.05) !important;
+    }}
+    .stat-card .stat-label {{
+        color: {p.text_secondary} !important;
+    }}
+    .stat-card .stat-value {{
+        color: {p.text_primary} !important;
+    }}
+    .stat-card .stat-value.positive {{
+        color: {p.income_color} !important;
+    }}
+    .stat-card .stat-value.negative {{
+        color: {p.expense_color} !important;
+    }}
+
+    /* Edit panel */
+    .edit-panel {{
+        background: {p.bg_secondary} !important;
+        border: 1px solid rgba(255,255,255,0.05) !important;
+        border-left: 4px solid {p.primary} !important;
+    }}
+    .edit-panel .panel-header {{
+        color: {p.text_primary} !important;
+    }}
+
+    /* Info display */
+    .info-display {{
+        background: {p.bg_primary} !important;
+    }}
+    .info-display .info-row {{
+        border-bottom-color: {p.bg_tertiary} !important;
+    }}
+    .info-display .info-label {{
+        color: {p.text_secondary} !important;
+    }}
+    .info-display .info-value {{
+        color: {p.text_primary} !important;
+    }}
+
+    /* Table container */
+    .table-container {{
+        background: {p.bg_secondary} !important;
+        border: 1px solid rgba(255,255,255,0.05) !important;
+    }}
+    .table-container .table-header {{
+        border-bottom-color: {p.bg_tertiary} !important;
+    }}
+    .table-container .table-title {{
+        color: {p.text_primary} !important;
+    }}
+    .table-container .table-count {{
+        color: {p.text_secondary} !important;
+    }}
+
+    /* Empty state */
+    .empty-state .empty-title {{
+        color: {p.text_primary} !important;
+    }}
+    .empty-state .empty-message {{
+        color: {p.text_secondary} !important;
+    }}
+
+    /* Results count */
+    .results-count {{
+        color: {p.text_secondary} !important;
+    }}
+    .results-count strong {{
         color: {p.text_primary} !important;
     }}
     ''' if is_dark else ''}

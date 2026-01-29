@@ -24,7 +24,7 @@ from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, sh
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.empty_states import empty_transactions_state
 # Filters are now inline for better coherence
-from streamlit_app.components.theme import apply_theme, render_theme_switcher
+from streamlit_app.components.theme import apply_theme
 from streamlit_app.utils.mobile import detect_mobile, is_mobile
 from streamlit_app.auth import check_authentication
 from streamlit_app.components.mobile_ui import (
@@ -32,6 +32,7 @@ from streamlit_app.components.mobile_ui import (
     transaction_list,
     bottom_navigation,
     filter_chips,
+    mobile_quick_settings,
 )
 from streamlit_app.utils.formatters import get_category_icon
 
@@ -62,6 +63,9 @@ def render_mobile_transactions():
 
     # Apply mobile CSS
     apply_mobile_css()
+
+    # Mobile quick settings (Privacy & Theme toggles)
+    mobile_quick_settings()
 
     session = get_session()
 
@@ -192,19 +196,10 @@ theme = apply_theme()
 # Render sidebar
 render_minimal_sidebar()
 
-# Render theme switcher in sidebar
-render_theme_switcher("sidebar")
-
-# Page header
-st.title("💳 Transactions Browser")
-st.markdown("Browse, filter, and manage your financial transactions")
-
 # Inject amount styling CSS
 st.markdown(AMOUNT_STYLE_CSS, unsafe_allow_html=True)
 
 # Table styling is now in styles/main.css (loaded via apply_theme())
-
-st.markdown("---")
 
 # Get database session
 try:
@@ -224,6 +219,14 @@ try:
     # Get earliest and latest transaction dates for data coverage info
     earliest_date = session.query(func.min(Transaction.transaction_date)).scalar()
     latest_date = session.query(func.max(Transaction.transaction_date)).scalar()
+
+    # Hero card with transaction summary
+    date_range_str = f"{earliest_date.strftime('%b %Y')} - {latest_date.strftime('%b %Y')}" if earliest_date and latest_date else "No data"
+    st.markdown(f'''<div class="hero-card" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+        <div class="hero-label">Total Transactions</div>
+        <div class="hero-amount">{transaction_count:,}</div>
+        <div class="hero-sync">{date_range_str}</div>
+    </div>''', unsafe_allow_html=True)
 
     # ============================================================================
     # FILTER PANEL - Compact, coherent layout
@@ -400,8 +403,6 @@ try:
                     del st.session_state[key]
             st.rerun()
 
-    st.markdown("---")
-
     # ============================================================================
     # BUILD QUERY WITH FILTERS
     # ============================================================================
@@ -507,7 +508,7 @@ try:
     # ============================================================================
     # PAGINATION
     # ============================================================================
-    st.subheader(f"📋 Transactions ({format_number(total_transactions)} found)")
+    st.markdown(f'<div class="section-title">📋 Transactions <span class="results-count">({format_number(total_transactions)} found)</span></div>', unsafe_allow_html=True)
 
     # Search statistics and feedback
     if search_query:
@@ -569,7 +570,7 @@ try:
     # BULK ACTIONS
     # ============================================================================
     if total_transactions > 0:
-        st.markdown("**Bulk Actions**")
+        st.markdown('<div class="section-title" style="font-size: 0.9rem; margin-top: 1rem;">Export Options</div>', unsafe_allow_html=True)
 
         col1, col2, col3, col4 = st.columns(4)
 
@@ -621,8 +622,6 @@ try:
                     mime="text/csv",
                     use_container_width=True
                 )
-
-    st.markdown("---")
 
     # ============================================================================
     # TRANSACTION TABLE
@@ -851,8 +850,7 @@ try:
         # ============================================================================
         # TRANSACTION EDIT PANEL
         # ============================================================================
-        st.markdown("---")
-        st.subheader("✏️ Edit Transaction")
+        st.markdown('<div class="section-title">✏️ Edit Transaction</div>', unsafe_allow_html=True)
 
         # Select a transaction to edit
         selected_txn_id = st.selectbox(
@@ -877,21 +875,21 @@ try:
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    st.markdown("**📋 Original Transaction Info** *(read-only)*")
-                    st.text(f"ID: {txn.id}")
-                    st.text(f"Date: {format_datetime(txn.transaction_date, '%Y-%m-%d')}")
-                    st.text(f"Description: {txn.description}")
-                    st.text(f"Amount: {format_amount_private(txn.original_amount)} {txn.original_currency}")
-                    st.text(f"Status: {'✅ Completed' if txn.status == 'completed' else '⏳ Pending'}")
+                    st.markdown('<div class="edit-section-header">📋 Original Transaction Info <span class="edit-section-hint">(read-only)</span></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="edit-info-text">ID: {txn.id}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="edit-info-text">Date: {format_datetime(txn.transaction_date, "%Y-%m-%d")}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="edit-info-text">Description: {txn.description}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="edit-info-text">Amount: {format_amount_private(txn.original_amount)} {txn.original_currency}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="edit-info-text">Status: {"✅ Completed" if txn.status == "completed" else "⏳ Pending"}</div>', unsafe_allow_html=True)
                     if txn.account:
-                        st.text(f"Account: {txn.account.institution} ({txn.account.account_type or 'N/A'})")
+                        st.markdown(f'<div class="edit-info-text">Account: {txn.account.institution} ({txn.account.account_type or "N/A"})</div>', unsafe_allow_html=True)
                     if txn.raw_category:
-                        st.text(f"Raw Category: {txn.raw_category}")
+                        st.markdown(f'<div class="edit-info-text">Raw Category: {txn.raw_category}</div>', unsafe_allow_html=True)
                     if txn.category:
-                        st.text(f"Normalized Category: {txn.category}")
+                        st.markdown(f'<div class="edit-info-text">Normalized Category: {txn.category}</div>', unsafe_allow_html=True)
 
                 with col2:
-                    st.markdown("**✏️ Editable Fields**")
+                    st.markdown('<div class="edit-section-header">✏️ Editable Fields</div>', unsafe_allow_html=True)
 
                     # --- Memo/Notes Field ---
                     new_memo = st.text_area(
@@ -934,7 +932,7 @@ try:
                         )
 
                     # --- Tags Editor ---
-                    st.markdown("**Tags**")
+                    st.markdown('<div class="edit-field-label">Tags</div>', unsafe_allow_html=True)
 
                     # Get all existing tags for multiselect
                     all_tags = get_all_tags()
@@ -956,8 +954,8 @@ try:
                     )
 
                 # --- Save/Reset Buttons ---
-                st.markdown("---")
-                btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 3])
+                st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
+                btn_col1, btn_col2 = st.columns(2)
 
                 with btn_col1:
                     save_clicked = st.button("💾 Save Changes", type="primary", use_container_width=True)
@@ -1034,53 +1032,48 @@ try:
     # SUMMARY FOOTER
     # ============================================================================
     if total_transactions > 0:
-        st.markdown("---")
-        st.subheader("📊 Summary")
-
         # Calculate summary statistics
         all_filtered_transactions = query.all()
 
         total_amount = sum([txn.original_amount for txn in all_filtered_transactions])
         income = sum([txn.original_amount for txn in all_filtered_transactions if txn.original_amount > 0])
         expenses = abs(sum([txn.original_amount for txn in all_filtered_transactions if txn.original_amount < 0]))
-        avg_transaction = total_amount / len(all_filtered_transactions) if all_filtered_transactions else 0
+
+        # Summary section with new design
+        st.markdown('<div class="section-title">📊 Summary</div>', unsafe_allow_html=True)
 
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
-            st.metric("Total Transactions", format_number(total_transactions))
+            st.markdown(f"""
+            <div class="stat-card">
+                <div class="stat-label">Total Transactions</div>
+                <div class="stat-value">{format_number(total_transactions)}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
         with col2:
-            # Income in green (matching Dashboard style)
             st.markdown(f"""
-            <div style="padding: 10px 0;">
-                <p style="margin: 0; font-size: 0.875rem; color: #666;">Total Income</p>
-                <p style="margin: 0; font-size: 1.5rem; font-weight: 600; color: #00897b;">
-                    {format_amount_private(income)}
-                </p>
+            <div class="stat-card">
+                <div class="stat-label">Total Income</div>
+                <div class="stat-value positive">{format_amount_private(income)}</div>
             </div>
             """, unsafe_allow_html=True)
 
         with col3:
-            # Expenses in red (matching Dashboard style)
             st.markdown(f"""
-            <div style="padding: 10px 0;">
-                <p style="margin: 0; font-size: 0.875rem; color: #666;">Total Expenses</p>
-                <p style="margin: 0; font-size: 1.5rem; font-weight: 600; color: #c62828;">
-                    {format_amount_private(expenses)}
-                </p>
+            <div class="stat-card">
+                <div class="stat-label">Total Expenses</div>
+                <div class="stat-value negative">{format_amount_private(expenses)}</div>
             </div>
             """, unsafe_allow_html=True)
 
         with col4:
-            # Net amount with appropriate color (matching Dashboard style)
-            net_color = "#00897b" if total_amount >= 0 else "#c62828"
+            net_class = "positive" if total_amount >= 0 else "negative"
             st.markdown(f"""
-            <div style="padding: 10px 0;">
-                <p style="margin: 0; font-size: 0.875rem; color: #666;">Net Amount</p>
-                <p style="margin: 0; font-size: 1.5rem; font-weight: 600; color: {net_color};">
-                    {format_amount_private(total_amount)}
-                </p>
+            <div class="stat-card">
+                <div class="stat-label">Net Amount</div>
+                <div class="stat-value {net_class}">{format_amount_private(total_amount)}</div>
             </div>
             """, unsafe_allow_html=True)
 

@@ -39,10 +39,10 @@ from streamlit_app.components.charts import (
     CATEGORY_COLORS
 )
 from streamlit_app.components.heatmap import calendar_heatmap, monthly_heatmap
-from streamlit_app.components.theme import apply_theme, render_theme_switcher
+from streamlit_app.components.theme import apply_theme
 from streamlit_app.components.cards import render_metric_row
 from streamlit_app.utils.mobile import detect_mobile, is_mobile
-from streamlit_app.components.mobile_ui import apply_mobile_css, summary_card, bottom_navigation
+from streamlit_app.components.mobile_ui import apply_mobile_css, summary_card, bottom_navigation, mobile_quick_settings
 from streamlit_app.auth import check_authentication
 
 # Page config
@@ -68,6 +68,9 @@ def render_mobile_analytics():
     """Render simplified mobile analytics view."""
     # Apply mobile CSS
     apply_mobile_css()
+
+    # Mobile quick settings (Privacy & Theme toggles)
+    mobile_quick_settings()
 
     st.markdown("### 📈 Analytics")
 
@@ -102,7 +105,7 @@ def render_mobile_analytics():
                 value=format_amount_private(total_spent),
             )
 
-            st.markdown("---")
+            st.markdown("")  # Spacing
 
             # Top categories as horizontal bar chart
             st.markdown("**Top Categories**")
@@ -135,7 +138,7 @@ def render_mobile_analytics():
     except Exception as e:
         st.warning(f"Could not load category data: {str(e)}")
 
-    st.markdown("---")
+    st.markdown("")  # Spacing
 
     # Monthly trend (last 6 months)
     st.markdown("**Monthly Trend**")
@@ -183,13 +186,13 @@ theme = apply_theme()
 # Render minimal sidebar
 render_minimal_sidebar()
 
-# Render theme switcher in sidebar
-render_theme_switcher("sidebar")
-
-# Page header
-st.title("📈 Analytics & Reports")
-st.markdown("Comprehensive financial insights and visualizations")
-st.markdown("---")
+# Page header with new design
+st.markdown("""
+<div class="page-header">
+    <h1>📈 Analytics & Reports</h1>
+    <p class="subtitle">Comprehensive financial insights and visualizations</p>
+</div>
+""", unsafe_allow_html=True)
 
 
 def time_range_selector() -> Tuple[date, date]:
@@ -277,7 +280,6 @@ with ErrorBoundary("Failed to load analytics data"):
     # Time range selector
     start_date, end_date = time_range_selector()
     st.info(f"Showing data from **{start_date}** to **{end_date}**")
-    st.markdown("---")
 
     # Fetch transactions for selected period (cached for 5 minutes)
     transactions_list = safe_call_with_spinner(
@@ -347,7 +349,7 @@ with ErrorBoundary("Failed to load analytics data"):
     # TAB 1: SPENDING ANALYSIS
     # ============================================================================
     with tab1:
-        st.header("Spending Analysis")
+        st.markdown('<div class="section-title" style="font-size: 1.25rem;">Spending Analysis</div>', unsafe_allow_html=True)
 
         if df_expenses.empty:
             st.info("No expenses found in the selected period.")
@@ -418,24 +420,44 @@ with ErrorBoundary("Failed to load analytics data"):
                 st.plotly_chart(fig_dow, use_container_width=True)
 
             with col2:
-                st.subheader("Summary Statistics")
+                st.markdown('<div class="section-title">Summary Statistics</div>', unsafe_allow_html=True)
                 total_spent = df_expenses['amount'].sum()
                 avg_transaction = df_expenses['amount'].mean()
                 median_transaction = df_expenses['amount'].median()
                 max_transaction = df_expenses['amount'].min()  # Most negative = highest expense
 
-                st.metric("Total Spent", format_amount_private(abs(total_spent)))
-                st.metric("Average Transaction", format_amount_private(abs(avg_transaction)))
-                st.metric("Median Transaction", format_amount_private(abs(median_transaction)))
-                st.metric("Largest Single Expense", format_amount_private(abs(max_transaction)))
-
                 # Daily average
                 num_days = (end_date - start_date).days + 1
                 daily_avg = abs(total_spent) / num_days
-                st.metric("Average Daily Spending", format_amount_private(daily_avg))
+
+                # Render as styled stat cards in a grid
+                st.markdown(f'''
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Spent</div>
+                        <div class="stat-value negative">{format_amount_private(abs(total_spent))}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Avg Transaction</div>
+                        <div class="stat-value">{format_amount_private(abs(avg_transaction))}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Median</div>
+                        <div class="stat-value">{format_amount_private(abs(median_transaction))}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Largest Expense</div>
+                        <div class="stat-value negative">{format_amount_private(abs(max_transaction))}</div>
+                    </div>
+                    <div class="stat-card" style="grid-column: span 2;">
+                        <div class="stat-label">Daily Average</div>
+                        <div class="stat-value">{format_amount_private(daily_avg)}</div>
+                    </div>
+                </div>
+                ''', unsafe_allow_html=True)
 
             # Calendar Heatmap
-            st.markdown("---")
+            st.markdown("")  # Spacing
             st.subheader("📅 Daily Spending Calendar")
 
             # Year selector for heatmap
@@ -470,19 +492,17 @@ with ErrorBoundary("Failed to load analytics data"):
                 st.plotly_chart(fig_heatmap, use_container_width=True)
 
                 # Quick stats for the year
-                col_s1, col_s2, col_s3, col_s4 = st.columns(4)
-                with col_s1:
-                    year_total = df_year['amount'].sum()
-                    st.metric("Year Total", format_amount_private(abs(year_total)))
-                with col_s2:
-                    year_avg = df_year['amount'].mean()
-                    st.metric("Avg Transaction", format_amount_private(abs(year_avg)))
-                with col_s3:
-                    days_with_spending = df_year['date'].dt.date.nunique()
-                    st.metric("Days with Spending", f"{days_with_spending} days")
-                with col_s4:
-                    max_day = df_year.groupby(df_year['date'].dt.date)['amount'].sum().abs().max()
-                    st.metric("Highest Day", format_amount_private(max_day))
+                year_total = df_year['amount'].sum()
+                year_avg = df_year['amount'].mean()
+                days_with_spending = df_year['date'].dt.date.nunique()
+                max_day = df_year.groupby(df_year['date'].dt.date)['amount'].sum().abs().max()
+
+                render_metric_row([
+                    {"value": format_amount_private(abs(year_total)), "label": "Year Total"},
+                    {"value": format_amount_private(abs(year_avg)), "label": "Avg Transaction"},
+                    {"value": f"{days_with_spending} days", "label": "Days with Spending"},
+                    {"value": format_amount_private(max_day), "label": "Highest Day"},
+                ])
             else:
                 st.info(f"No spending data available for {selected_year}")
 
@@ -490,7 +510,7 @@ with ErrorBoundary("Failed to load analytics data"):
     # TAB 2: TRENDS
     # ============================================================================
     with tab2:
-        st.header("Spending Trends Over Time")
+        st.markdown('<div class="section-title" style="font-size: 1.25rem;">Spending Trends Over Time</div>', unsafe_allow_html=True)
 
         if df_expenses.empty:
             st.info("No expenses found in the selected period.")
@@ -602,7 +622,7 @@ with ErrorBoundary("Failed to load analytics data"):
     # TAB 3: BALANCE & PORTFOLIO
     # ============================================================================
     with tab3:
-        st.header("Balance & Portfolio Analysis")
+        st.markdown('<div class="section-title" style="font-size: 1.25rem;">Balance & Portfolio Analysis</div>', unsafe_allow_html=True)
 
         # Portfolio Composition
         col1, col2 = st.columns(2)
@@ -729,7 +749,7 @@ with ErrorBoundary("Failed to load analytics data"):
     # TAB 4: TAGS ANALYSIS
     # ============================================================================
     with tab4:
-        st.header("Tags Analysis")
+        st.markdown('<div class="section-title" style="font-size: 1.25rem;">Tags Analysis</div>', unsafe_allow_html=True)
 
         # Get all tags with transaction data
         with st.spinner("Loading tag data..."):
@@ -898,11 +918,10 @@ with ErrorBoundary("Failed to load analytics data"):
             finally:
                 session.close()
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Untagged Transactions", format_number(untagged_count))
-        with col2:
-            st.metric("Untagged Amount", format_amount_private(abs(untagged_amount)))
+        render_metric_row([
+            {"value": format_number(untagged_count), "label": "Untagged Transactions"},
+            {"value": format_amount_private(abs(untagged_amount)), "label": "Untagged Amount"},
+        ])
 
         if untagged_count > 0:
             st.info(f"💡 You have {untagged_count} untagged expenses. Consider tagging them for better insights!")
@@ -911,7 +930,7 @@ with ErrorBoundary("Failed to load analytics data"):
     # TAB 5: COMPARISONS
     # ============================================================================
     with tab5:
-        st.header("Detailed Comparisons")
+        st.markdown('<div class="section-title" style="font-size: 1.25rem;">Detailed Comparisons</div>', unsafe_allow_html=True)
 
         # Month vs Month Comparison
         st.subheader("Month vs Month Comparison")
@@ -948,21 +967,29 @@ with ErrorBoundary("Failed to load analytics data"):
                 df_month2 = df_expenses_with_month[df_expenses_with_month['month'] == pd.Period(month2)]
 
                 # Side by side metrics
-                col1, col2, col3 = st.columns(3)
-
                 total1 = abs(df_month1['amount'].sum())
                 total2 = abs(df_month2['amount'].sum())
                 diff = total1 - total2
                 pct_change = ((total1 - total2) / total2 * 100) if total2 > 0 else 0
+                diff_class = "positive" if diff > 0 else "negative" if diff < 0 else ""
 
-                with col1:
-                    st.metric(f"{month1}", format_amount_private(total1))
-
-                with col2:
-                    st.metric(f"{month2}", format_amount_private(total2))
-
-                with col3:
-                    st.metric("Difference", format_amount_private(diff), f"{pct_change:+.1f}%")
+                st.markdown(f'''
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem;">
+                    <div class="stat-card">
+                        <div class="stat-label">{month1}</div>
+                        <div class="stat-value">{format_amount_private(total1)}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">{month2}</div>
+                        <div class="stat-value">{format_amount_private(total2)}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Difference</div>
+                        <div class="stat-value {diff_class}">{format_amount_private(diff)}</div>
+                        <div class="metric-sublabel">{pct_change:+.1f}%</div>
+                    </div>
+                </div>
+                ''', unsafe_allow_html=True)
 
                 # Category comparison
                 cat1 = df_month1.groupby('category')['amount'].sum().abs()
@@ -998,7 +1025,7 @@ with ErrorBoundary("Failed to load analytics data"):
         else:
             st.info("Need at least 2 months of data for comparison")
 
-        st.markdown("---")
+        st.markdown("")  # Spacing
 
         # Category Deep Dive
         st.subheader("Category Deep Dive")
@@ -1014,16 +1041,11 @@ with ErrorBoundary("Failed to load analytics data"):
             if selected_category:
                 df_cat = df_expenses[df_expenses['category'] == selected_category]
 
-                col1, col2, col3 = st.columns(3)
-
-                with col1:
-                    st.metric("Total Spent", format_amount_private(abs(df_cat['amount'].sum())))
-
-                with col2:
-                    st.metric("Transactions", format_number(len(df_cat)))
-
-                with col3:
-                    st.metric("Average", format_amount_private(abs(df_cat['amount'].mean())))
+                render_metric_row([
+                    {"value": format_amount_private(abs(df_cat['amount'].sum())), "label": "Total Spent"},
+                    {"value": format_number(len(df_cat)), "label": "Transactions"},
+                    {"value": format_amount_private(abs(df_cat['amount'].mean())), "label": "Average"},
+                ])
 
                 # Monthly trend for this category
                 df_cat_copy = df_cat.copy()
@@ -1056,7 +1078,7 @@ with ErrorBoundary("Failed to load analytics data"):
                     hide_index=True
                 )
 
-        st.markdown("---")
+        st.markdown("")  # Spacing
 
         # Account Comparison
         st.subheader("Account Comparison")
@@ -1092,7 +1114,7 @@ with ErrorBoundary("Failed to load analytics data"):
             )
             st.plotly_chart(fig_acc_comp, use_container_width=True)
 
-    st.markdown("---")
+    st.markdown("")  # Spacing
 
     # Export Options
     st.subheader("📥 Export Data")

@@ -24,8 +24,9 @@ from streamlit_app.utils.cache import invalidate_transaction_cache, invalidate_t
 from streamlit_app.utils.formatters import format_number, format_category_badge, format_tags, format_transaction_with_currency
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.bulk_actions import show_bulk_preview, show_bulk_confirmation
-from streamlit_app.components.theme import apply_theme, render_theme_switcher
+from streamlit_app.components.theme import apply_theme
 from streamlit_app.components.cards import render_metric_row
+from streamlit_app.components.mobile_ui import mobile_quick_settings
 
 # Page config
 st.set_page_config(
@@ -44,16 +45,19 @@ if not check_authentication():
 # Apply theme
 theme = apply_theme()
 
+# Mobile quick settings (for pages without dedicated mobile views)
+mobile_quick_settings()
+
 # Render sidebar
 render_minimal_sidebar()
 
-# Render theme switcher in sidebar
-render_theme_switcher("sidebar")
-
-# Page header
-st.title("🏷️ Organize Transactions")
-st.markdown("Manage categories, rules, and tags for your transactions")
-st.markdown("---")
+# Page header with new design
+st.markdown("""
+<div class="page-header">
+    <h1>🏷️ Organize Transactions</h1>
+    <p class="subtitle">Manage categories, rules, and tags for your transactions</p>
+</div>
+""", unsafe_allow_html=True)
 
 # Get services
 try:
@@ -111,7 +115,7 @@ try:
             if hints:
                 st.info("ℹ️ " + " | ".join(hints))
 
-        st.markdown("---")
+        st.markdown("")  # Spacing
 
         # Categories Sub-tabs
         cat_tab1, cat_tab2, cat_tab3 = st.tabs(["⚠️ Unmapped", "🏪 By Merchant", "📋 All Mappings"])
@@ -277,21 +281,17 @@ try:
         rules = rules_service.get_rules()
 
         # Rules Overview
-        col1, col2, col3 = st.columns(3)
+        enabled_rules = sum(1 for rule in rules if rule.enabled)
+        rules_with_category = sum(1 for rule in rules if rule.category)
+        rules_with_tags = sum(1 for rule in rules if rule.tags)
 
-        with col1:
-            enabled_rules = sum(1 for rule in rules if rule.enabled)
-            st.metric("Total Rules", f"{enabled_rules} / {len(rules)}")
+        render_metric_row([
+            {"value": f"{enabled_rules} / {len(rules)}", "label": "Total Rules"},
+            {"value": format_number(rules_with_category), "label": "With Category"},
+            {"value": format_number(rules_with_tags), "label": "With Tags"},
+        ])
 
-        with col2:
-            rules_with_category = sum(1 for rule in rules if rule.category)
-            st.metric("With Category", format_number(rules_with_category))
-
-        with col3:
-            rules_with_tags = sum(1 for rule in rules if rule.tags)
-            st.metric("With Tags", format_number(rules_with_tags))
-
-        st.markdown("---")
+        st.markdown("")  # Spacing
 
         # Add New Rule
         with st.expander("➕ Add New Rule", expanded=False):
@@ -342,7 +342,7 @@ try:
                 else:
                     st.toast("Please enter a pattern", icon="⚠️")
 
-        st.markdown("---")
+        st.markdown("")  # Spacing
 
         # Rules Table
         if not rules:
@@ -364,7 +364,7 @@ try:
             st.dataframe(df_rules, use_container_width=True, hide_index=True)
 
             # Apply Rules
-            st.markdown("---")
+            st.markdown("")  # Spacing
             col1, col2 = st.columns(2)
 
             with col1:
@@ -407,24 +407,18 @@ try:
             func.coalesce(func.sum(func.coalesce(Transaction.charged_amount, Transaction.original_amount)), 0)
         ).scalar()
 
-        col1, col2, col3, col4 = st.columns(4)
+        tagged_count = total_transactions - untagged_count
+        tagged_pct = (tagged_count / total_transactions * 100) if total_transactions > 0 else 0
+        untagged_total = tag_service.get_untagged_total()
 
-        with col1:
-            st.metric("Total Tags", format_number(len(tag_stats)))
+        render_metric_row([
+            {"value": format_number(len(tag_stats)), "label": "Total Tags"},
+            {"value": f"{format_number(tagged_count)}/{format_number(total_transactions)}", "label": "Tagged Transactions"},
+            {"value": f"{tagged_pct:.1f}%", "label": "Coverage"},
+            {"value": format_amount_private(untagged_total), "label": "Untagged Amount"},
+        ])
 
-        with col2:
-            tagged_count = total_transactions - untagged_count
-            st.metric("Tagged Transactions", f"{format_number(tagged_count)}/{format_number(total_transactions)}")
-
-        with col3:
-            tagged_pct = (tagged_count / total_transactions * 100) if total_transactions > 0 else 0
-            st.metric("Coverage", f"{tagged_pct:.1f}%")
-
-        with col4:
-            untagged_total = tag_service.get_untagged_total()
-            st.metric("Untagged Amount", format_amount_private(untagged_total))
-
-        st.markdown("---")
+        st.markdown("")  # Spacing
 
         # Create Tag
         with st.expander("➕ Create New Tag", expanded=False):
@@ -446,7 +440,7 @@ try:
                     else:
                         st.toast("Please enter a tag name", icon="⚠️")
 
-        st.markdown("---")
+        st.markdown("")  # Spacing
 
         # Tags Table
         if not tag_stats:
@@ -473,7 +467,7 @@ try:
             tag_badges_html = format_tags([tag_stat['name'] for tag_stat in tag_stats])
             st.markdown(tag_badges_html, unsafe_allow_html=True)
 
-            st.markdown("---")
+            st.markdown("")  # Spacing
 
             # Tag Actions
             col1, col2 = st.columns(2)
@@ -510,7 +504,7 @@ try:
                         st.toast("Failed to delete tag", icon="❌")
 
         # Bulk Tagging
-        st.markdown("---")
+        st.markdown("")  # Spacing
         st.markdown("### Bulk Tagging")
 
         bulk_tab1, bulk_tab2 = st.tabs(["By Merchant Pattern", "By Category"])

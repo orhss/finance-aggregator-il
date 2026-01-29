@@ -49,20 +49,26 @@ from services.analytics_service import AnalyticsService
 from streamlit_app.utils.formatters import format_number, format_datetime, format_account_number
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.charts import balance_history
-from streamlit_app.components.theme import apply_theme, render_theme_switcher
+from streamlit_app.components.theme import apply_theme
 from streamlit_app.components.cards import render_metric_row
+from streamlit_app.components.mobile_ui import mobile_quick_settings
 
 # Apply theme
 theme = apply_theme()
 
+# Mobile quick settings (for pages without dedicated mobile views)
+mobile_quick_settings()
+
 # Render sidebar
 render_minimal_sidebar()
-render_theme_switcher("sidebar")
 
-# Page header
-st.title("🏦 Accounts & Sync")
-st.markdown("Manage accounts and synchronize financial data")
-st.markdown("---")
+# Page header with new design
+st.markdown("""
+<div class="page-header">
+    <h1>🏦 Accounts & Sync</h1>
+    <p class="subtitle">Manage accounts and synchronize financial data</p>
+</div>
+""", unsafe_allow_html=True)
 
 # ============================================================================
 # SYNC HELPER FUNCTIONS (moved from Sync page)
@@ -253,13 +259,14 @@ try:
         total_accounts = len(accounts_with_balance)
         active = sum([1 for items in account_types.values() for item in items if item['balance'] and item['balance'] > 0])
 
-        render_metric_row([
-            {"value": format_number(total_accounts), "label": "Total Accounts"},
-            {"value": format_amount_private(total_balance), "label": "Total Balance"},
-            {"value": format_number(active), "label": "Active Accounts"},
-        ])
+        # Hero card showing total portfolio value
+        st.markdown(f'''<div class="hero-card" style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%);">
+            <div class="hero-label">Total Portfolio Value</div>
+            <div class="hero-amount">{format_amount_private(total_balance)}</div>
+            <div class="hero-sync">{total_accounts} accounts · {active} active</div>
+        </div>''', unsafe_allow_html=True)
 
-        st.markdown("---")
+        st.markdown("")  # Spacing
 
         # Account Details View
         if 'selected_account_id' in st.session_state and st.session_state.selected_account_id:
@@ -283,7 +290,7 @@ try:
 
                 latest_balance = account.latest_balance
                 if latest_balance:
-                    st.markdown("---")
+                    st.markdown("")  # Spacing
                     col1, col2, col3 = st.columns(3)
                     with col1:
                         st.metric("Total Amount", format_amount_private(latest_balance.total_amount))
@@ -294,7 +301,7 @@ try:
                         st.metric("As of", format_datetime(latest_balance.balance_date, '%Y-%m-%d'))
 
                 # Balance History Chart
-                st.markdown("---")
+                st.markdown("")  # Spacing
                 st.markdown("**Balance History (Last 3 Months)**")
 
                 three_months_ago = date.today() - timedelta(days=90)
@@ -313,7 +320,7 @@ try:
                 else:
                     st.info("No balance history available")
 
-                st.markdown("---")
+                st.markdown("")  # Spacing
 
         # Accounts by Type (Card View)
         for acc_type, accounts_list in sorted(account_types.items()):
@@ -365,12 +372,14 @@ try:
     # ========================================================================
     with tab_sync:
         # Security Notice
-        st.info("""
-        🔒 **Your Data is Secure**
-        - Encrypted credentials stored locally
-        - Read-only access (never performs transactions)
-        - All data stays on your device
-        """)
+        st.markdown('''
+        <div class="insight-banner neutral">
+            <span class="insight-icon">🔒</span>
+            <span class="insight-message">
+                <strong>Your Data is Secure</strong> · Encrypted credentials stored locally · Read-only access · All data stays on your device
+            </span>
+        </div>
+        ''', unsafe_allow_html=True)
 
         # Process queue messages
         if st.session_state.sync_running and st.session_state.sync_queue:
@@ -427,7 +436,7 @@ try:
             time.sleep(3)
             st.rerun()
 
-        st.markdown("---")
+        st.markdown("")  # Spacing
 
         # Sync Status by Institution
         st.subheader("📊 Sync Status")
@@ -496,7 +505,7 @@ try:
                 start_sync(sync_target)
                 st.rerun()
 
-            st.markdown("---")
+            st.markdown("")  # Spacing
 
         # Brokers & Pensions
         if brokers_pensions:
@@ -514,7 +523,7 @@ try:
                 with cols[i % 3]:
                     render_sync_card(institution, accs, is_credit_card=True)
 
-        st.markdown("---")
+        st.markdown("")  # Spacing
 
         # Sync Options
         st.subheader("⚙️ Sync Options")

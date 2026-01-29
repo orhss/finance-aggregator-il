@@ -403,7 +403,6 @@ def main():
 
     # Render sidebar
     render_minimal_sidebar()
-    render_theme_switcher("sidebar")
 
     # Add logout button if auth is enabled
     get_logout_button()

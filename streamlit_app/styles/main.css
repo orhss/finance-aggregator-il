@@ -962,3 +962,345 @@ hr {
     background-color: var(--color-surface) !important;
     color: var(--color-text-primary) !important;
 }
+
+/* ===== PAGE LAYOUT COMPONENTS ===== */
+
+/* Page Header */
+.page-header {
+    margin-bottom: var(--spacing-lg);
+}
+
+.page-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.page-header .subtitle {
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+}
+
+/* Filter Panel */
+.filter-panel {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--color-border-light);
+    margin-bottom: var(--spacing-lg);
+}
+
+.filter-panel .filter-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--spacing-md);
+}
+
+/* Content Card - General purpose wrapper */
+.content-card {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--color-border-light);
+    margin-bottom: var(--spacing-lg);
+}
+
+.content-card .card-header {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--color-border-light);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.stat-card {
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md) var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--color-border-light);
+    text-align: center;
+}
+
+.stat-card .stat-label {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.stat-card .stat-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.stat-card .stat-value.positive {
+    color: var(--color-income);
+}
+
+.stat-card .stat-value.negative {
+    color: var(--color-expense);
+}
+
+/* Edit Panel */
+.edit-panel {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--color-border-light);
+    border-left: 4px solid var(--color-primary);
+    margin-top: var(--spacing-lg);
+}
+
+.edit-panel .panel-header {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Info Display (read-only fields) */
+.info-display {
+    background: var(--color-surface-subtle);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.info-display .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.info-display .info-row:last-child {
+    border-bottom: none;
+}
+
+.info-display .info-label {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+}
+
+.info-display .info-value {
+    font-size: 0.85rem;
+    color: var(--color-text-primary);
+    font-weight: 500;
+}
+
+/* Table Container */
+.table-container {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--color-border-light);
+    margin-bottom: var(--spacing-lg);
+}
+
+.table-container .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.table-container .table-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.table-container .table-count {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: var(--spacing-xl) var(--spacing-lg);
+    color: var(--color-text-secondary);
+}
+
+.empty-state .empty-icon {
+    font-size: 3rem;
+    margin-bottom: var(--spacing-md);
+    opacity: 0.5;
+}
+
+.empty-state .empty-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state .empty-message {
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+}
+
+/* Quick Actions Bar */
+.quick-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    margin-bottom: var(--spacing-md);
+}
+
+/* Results Count */
+.results-count {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.results-count strong {
+    color: var(--color-text-primary);
+}
+
+/* ===== SIDEBAR COMPONENTS ===== */
+
+/* Section Header */
+.sidebar-section-header {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 1rem 0 0.75rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+/* Toggle Row */
+.sidebar-toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    margin: 0.25rem 0;
+    background: var(--color-surface-hover);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+.sidebar-toggle-row:hover {
+    background: var(--color-surface-subtle);
+}
+.sidebar-toggle-row .toggle-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--color-text-primary);
+}
+.sidebar-toggle-row .toggle-icon {
+    font-size: 1.1rem;
+}
+
+/* Stat Card */
+.sidebar-stat-card {
+    background: var(--color-surface-hover);
+    border-radius: 10px;
+    padding: 0.875rem 1rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--color-border-light);
+}
+.sidebar-stat-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 0.25rem;
+}
+.sidebar-stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+.sidebar-stat-sublabel {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-top: 0.25rem;
+}
+
+/* About Card */
+.sidebar-about-card {
+    background: var(--color-surface-hover);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-top: 1rem;
+    border: 1px solid var(--color-border-light);
+    text-align: center;
+}
+.sidebar-about-card .about-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+.sidebar-about-card .about-version {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin: 0.25rem 0;
+}
+.sidebar-about-card .about-links {
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+}
+.sidebar-about-card .about-links a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+.sidebar-about-card .about-links a:hover {
+    text-decoration: underline;
+}
+
+/* Mobile Quick Settings Bar */
+.mobile-quick-settings {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    margin-bottom: 0.5rem;
+}
+.mobile-quick-settings .quick-toggle {
+    background: var(--color-surface-hover);
+    border: 1px solid var(--color-border-light);
+    border-radius: 20px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.mobile-quick-settings .quick-toggle:active {
+    background: var(--color-surface-subtle);
+}
