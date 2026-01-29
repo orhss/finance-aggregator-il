@@ -17,7 +17,11 @@ from streamlit_app.utils.session import init_session_state
 from streamlit_app.auth import check_authentication
 from streamlit_app.utils.formatters import format_number
 from streamlit_app.components.sidebar import render_minimal_sidebar
-from streamlit_app.components.theme import apply_theme, render_page_header
+from streamlit_app.components.theme import (
+    apply_theme, render_page_header,
+    _save_theme_to_localstorage, _save_privacy_to_localstorage
+)
+from streamlit_app.config.theme import set_theme_mode
 from streamlit_app.components.cards import render_metric_row
 from streamlit_app.utils.mobile import detect_mobile, is_mobile
 from streamlit_app.components.mobile_ui import apply_mobile_css, bottom_navigation
@@ -45,13 +49,12 @@ theme = apply_theme()
 
 def render_theme_settings():
     """Render theme settings section."""
-    from streamlit_app.config.theme import set_theme_mode
-
     def on_theme_change():
         """Callback when user clicks the toggle - only fires on actual clicks."""
         new_mode = 'dark' if st.session_state.setting_dark_mode else 'light'
         st.session_state.theme_mode = new_mode
         set_theme_mode(new_mode)
+        _save_theme_to_localstorage(new_mode)
 
     current_mode = st.session_state.get('theme_mode', 'light')
     is_dark = current_mode == 'dark'
@@ -76,13 +79,25 @@ def render_theme_settings():
 
 def render_privacy_settings():
     """Render privacy settings section."""
-    mask_balances = st.toggle(
+    def on_privacy_change():
+        """Callback when privacy toggle changes."""
+        new_state = st.session_state.setting_mask_balances
+        st.session_state.mask_balances = new_state
+        _save_privacy_to_localstorage(new_state)
+
+    # Sync toggle with session state
+    current_privacy = st.session_state.get('mask_balances', False)
+    if 'setting_mask_balances' not in st.session_state:
+        st.session_state.setting_mask_balances = current_privacy
+    elif st.session_state.setting_mask_balances != current_privacy:
+        st.session_state.setting_mask_balances = current_privacy
+
+    st.toggle(
         "Hide All Balances",
-        value=st.session_state.get('mask_balances', False),
         key="setting_mask_balances",
-        help="Hide all financial amounts (shows ••••••)"
+        help="Hide all financial amounts (shows ••••••)",
+        on_change=on_privacy_change
     )
-    st.session_state.mask_balances = mask_balances
     st.caption("🔒 Useful when sharing screen")
 
     mask_accounts = st.toggle(

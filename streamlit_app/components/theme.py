@@ -30,16 +30,78 @@ def load_shared_css():
         pass
 
 
+def _save_settings_to_localstorage(theme_mode: str, privacy_mode: bool):
+    """Inject JavaScript to save settings to localStorage."""
+    privacy_value = '1' if privacy_mode else '0'
+    st.markdown(f"""
+    <script>
+    localStorage.setItem('fin_theme_mode', '{theme_mode}');
+    localStorage.setItem('fin_privacy_mode', '{privacy_value}');
+    </script>
+    """, unsafe_allow_html=True)
+
+
+def _save_theme_to_localstorage(mode: str):
+    """Inject JavaScript to save theme to localStorage."""
+    st.markdown(f"""
+    <script>
+    localStorage.setItem('fin_theme_mode', '{mode}');
+    </script>
+    """, unsafe_allow_html=True)
+
+
+def _save_privacy_to_localstorage(enabled: bool):
+    """Inject JavaScript to save privacy mode to localStorage."""
+    value = '1' if enabled else '0'
+    st.markdown(f"""
+    <script>
+    localStorage.setItem('fin_privacy_mode', '{value}');
+    </script>
+    """, unsafe_allow_html=True)
+
+
 def init_theme() -> Theme:
     """
-    Initialize theme from session state
+    Initialize theme and privacy settings from session state, query params, or localStorage.
+
+    Priority:
+    1. Session state (if already set)
+    2. Query params (set by JS from localStorage on page load)
+    3. Defaults: theme='light', privacy=False, mask_account_numbers=True
 
     Returns:
         Current theme instance
     """
+    # Check query params first (set by JS from localStorage)
+    query_params = st.query_params
+    url_theme = query_params.get('theme', None)
+    url_privacy = query_params.get('privacy', None)
+
     # Initialize theme mode in session state if not present
+    # Only use URL params on first init, not on reruns (to respect user's toggle choice)
     if 'theme_mode' not in st.session_state:
-        st.session_state.theme_mode = 'light'
+        if url_theme in ('light', 'dark'):
+            st.session_state.theme_mode = url_theme
+        else:
+            st.session_state.theme_mode = 'light'
+
+    # Initialize privacy mode (mask_balances)
+    # Only use URL params on first init, not on reruns
+    if 'mask_balances' not in st.session_state:
+        if url_privacy == '1':
+            st.session_state.mask_balances = True
+        else:
+            st.session_state.mask_balances = False
+
+    # Initialize mask_account_numbers (default True)
+    if 'mask_account_numbers' not in st.session_state:
+        st.session_state.mask_account_numbers = True
+
+    # Save current settings to localStorage
+    _save_settings_to_localstorage(
+        st.session_state.theme_mode,
+        st.session_state.mask_balances
+    )
 
     # Get or create theme with current mode
     theme = get_theme(st.session_state.theme_mode)
@@ -82,6 +144,7 @@ def render_theme_switcher(location: str = "sidebar") -> None:
             if new_mode != current_mode:
                 st.session_state.theme_mode = new_mode
                 set_theme_mode(new_mode)
+                _save_theme_to_localstorage(new_mode)
                 st.rerun()
 
     elif location == "header":
@@ -98,6 +161,7 @@ def render_theme_switcher(location: str = "sidebar") -> None:
             if new_mode != current_mode:
                 st.session_state.theme_mode = new_mode
                 set_theme_mode(new_mode)
+                _save_theme_to_localstorage(new_mode)
                 st.rerun()
 
     else:  # main
@@ -111,6 +175,7 @@ def render_theme_switcher(location: str = "sidebar") -> None:
         if new_mode != current_mode:
             st.session_state.theme_mode = new_mode
             set_theme_mode(new_mode)
+            _save_theme_to_localstorage(new_mode)
             st.rerun()
 
 

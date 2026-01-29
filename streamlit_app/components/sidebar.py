@@ -15,12 +15,15 @@ sys.path.insert(0, str(project_root))
 from streamlit_app.utils.formatters import format_datetime
 from streamlit_app.utils.session import format_amount_private
 from streamlit_app.utils.cache import get_dashboard_stats
+from streamlit_app.config.theme import set_theme_mode
+from streamlit_app.components.theme import _save_privacy_to_localstorage, _save_theme_to_localstorage
 
 
 def render_privacy_toggle():
     """
     Render a styled privacy mode toggle in the sidebar.
     Toggles balance masking with a single click.
+    Persists setting to localStorage for cross-page navigation.
     """
     is_private = st.session_state.get('mask_balances', False)
     icon = "🙈" if is_private else "👁️"
@@ -35,7 +38,9 @@ def render_privacy_toggle():
         )
     with col2:
         if st.button(icon, key="privacy_toggle", help="Toggle balance visibility"):
-            st.session_state.mask_balances = not is_private
+            new_state = not is_private
+            st.session_state.mask_balances = new_state
+            _save_privacy_to_localstorage(new_state)
             st.rerun()
 
 
@@ -102,9 +107,8 @@ def render_quick_stats():
 def render_theme_toggle():
     """
     Render a styled dark mode toggle in the sidebar.
+    Persists setting to localStorage for cross-page navigation.
     """
-    from streamlit_app.config.theme import set_theme_mode
-
     current_mode = st.session_state.get('theme_mode', 'light')
     is_dark = current_mode == 'dark'
     icon = "🌙" if is_dark else "☀️"
@@ -130,6 +134,7 @@ def render_theme_toggle():
             # Sync with settings page toggle key to prevent state conflicts
             st.session_state.setting_dark_mode = (new_mode == 'dark')
             set_theme_mode(new_mode)
+            _save_theme_to_localstorage(new_mode)
             st.rerun()
 
 
