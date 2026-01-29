@@ -236,6 +236,15 @@ def generate_css_variables(theme: Theme) -> str:
     .stApp {{
         background-color: {p.bg_primary};
     }}
+
+    /* Make Streamlit header transparent */
+    [data-testid="stHeader"] {{
+        background: transparent !important;
+    }}
+    [data-testid="stDecoration"] {{
+        display: none !important;
+    }}
+
     [data-testid="stSidebar"] {{
         background-color: {p.bg_secondary};
     }}

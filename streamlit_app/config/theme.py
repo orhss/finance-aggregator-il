@@ -333,6 +333,14 @@ class Theme:
             color: {self.palette.text_primary};
         }}
 
+        /* Make Streamlit header transparent */
+        [data-testid="stHeader"] {{
+            background: transparent !important;
+        }}
+        [data-testid="stDecoration"] {{
+            display: none !important;
+        }}
+
         /* Sidebar */
         [data-testid="stSidebar"] {{
             background-color: {self.palette.bg_secondary};

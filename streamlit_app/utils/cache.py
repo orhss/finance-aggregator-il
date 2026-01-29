@@ -50,7 +50,14 @@ def get_transactions_cached(
         if status:
             query = query.filter(Transaction.status == status)
         if category:
-            query = query.filter(Transaction.effective_category == category)
+            # effective_category is a property, use coalesce for SQL
+            from sqlalchemy import func
+            effective_cat = func.coalesce(
+                Transaction.user_category,
+                Transaction.category,
+                Transaction.raw_category
+            )
+            query = query.filter(effective_cat == category)
         if institution:
             query = query.filter(Account.institution == institution)
 
@@ -184,8 +191,15 @@ def get_category_spending_cached(
 
     session = get_session()
     try:
+        # effective_category is a property, use coalesce for SQL
+        effective_cat = func.coalesce(
+            Transaction.user_category,
+            Transaction.category,
+            Transaction.raw_category
+        ).label('effective_category')
+
         query = session.query(
-            Transaction.effective_category,
+            effective_cat,
             func.sum(Transaction.original_amount).label('total'),
             func.count(Transaction.id).label('count')
         ).filter(
@@ -194,7 +208,7 @@ def get_category_spending_cached(
                 Transaction.original_amount < 0,  # Expenses only
                 Transaction.status == 'completed'
             )
-        ).group_by(Transaction.effective_category)
+        ).group_by(effective_cat)
 
         if top_n:
             query = query.order_by(func.sum(Transaction.original_amount).asc()).limit(top_n)
