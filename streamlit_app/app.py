@@ -78,7 +78,7 @@ def render_header():
     col1, col2 = st.columns([4, 1])
     with col1:
         greeting = get_time_greeting()
-        render_page_header(f"💰 {greeting}")
+        render_page_header(greeting)
     with col2:
         if st.button("Sync Now", use_container_width=True, type="secondary"):
             st.switch_page("views/accounts.py")
