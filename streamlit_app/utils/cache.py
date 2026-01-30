@@ -101,6 +101,7 @@ def get_dashboard_stats(months_back: int = 3) -> Dict[str, Any]:
     """
     from db.database import get_session
     from db.models import Transaction, Account
+    from db.query_utils import effective_amount_expr
     from sqlalchemy import func, and_
     from datetime import date, timedelta
 

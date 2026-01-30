@@ -8,13 +8,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from db.models import Tag, TransactionTag, Transaction, Account
 from db.database import get_db
+from db.query_utils import effective_amount_expr
 
 logger = logging.getLogger(__name__)
-
-
-def _effective_amount_expr():
-    """SQLAlchemy expression for effective amount: COALESCE(charged_amount, original_amount)"""
-    return func.coalesce(Transaction.charged_amount, Transaction.original_amount)
 
 
 class TagService:
@@ -325,7 +321,7 @@ class TagService:
         results = self.session.query(
             Tag.name,
             func.count(TransactionTag.id).label('count'),
-            func.coalesce(func.sum(_effective_amount_expr()), 0).label('total_amount')
+            func.coalesce(func.sum(effective_amount_expr()), 0).label('total_amount')
         ).outerjoin(
             TransactionTag, Tag.id == TransactionTag.tag_id
         ).outerjoin(
@@ -359,7 +355,7 @@ class TagService:
         """
         tagged_ids = self.session.query(TransactionTag.transaction_id).distinct()
         result = self.session.query(
-            func.coalesce(func.sum(_effective_amount_expr()), 0)
+            func.coalesce(func.sum(effective_amount_expr()), 0)
         ).filter(
             ~Transaction.id.in_(tagged_ids)
         ).scalar()

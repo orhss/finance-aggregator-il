@@ -11,7 +11,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from db.models import Budget, Transaction
 from db.database import get_db
-from services.analytics_service import effective_amount_expr
+from db.query_utils import effective_amount_expr
 
 logger = logging.getLogger(__name__)
 

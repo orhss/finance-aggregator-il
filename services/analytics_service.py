@@ -8,34 +8,11 @@ from sqlalchemy import func, extract, and_, or_
 from sqlalchemy.orm import Session, joinedload
 from db.models import Account, Transaction, Balance, SyncHistory, Tag, TransactionTag
 from db.database import get_db
-
-
-def get_effective_amount(txn: Transaction) -> float:
-    """
-    Get the effective amount for a transaction.
-    Uses charged_amount (actual payment, e.g., per-installment) if available,
-    otherwise falls back to original_amount (total purchase price).
-    """
-    if txn.charged_amount is not None:
-        return txn.charged_amount
-    return txn.original_amount or 0
-
-
-# SQLAlchemy expression for effective amount in queries
-# Use COALESCE(charged_amount, original_amount) for SQL aggregations
-def effective_amount_expr():
-    """SQLAlchemy expression for effective amount: COALESCE(charged_amount, original_amount)"""
-    return func.coalesce(Transaction.charged_amount, Transaction.original_amount)
-
-
-# SQLAlchemy expression for effective category in queries
-# Use COALESCE(user_category, category, raw_category) with priority:
-# 1. user_category (user override)
-# 2. category (normalized from mapping)
-# 3. raw_category (original from provider)
-def effective_category_expr():
-    """SQLAlchemy expression for effective category: COALESCE(user_category, category, raw_category)"""
-    return func.coalesce(Transaction.user_category, Transaction.category, Transaction.raw_category)
+from db.query_utils import (
+    effective_amount_expr,
+    effective_category_expr,
+    get_effective_amount,
+)
 
 
 class AnalyticsService:
