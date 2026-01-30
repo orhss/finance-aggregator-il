@@ -273,6 +273,26 @@ MOBILE_CSS = """
 [data-testid="stMainBlockContainer"] {
     padding-bottom: 80px !important;
 }
+
+/* Mobile-specific adjustments */
+@media (max-width: 768px) {
+    /* Hide Streamlit header */
+    [data-testid="stHeader"] {
+        display: none !important;
+    }
+    /* Hide sidebar */
+    [data-testid="stSidebar"] {
+        display: none !important;
+    }
+    /* Hide sidebar collapse button */
+    [data-testid="collapsedControl"] {
+        display: none !important;
+    }
+    /* Remove top padding */
+    .block-container {
+        padding-top: 0 !important;
+    }
+}
 </style>
 """
 
