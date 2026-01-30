@@ -42,12 +42,21 @@ def detect_mobile():
     # Already have mobile param (set by JS or manual)
     if 'mobile' in query_params:
         st.session_state.is_mobile = query_params['mobile'] == 'true'
+        st.session_state._mobile_detection_done = True
         return
 
     # Check User-Agent for real mobile devices
     if _detect_from_user_agent():
         st.session_state.is_mobile = True
+        st.session_state._mobile_detection_done = True
         return
+
+    # Only inject JS once per session to avoid multiple iframes
+    if st.session_state.get('_mobile_detection_done'):
+        return
+
+    # Mark as done before injecting to prevent duplicates on re-runs
+    st.session_state._mobile_detection_done = True
 
     # No param yet - inject JS to detect viewport and redirect
     # This runs once, then redirects with ?mobile=true/false

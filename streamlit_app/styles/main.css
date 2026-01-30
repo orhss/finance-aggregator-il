@@ -97,8 +97,12 @@
 }
 
 /* ===== GLOBAL LAYOUT ===== */
-.main .block-container {
-    padding: var(--spacing-lg) var(--spacing-xl) var(--spacing-xl) var(--spacing-xl);
+.main .block-container,
+.stMainBlockContainer {
+    padding-top: var(--spacing-md) !important;
+    padding-left: var(--spacing-xl);
+    padding-right: var(--spacing-xl);
+    padding-bottom: var(--spacing-xl);
     max-width: 1200px;
 }
 
@@ -792,6 +796,26 @@ div[data-testid="stButton"] button[kind="secondary"] span {
 /* Hide Streamlit footer */
 footer {
     visibility: hidden;
+}
+
+/* Make header minimal but keep sidebar toggle functional */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    height: auto !important;
+    min-height: 0 !important;
+}
+
+/* Hide the decorative line in header */
+[data-testid="stDecoration"] {
+    display: none !important;
+}
+
+/* Hide empty containers that only contain style/script elements */
+.stElementContainer:has(> .stMarkdown > div > div > style:only-child),
+.stElementContainer:has(> .stHtml > div > style:only-child),
+.stElementContainer:has(> .stHtml > div > script:only-child),
+.stElementContainer:has(> iframe[height="0"]) {
+    display: none !important;
 }
 
 /* ===== GLASSMORPHISM UTILITIES (for floating elements) ===== */

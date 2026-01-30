@@ -69,6 +69,8 @@ def init_theme() -> Theme:
     2. Query params (set by JS from localStorage on page load)
     3. Defaults: theme='light', privacy=False, mask_account_numbers=True
 
+    Note: Does NOT inject any HTML/scripts - that's done in apply_theme() to minimize container divs.
+
     Returns:
         Current theme instance
     """
@@ -97,16 +99,21 @@ def init_theme() -> Theme:
     if 'mask_account_numbers' not in st.session_state:
         st.session_state.mask_account_numbers = True
 
-    # Save current settings to localStorage
-    _save_settings_to_localstorage(
-        st.session_state.theme_mode,
-        st.session_state.mask_balances
-    )
-
     # Get or create theme with current mode
     theme = get_theme(st.session_state.theme_mode)
 
     return theme
+
+
+def _get_localstorage_script(theme_mode: str, privacy_mode: bool) -> str:
+    """Generate JavaScript to save settings to localStorage (no injection)."""
+    privacy_value = '1' if privacy_mode else '0'
+    return f"""
+    <script>
+    localStorage.setItem('fin_theme_mode', '{theme_mode}');
+    localStorage.setItem('fin_privacy_mode', '{privacy_value}');
+    </script>
+    """
 
 
 def render_theme_switcher(location: str = "sidebar") -> None:
@@ -749,6 +756,12 @@ def apply_theme() -> Theme:
     """
     # Initialize theme
     theme = init_theme()
+
+    # Save settings to localStorage
+    _save_settings_to_localstorage(
+        st.session_state.theme_mode,
+        st.session_state.mask_balances
+    )
 
     # Inject CSS variables FIRST (so main.css can use them)
     st.markdown(generate_css_variables(theme), unsafe_allow_html=True)
