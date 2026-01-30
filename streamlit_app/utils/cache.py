@@ -119,12 +119,13 @@ def get_dashboard_stats(months_back: int = 3) -> Dict[str, Any]:
 
         # Monthly spending (current month, expenses only)
         month_start = date.today().replace(day=1)
+        effective_amt = effective_amount_expr()
         monthly_spending = session.query(
-            func.sum(Transaction.original_amount)
+            func.sum(effective_amt)
         ).filter(
             and_(
                 Transaction.transaction_date >= month_start,
-                Transaction.original_amount < 0,
+                effective_amt < 0,
                 Transaction.status == 'completed'
             )
         ).scalar() or 0.0

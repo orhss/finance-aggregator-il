@@ -134,6 +134,7 @@ class BudgetService:
     def get_monthly_spending(self, year: int, month: int) -> float:
         """
         Get total spending for a specific month.
+        Only counts completed expenses (negative amounts).
         Uses effective_amount (charged_amount if available, else original_amount).
 
         Args:
@@ -141,18 +142,22 @@ class BudgetService:
             month: Month (1-12)
 
         Returns:
-            Total spending (absolute value, as positive number)
+            Total spending (as positive number)
         """
-        from sqlalchemy import extract
+        from sqlalchemy import extract, and_
 
         result = self.session.query(
-            func.sum(func.abs(effective_amount_expr()))
+            func.sum(effective_amount_expr())
         ).filter(
-            extract('year', Transaction.transaction_date) == year,
-            extract('month', Transaction.transaction_date) == month
+            and_(
+                extract('year', Transaction.transaction_date) == year,
+                extract('month', Transaction.transaction_date) == month,
+                effective_amount_expr() < 0,
+                Transaction.status == 'completed'
+            )
         ).scalar()
 
-        return float(result or 0)
+        return abs(float(result or 0))
 
     def get_budget_progress(self, year: Optional[int] = None, month: Optional[int] = None) -> Dict[str, Any]:
         """
