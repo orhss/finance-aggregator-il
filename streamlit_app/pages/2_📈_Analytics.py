@@ -16,7 +16,7 @@ from typing import Tuple, Optional
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from streamlit_app.utils.session import init_session_state, get_db_session, format_amount_private, get_accounts_display
+from streamlit_app.utils.session import init_session_state, format_amount_private, get_accounts_display
 from streamlit_app.utils.formatters import format_number, format_datetime
 from streamlit_app.utils.cache import (
     get_transactions_cached,
@@ -24,13 +24,12 @@ from streamlit_app.utils.cache import (
     get_monthly_trend_cached,
     get_tags_cached
 )
-from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, show_info
+from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.empty_states import empty_analytics_state
 from streamlit_app.components.loading import contextual_spinner
 from streamlit_app.components.charts import (
     spending_donut,
-    trend_line,
     category_bar,
     balance_history,
     balance_distribution,
@@ -38,7 +37,7 @@ from streamlit_app.components.charts import (
     COLORS,
     CATEGORY_COLORS
 )
-from streamlit_app.components.heatmap import calendar_heatmap, monthly_heatmap
+from streamlit_app.components.heatmap import calendar_heatmap
 from streamlit_app.components.theme import apply_theme, render_page_header
 from streamlit_app.components.cards import render_metric_row
 from streamlit_app.utils.mobile import detect_mobile, is_mobile

@@ -11,7 +11,6 @@ Usage:
 """
 
 import ast
-import fnmatch
 from datetime import datetime
 from pathlib import Path
 

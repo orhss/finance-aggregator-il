@@ -21,7 +21,7 @@ sys.path.insert(0, str(project_root))
 from streamlit_app.utils.session import init_session_state, format_amount_private, get_all_categories, get_all_tags
 from streamlit_app.auth import check_authentication
 from streamlit_app.utils.cache import invalidate_transaction_cache, invalidate_tag_cache
-from streamlit_app.utils.formatters import format_number, format_category_badge, format_tags, format_transaction_with_currency
+from streamlit_app.utils.formatters import format_number, format_tags
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.bulk_actions import show_bulk_preview, show_bulk_confirmation
 from streamlit_app.components.theme import apply_theme, render_page_header

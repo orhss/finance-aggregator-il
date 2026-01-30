@@ -11,9 +11,8 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import DataTable, Header, Footer, Input, Static, Button, Label, OptionList
 from textual.widgets.option_list import Option
-from textual.containers import Container, Horizontal, Vertical, Grid
+from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
-from textual.message import Message
 from textual import on
 
 from services.analytics_service import AnalyticsService

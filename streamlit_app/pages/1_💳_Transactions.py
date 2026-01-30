@@ -13,14 +13,13 @@ from typing import List, Optional
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from streamlit_app.utils.session import init_session_state, get_db_session, get_tag_service, get_all_categories, get_all_tags, format_amount_private
+from streamlit_app.utils.session import init_session_state, get_tag_service, get_all_categories, get_all_tags, format_amount_private
 from streamlit_app.utils.formatters import (
-    format_number, format_datetime,
-    format_transaction_amount, color_for_amount, AMOUNT_STYLE_CSS
+    format_number, format_datetime, AMOUNT_STYLE_CSS
 )
 from streamlit_app.utils.rtl import fix_rtl, has_hebrew
 from streamlit_app.utils.cache import get_transactions_cached, invalidate_transaction_cache, invalidate_tag_cache
-from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary, show_success, show_warning
+from streamlit_app.utils.errors import safe_call_with_spinner, ErrorBoundary
 from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.empty_states import empty_transactions_state
 # Filters are now inline for better coherence
@@ -31,7 +30,6 @@ from streamlit_app.components.mobile_ui import (
     apply_mobile_css,
     transaction_list,
     bottom_navigation,
-    filter_chips,
 )
 from streamlit_app.utils.formatters import get_category_icon
 

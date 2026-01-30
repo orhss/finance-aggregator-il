@@ -4,8 +4,7 @@ Integrates credit card scrapers with database storage.
 """
 
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Set, Tuple
-from sqlalchemy.exc import IntegrityError
+from typing import Optional, List, Dict, Any, Tuple
 
 from db.models import Account, Transaction as DBTransaction
 from config.constants import AccountType, Institution, SyncType

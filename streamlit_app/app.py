@@ -23,7 +23,6 @@ from streamlit_app.utils.session import (
     init_session_state,
     format_amount_private,
     get_accounts_display,
-    get_dashboard_stats_display,
 )
 from streamlit_app.utils.cache import (
     get_dashboard_stats,
@@ -41,7 +40,7 @@ from services.budget_service import BudgetService
 from streamlit_app.utils.rtl import clean_merchant_name
 from streamlit_app.components.cards import render_transaction_card, render_summary_card
 from streamlit_app.components.sidebar import render_minimal_sidebar
-from streamlit_app.components.theme import apply_theme, render_theme_switcher, render_page_header
+from streamlit_app.components.theme import apply_theme, render_page_header
 from streamlit_app.utils.mobile import detect_mobile, is_mobile
 from streamlit_app.auth import check_authentication, get_logout_button
 
