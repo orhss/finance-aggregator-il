@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-01-30 22:52
+# Auto-generated: 2026-01-31 00:32
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -87,14 +87,10 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/components/responsive.py: fn:responsive_columns,mobile_card,responsive_metrics,responsive_table_config,stacked_layout
 - streamlit_app/components/sidebar.py: fn:render_privacy_toggle,render_quick_stats,render_theme_toggle,render_about,render_minimal_sidebar
 - streamlit_app/components/theme.py: fn:load_shared_css,init_theme,render_theme_switcher,generate_css_variables,apply_theme
+- streamlit_app/config/pages.py: class:PagePath
 - streamlit_app/config/theme.py: class:ColorPalette,Theme | fn:get_theme,set_theme_mode
+- streamlit_app/main.py: Financial Data Aggregator - Central Entrypoint
 - streamlit_app/mobile_dashboard.py: fn:render_budget_progress,render_alerts,render_recent_transactions,render_mobile_dashboard
-- streamlit_app/pages/1_💳_Transactions.py: fn:render_mobile_transactions
-- streamlit_app/pages/2_📈_Analytics.py: fn:render_mobile_analytics,time_range_selector
-- streamlit_app/pages/3_🏦_Accounts.py: fn:get_status_indicator,run_sync_in_thread,start_sync
-- streamlit_app/pages/4_🏷️_Organize.py: Organize Page - Unified management for Categories, Rules, an
-- streamlit_app/pages/5_⚙️_Settings.py: fn:render_theme_settings,render_privacy_settings,render_budget_settings,render_mobile_settings,render_desktop_settings
-- streamlit_app/pages/99_🎨_Style_Preview.py: Style Preview Page - Visual mockups of 3 different UI design
 - streamlit_app/styles/design_tokens.py: fn:get_css_variables,get_token,get_hero_styles,get_card_styles,get_metric_card_styles
 - streamlit_app/utils/cache.py: fn:get_transactions_cached,get_dashboard_stats,get_category_spending_cached,get_monthly_trend_cached,get_accounts_cached
 - streamlit_app/utils/errors.py: class:ErrorBoundary | fn:safe_service_call,get_user_friendly_error,safe_call_with_spinner,handle_error_with_retry,safe_decorator
@@ -103,3 +99,8 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/utils/mobile.py: fn:detect_mobile,render_mobile_toggle,is_mobile,mobile_page_config,force_mobile_mode
 - streamlit_app/utils/rtl.py: fn:has_hebrew,fix_rtl,format_description,mixed_rtl_ltr,clean_merchant_name
 - streamlit_app/utils/session.py: fn:format_amount_private,get_accounts_display,get_dashboard_stats_display,get_transactions_display,get_tags_display
+- streamlit_app/views/accounts.py: fn:get_status_indicator,run_sync_in_thread,start_sync,init_sync_state,render_mobile_accounts
+- streamlit_app/views/analytics.py: fn:render_mobile_analytics,time_range_selector,render_desktop_analytics
+- streamlit_app/views/organize.py: Organize Page - Unified management for Categories, Rules, an
+- streamlit_app/views/settings.py: fn:render_theme_settings,render_privacy_settings,render_budget_settings,render_mobile_settings,render_desktop_settings
+- streamlit_app/views/transactions.py: fn:render_mobile_transactions,render_desktop_transactions
