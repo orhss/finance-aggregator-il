@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-01-29 16:57
+# Auto-generated: 2026-01-30 22:52
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -38,6 +38,7 @@ scrapers → services → db → cli/streamlit_app
 - db/database.py: fn:get_database_url,enable_foreign_keys,create_database_engine,init_db,drop_all_tables
 - db/migrations/add_indexes.py: fn:run_migration,rollback_migration,check_indexes
 - db/models.py: class:Account,Transaction,Balance,SyncHistory,Tag
+- db/query_utils.py: fn:effective_amount_expr,effective_category_expr,get_effective_amount
 
 ## examples/ - Example scripts demonstrating scraper usage
 - examples/example_cal_usage.py: fn:main,display_results,export_to_csv
@@ -62,7 +63,7 @@ scrapers → services → db → cli/streamlit_app
 - scrapers/utils/wait_conditions.py: class:SmartWait
 
 ## services/ - Services package for data synchronization and anal
-- services/analytics_service.py: class:AnalyticsService | fn:get_effective_amount,effective_amount_expr,effective_category_expr
+- services/analytics_service.py: class:AnalyticsService
 - services/base_service.py: class:BaseSyncService
 - services/broker_service.py: class:BrokerSyncResult,BrokerService
 - services/budget_service.py: class:BudgetService
@@ -92,7 +93,7 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/pages/2_📈_Analytics.py: fn:render_mobile_analytics,time_range_selector
 - streamlit_app/pages/3_🏦_Accounts.py: fn:get_status_indicator,run_sync_in_thread,start_sync
 - streamlit_app/pages/4_🏷️_Organize.py: Organize Page - Unified management for Categories, Rules, an
-- streamlit_app/pages/5_⚙️_Settings.py: Settings Page - Application configuration and management
+- streamlit_app/pages/5_⚙️_Settings.py: fn:render_theme_settings,render_privacy_settings,render_budget_settings,render_mobile_settings,render_desktop_settings
 - streamlit_app/pages/99_🎨_Style_Preview.py: Style Preview Page - Visual mockups of 3 different UI design
 - streamlit_app/styles/design_tokens.py: fn:get_css_variables,get_token,get_hero_styles,get_card_styles,get_metric_card_styles
 - streamlit_app/utils/cache.py: fn:get_transactions_cached,get_dashboard_stats,get_category_spending_cached,get_monthly_trend_cached,get_accounts_cached
