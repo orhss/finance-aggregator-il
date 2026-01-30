@@ -116,7 +116,7 @@ def render_recent_transactions():
     transaction_list(transactions, date_formatter=format_date_relative)
 
     if st.button("View All Transactions", use_container_width=True, type="secondary"):
-        st.switch_page("pages/1_💳_Transactions.py")
+        st.switch_page("views/transactions.py")
 
 
 def render_mobile_dashboard():
@@ -140,7 +140,7 @@ def render_mobile_dashboard():
         st.info("No accounts configured yet. Set up your accounts to get started.")
 
         if st.button("Go to Accounts", use_container_width=True, type="primary"):
-            st.switch_page("pages/3_🏦_Accounts.py")
+            st.switch_page("views/accounts.py")
         return
 
     # Page header with greeting

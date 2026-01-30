@@ -419,32 +419,23 @@ def bottom_navigation(current: str = "home"):
     Render fixed bottom navigation bar that stays visible while scrolling.
 
     Args:
-        current: Current active page ("home", "transactions", "analytics", "settings")
+        current: Current active page ("home", "transactions", "analytics", "accounts", "settings")
     """
-    # Get current settings to persist across navigation
-    theme_mode = st.session_state.get('theme_mode', 'light')
-    privacy_mode = st.session_state.get('mask_balances', False)
-
-    # Build query params
-    params = []
-    if theme_mode == 'dark':
-        params.append('theme=dark')
-    if privacy_mode:
-        params.append('privacy=1')
-    query_string = '?' + '&'.join(params) if params else ''
-
+    # Navigation items: key, icon, label, URL path
+    # URLs match url_path parameters in main.py st.Page() definitions
     nav_items = [
-        ("home", "🏠", "Home", f"/{query_string}"),
-        ("transactions", "💳", "Transactions", f"/Transactions{query_string}"),
-        ("analytics", "📈", "Analytics", f"/Analytics{query_string}"),
-        ("settings", "⚙️", "Settings", f"/Settings{query_string}"),
+        ("home", "🏠", "Home", "/home"),
+        ("transactions", "💳", "Txns", "/transactions"),
+        ("analytics", "📈", "Stats", "/analytics"),
+        ("accounts", "🏦", "Accounts", "/accounts"),
+        ("settings", "⚙️", "Settings", "/settings"),
     ]
 
     nav_html_items = []
-    for key, icon, label, href in nav_items:
+    for key, icon, label, url in nav_items:
         active_class = "active" if current == key else ""
         nav_html_items.append(
-            f'<a href="{href}" target="_self" class="mobile-nav-item {active_class}">'
+            f'<a href="{url}" target="_self" class="mobile-nav-item {active_class}">'
             f'<span class="icon">{icon}</span>'
             f'<span>{label}</span>'
             f'</a>'

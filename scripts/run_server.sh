@@ -56,7 +56,7 @@ fi
 echo ""
 
 # Run Streamlit
-exec streamlit run streamlit_app/app.py \
+exec streamlit run streamlit_app/main.py \
     --server.address="$HOST" \
     --server.port="$PORT" \
     --server.headless=true

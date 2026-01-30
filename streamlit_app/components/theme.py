@@ -19,7 +19,7 @@ def load_shared_css():
         from streamlit_app.components.theme import load_shared_css
         load_shared_css()
     """
-    css_path = Path(__file__).parent.parent / "styles" / "main.css"
+    css_path = Path(__file__).resolve().parent.parent / "styles" / "main.css"
 
     if css_path.exists():
         with open(css_path, 'r') as f:

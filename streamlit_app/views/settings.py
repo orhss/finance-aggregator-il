@@ -1,50 +1,26 @@
 """
 Settings Page - Application configuration and management
+
+Boilerplate (page config, auth, theme, sidebar) is handled by main.py.
+This file contains only the page-specific content.
 """
 
 import streamlit as st
-import pandas as pd
-from datetime import datetime
 import sys
 from pathlib import Path
+from datetime import datetime
 import shutil
 
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
 from streamlit_app.utils.session import init_session_state
-from streamlit_app.auth import check_authentication
 from streamlit_app.utils.formatters import format_number
-from streamlit_app.components.sidebar import render_minimal_sidebar
 from streamlit_app.components.theme import (
-    apply_theme, render_page_header,
+    render_page_header,
     _save_theme_to_localstorage, _save_privacy_to_localstorage
 )
 from streamlit_app.config.theme import set_theme_mode
 from streamlit_app.components.cards import render_metric_row
-from streamlit_app.utils.mobile import detect_mobile, is_mobile
+from streamlit_app.utils.mobile import is_mobile
 from streamlit_app.components.mobile_ui import apply_mobile_css, bottom_navigation
-
-# Page config
-st.set_page_config(
-    page_title="Settings - Financial Aggregator",
-    page_icon="⚙️",
-    layout="wide"
-)
-
-# Initialize session state
-init_session_state()
-
-# Check authentication (if enabled)
-if not check_authentication():
-    st.stop()
-
-# Mobile detection
-detect_mobile()
-
-# Apply theme
-theme = apply_theme()
 
 
 def render_theme_settings():
@@ -74,7 +50,7 @@ def render_theme_settings():
         on_change=on_theme_change
     )
 
-    st.caption("🌙 Easier on the eyes in low light")
+    st.caption("Easier on the eyes in low light")
 
 
 def render_privacy_settings():
@@ -95,19 +71,19 @@ def render_privacy_settings():
     st.toggle(
         "Hide All Balances",
         key="setting_mask_balances",
-        help="Hide all financial amounts (shows ••••••)",
+        help="Hide all financial amounts (shows ******)",
         on_change=on_privacy_change
     )
-    st.caption("🔒 Useful when sharing screen")
+    st.caption("Useful when sharing screen")
 
     mask_accounts = st.toggle(
         "Mask Account Numbers",
         value=st.session_state.get('mask_account_numbers', True),
         key="setting_mask_account_numbers",
-        help="Show account numbers as ••••1234"
+        help="Show account numbers as ****1234"
     )
     st.session_state.mask_account_numbers = mask_accounts
-    st.caption("📋 Account numbers show as ••••1234")
+    st.caption("Account numbers show as ****1234")
 
 
 def render_budget_settings(session):
@@ -124,16 +100,16 @@ def render_budget_settings(session):
         current_budget = progress['budget'] if progress['budget'] else 5000
 
         new_budget = st.number_input(
-            f"Monthly Budget for {month_name} (₪)",
+            f"Monthly Budget for {month_name}",
             min_value=0.0,
             value=float(current_budget),
             step=500.0,
             key="budget_input"
         )
 
-        if st.button("💾 Save Budget", use_container_width=True):
+        if st.button("Save Budget", use_container_width=True):
             budget_service.set_current_budget(new_budget)
-            st.success(f"Budget set to ₪{new_budget:,.0f}")
+            st.success(f"Budget set to {new_budget:,.0f}")
             st.rerun()
 
         if progress['budget']:
@@ -144,9 +120,9 @@ def render_budget_settings(session):
             st.progress(min(percent / 100, 1.0))
 
             if progress['is_over_budget']:
-                st.error(f"₪{spent:,.0f} spent — ₪{abs(remaining):,.0f} over budget")
+                st.error(f"{spent:,.0f} spent - {abs(remaining):,.0f} over budget")
             else:
-                st.success(f"₪{spent:,.0f} spent — ₪{remaining:,.0f} remaining")
+                st.success(f"{spent:,.0f} spent - {remaining:,.0f} remaining")
 
     except Exception as e:
         st.warning(f"Could not load budget: {str(e)}")
@@ -156,7 +132,7 @@ def render_mobile_settings():
     """Render mobile-optimized settings view."""
     apply_mobile_css()
 
-    render_page_header("⚙️ Settings")
+    render_page_header("Settings")
 
     # Get database session
     try:
@@ -167,18 +143,18 @@ def render_mobile_settings():
 
     # Theme Section
     st.markdown("---")
-    st.markdown("**🌓 Theme**")
+    st.markdown("**Theme**")
     render_theme_settings()
 
     # Privacy Section
     st.markdown("---")
-    st.markdown("**🔒 Privacy**")
+    st.markdown("**Privacy**")
     render_privacy_settings()
 
     # Budget Section
     if session:
         st.markdown("---")
-        st.markdown("**💰 Budget**")
+        st.markdown("**Budget**")
         render_budget_settings(session)
 
     # Link to full settings on desktop
@@ -191,11 +167,8 @@ def render_mobile_settings():
 
 def render_desktop_settings():
     """Render full desktop settings view."""
-    # Render sidebar
-    render_minimal_sidebar()
-
     # Page header
-    render_page_header("⚙️ Settings")
+    render_page_header("Settings")
 
     try:
         from db.database import get_session
@@ -207,10 +180,10 @@ def render_desktop_settings():
 
         # Use tabs for organization
         tab_appearance, tab_data, tab_security, tab_about = st.tabs([
-            "🎨 Appearance",
-            "💾 Data & Budget",
-            "🔑 Security",
-            "ℹ️ About"
+            "Appearance",
+            "Data & Budget",
+            "Security",
+            "About"
         ])
 
         # =====================================================================
@@ -220,11 +193,11 @@ def render_desktop_settings():
             col1, col2 = st.columns(2)
 
             with col1:
-                st.subheader("🌓 Theme")
+                st.subheader("Theme")
                 render_theme_settings()
 
                 st.markdown("")
-                st.subheader("🎨 Display")
+                st.subheader("Display")
 
                 rows_per_page = st.selectbox(
                     "Default Rows Per Page",
@@ -235,7 +208,7 @@ def render_desktop_settings():
 
                 currency_format = st.selectbox(
                     "Currency Display",
-                    ["₪1,234.56", "1,234.56 ₪", "1234.56"],
+                    ["1,234.56", "1,234.56", "1234.56"],
                     key="currency_format"
                 )
 
@@ -245,10 +218,10 @@ def render_desktop_settings():
                     key="date_format"
                 )
 
-                st.caption("💡 Display settings are for preview only")
+                st.caption("Display settings are for preview only")
 
             with col2:
-                st.subheader("🔒 Privacy")
+                st.subheader("Privacy")
                 render_privacy_settings()
 
         # =====================================================================
@@ -258,11 +231,11 @@ def render_desktop_settings():
             col1, col2 = st.columns(2)
 
             with col1:
-                st.subheader("💰 Monthly Budget")
+                st.subheader("Monthly Budget")
                 render_budget_settings(session)
 
                 st.markdown("")
-                st.subheader("📤 Export Defaults")
+                st.subheader("Export Defaults")
 
                 export_format = st.selectbox(
                     "Format",
@@ -278,11 +251,11 @@ def render_desktop_settings():
                 )
 
             with col2:
-                st.subheader("🔐 Credentials")
+                st.subheader("Credentials")
 
                 creds_path = CREDENTIALS_FILE
                 if creds_path.exists():
-                    st.success("✅ Credentials configured")
+                    st.success("Credentials configured")
 
                     institutions = session.query(Account.institution).distinct().all()
                     if institutions:
@@ -293,37 +266,37 @@ def render_desktop_settings():
                             ).scalar()
                             st.markdown(f"- {inst[0]}: {count} account(s)")
                 else:
-                    st.warning("⚠️ No credentials configured")
+                    st.warning("No credentials configured")
 
                 st.code("fin-cli config setup", language="bash")
                 st.caption("Run this command to configure credentials")
 
                 st.markdown("")
-                st.subheader("💾 Database")
+                st.subheader("Database")
 
                 db_path = CONFIG_DIR / "financial_data.db"
                 if db_path.exists():
                     db_size = db_path.stat().st_size / (1024 * 1024)
-                    st.success(f"✅ Database: {db_size:.2f} MB")
+                    st.success(f"Database: {db_size:.2f} MB")
 
                     account_count = session.query(func.count(Account.id)).scalar()
                     txn_count = session.query(func.count(Transaction.id)).scalar()
                     st.markdown(f"- {account_count} accounts, {txn_count:,} transactions")
 
-                    if st.button("📥 Create Backup", use_container_width=True):
+                    if st.button("Create Backup", use_container_width=True):
                         backup_name = f"financial_data_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
                         backup_path = CONFIG_DIR / backup_name
                         shutil.copy(db_path, backup_path)
-                        st.success(f"✅ Backup: `{backup_name}`")
+                        st.success(f"Backup: `{backup_name}`")
                 else:
-                    st.warning("⚠️ Database not found")
+                    st.warning("Database not found")
                     st.code("fin-cli init", language="bash")
 
         # =====================================================================
         # SECURITY TAB
         # =====================================================================
         with tab_security:
-            st.subheader("🔑 Authentication")
+            st.subheader("Authentication")
 
             try:
                 from config.settings import (
@@ -340,9 +313,9 @@ def render_desktop_settings():
 
                 with col1:
                     if auth_enabled:
-                        st.success(f"✅ Authentication **enabled** ({user_count} user{'s' if user_count != 1 else ''})")
+                        st.success(f"Authentication **enabled** ({user_count} user{'s' if user_count != 1 else ''})")
                     else:
-                        st.warning("⚠️ Authentication **disabled** — anyone with network access can view your data")
+                        st.warning("Authentication **disabled** - anyone with network access can view your data")
 
                 with col2:
                     if user_count > 0:
@@ -363,9 +336,9 @@ def render_desktop_settings():
                         for user in users:
                             ucol1, ucol2 = st.columns([3, 1])
                             with ucol1:
-                                st.markdown(f"👤 **{user['username']}** ({user['name']})")
+                                st.markdown(f"**{user['username']}** ({user['name']})")
                             with ucol2:
-                                if st.button("🗑️", key=f"del_{user['username']}"):
+                                if st.button("Delete", key=f"del_{user['username']}"):
                                     remove_auth_user(user['username'])
                                     if len(list_auth_users()) == 0:
                                         set_auth_enabled(False)
@@ -406,7 +379,7 @@ def render_desktop_settings():
             col1, col2 = st.columns(2)
 
             with col1:
-                st.subheader("📱 Application")
+                st.subheader("Application")
                 st.markdown("**Financial Data Aggregator**")
                 st.markdown("Version: 1.0.0")
                 st.markdown("License: MIT")
@@ -417,18 +390,18 @@ def render_desktop_settings():
                 st.markdown("- Database: SQLite")
 
             with col2:
-                st.subheader("📁 Configuration")
+                st.subheader("Configuration")
                 st.code(str(CONFIG_DIR), language="bash")
 
                 config_files = ["financial_data.db", "credentials.enc", "config.json"]
                 for file in config_files:
                     file_path = CONFIG_DIR / file
                     if file_path.exists():
-                        st.markdown(f"✅ `{file}`")
+                        st.markdown(f"`{file}`")
                     else:
-                        st.markdown(f"❌ `{file}`")
+                        st.markdown(f"~`{file}`~ (missing)")
 
-            with st.expander("🖥️ System Information"):
+            with st.expander("System Information"):
                 st.code(f"Python: {sys.version}", language="text")
                 st.code(f"Platform: {sys.platform}", language="text")
 
@@ -445,7 +418,7 @@ def render_desktop_settings():
         st.exception(e)
 
 
-# Main routing
+# Main routing based on device type
 if is_mobile():
     render_mobile_settings()
 else:

@@ -20,7 +20,6 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from streamlit_app.utils.session import (
-    init_session_state,
     format_amount_private,
     get_accounts_display,
 )
@@ -39,22 +38,10 @@ from streamlit_app.utils.insights import get_time_greeting, generate_hub_insight
 from services.budget_service import BudgetService
 from streamlit_app.utils.rtl import clean_merchant_name
 from streamlit_app.components.cards import render_transaction_card, render_summary_card
-from streamlit_app.components.sidebar import render_minimal_sidebar
-from streamlit_app.components.theme import apply_theme, render_page_header
-from streamlit_app.utils.mobile import detect_mobile, is_mobile
-from streamlit_app.auth import check_authentication, get_logout_button
+from streamlit_app.components.theme import render_page_header
+from streamlit_app.utils.mobile import is_mobile
 
-# Page configuration - collapse sidebar if mobile detected via query param
-st.set_page_config(
-    page_title="💰 Home",
-    page_icon="💰",
-    layout="wide",
-    initial_sidebar_state="collapsed" if st.query_params.get("mobile") == "true" else "expanded",
-)
-
-# Mobile detection (automatic via viewport JS + User-Agent fallback)
-detect_mobile()
-
+# Mobile view
 if is_mobile():
     from streamlit_app.mobile_dashboard import render_mobile_dashboard
     render_mobile_dashboard()
@@ -80,7 +67,7 @@ def render_empty_state():
         """)
 
         if st.button("Go to Accounts", use_container_width=True, type="primary"):
-            st.switch_page("pages/3_🏦_Accounts.py")
+            st.switch_page("views/accounts.py")
 
         st.markdown("---")
         st.caption("Supports: CAL, Max, Isracard, Excellence, Migdal, Phoenix")
@@ -94,7 +81,7 @@ def render_header():
         render_page_header(f"💰 {greeting}")
     with col2:
         if st.button("Sync Now", use_container_width=True, type="secondary"):
-            st.switch_page("pages/3_🏦_Accounts.py")
+            st.switch_page("views/accounts.py")
 
 
 def render_hero_and_metrics(stats: dict):
@@ -306,7 +293,7 @@ def render_recent_activity(min_height: int = None) -> int:
     )
 
     if st.button("View all transactions", use_container_width=True, type="secondary"):
-        st.switch_page("pages/1_💳_Transactions.py")
+        st.switch_page("views/transactions.py")
 
     return height
 
@@ -354,7 +341,7 @@ def render_accounts_overview(min_height: int = None) -> int:
     height = render_summary_card(title="🏦 Accounts", items=items, min_height=min_height)
 
     if st.button("View all accounts", use_container_width=True, type="secondary"):
-        st.switch_page("pages/3_🏦_Accounts.py")
+        st.switch_page("views/accounts.py")
 
     return height
 
@@ -391,21 +378,7 @@ def calculate_card_heights():
 
 def main():
     """Main hub page entry point."""
-    # Check authentication (if enabled)
-    if not check_authentication():
-        st.stop()
-
-    # Initialize session state
-    init_session_state()
-
-    # Apply theme (loads CSS + theme-specific styles)
-    apply_theme()
-
-    # Render sidebar
-    render_minimal_sidebar()
-
-    # Add logout button if auth is enabled
-    get_logout_button()
+    # Note: Authentication, session init, theme, and sidebar are handled by main.py
 
     # Get stats to check if we have data
     stats = get_dashboard_stats()
@@ -444,5 +417,5 @@ def main():
         render_accounts_overview(min_height=aligned_height)
 
 
-if __name__ == "__main__":
-    main()
+# Run the page (called by st.navigation via main.py)
+main()

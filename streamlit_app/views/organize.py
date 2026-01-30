@@ -5,50 +5,23 @@ Consolidates three previously separate pages into one with tabs:
 - Categories: Provider and merchant category mappings
 - Rules: Auto-categorization and tagging rules
 - Tags: Custom transaction labels
+
+Boilerplate (page config, auth, theme, sidebar) is handled by main.py.
 """
 
 import streamlit as st
 import pandas as pd
 import yaml
 from datetime import datetime
-import sys
-from pathlib import Path
 
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-from streamlit_app.utils.session import init_session_state, format_amount_private, get_all_categories, get_all_tags
-from streamlit_app.auth import check_authentication
+from streamlit_app.utils.session import format_amount_private, get_all_categories, get_all_tags
 from streamlit_app.utils.cache import invalidate_transaction_cache, invalidate_tag_cache
 from streamlit_app.utils.formatters import format_number, format_tags
-from streamlit_app.components.sidebar import render_minimal_sidebar
-from streamlit_app.components.bulk_actions import show_bulk_preview, show_bulk_confirmation
-from streamlit_app.components.theme import apply_theme, render_page_header
+from streamlit_app.components.theme import render_page_header
 from streamlit_app.components.cards import render_metric_row
 
-# Page config
-st.set_page_config(
-    page_title="Organize - Financial Aggregator",
-    page_icon="🏷️",
-    layout="wide"
-)
-
-# Initialize session state
-init_session_state()
-
-# Check authentication (if enabled)
-if not check_authentication():
-    st.stop()
-
-# Apply theme
-theme = apply_theme()
-
-# Render sidebar
-render_minimal_sidebar()
-
 # Page header
-render_page_header("🏷️ Organize")
+render_page_header("Organize")
 
 # Get services
 try:
@@ -69,9 +42,9 @@ try:
     # MAIN TABS
     # ========================================================================
     tab_categories, tab_rules, tab_tags = st.tabs([
-        "📂 Categories",
-        "📋 Rules",
-        "🏷️ Tags"
+        "Categories",
+        "Rules",
+        "Tags"
     ])
 
     # ========================================================================
@@ -104,12 +77,12 @@ try:
             if merchant_groups:
                 hints.append(f"{sum(g['count'] for g in merchant_groups):,} transactions without provider category")
             if hints:
-                st.info("ℹ️ " + " | ".join(hints))
+                st.info(" | ".join(hints))
 
         st.markdown("")  # Spacing
 
         # Categories Sub-tabs
-        cat_tab1, cat_tab2, cat_tab3 = st.tabs(["⚠️ Unmapped", "🏪 By Merchant", "📋 All Mappings"])
+        cat_tab1, cat_tab2, cat_tab3 = st.tabs(["Unmapped", "By Merchant", "All Mappings"])
 
         # Get suggestions for dropdowns
         existing_unified = category_service.get_unified_categories()
@@ -159,10 +132,10 @@ try:
                             item = unmapped[idx]
                             try:
                                 category_service.add_mapping(item['provider'], item['raw_category'], quick_map_unified)
-                                st.toast(f"Mapped '{item['raw_category']}' -> '{quick_map_unified}'", icon="✅")
+                                st.toast(f"Mapped '{item['raw_category']}' -> '{quick_map_unified}'", icon="check")
                                 st.rerun()
                             except Exception as e:
-                                st.toast(f"Error: {str(e)}", icon="❌")
+                                st.toast(f"Error: {str(e)}", icon="x")
 
         # --- By Merchant ---
         with cat_tab2:
@@ -189,7 +162,7 @@ try:
                             'Merchant': group['merchant_pattern'],
                             'Provider': group['provider'].upper(),
                             'Txns': group['count'],
-                            'Amount': f"₪{group['total_amount']:,.0f}",
+                            'Amount': f"{group['total_amount']:,.0f}",
                         })
 
                     df_merchants = pd.DataFrame(merchant_data)
@@ -219,10 +192,10 @@ try:
                                     msg = f"Categorized {result['transactions_updated']} transactions as '{assign_category}'"
                                     if result['mapping_created']:
                                         msg += " (mapping saved)"
-                                    st.toast(msg, icon="✅")
+                                    st.toast(msg, icon="check")
                                     st.rerun()
                                 except Exception as e:
-                                    st.toast(f"Error: {str(e)}", icon="❌")
+                                    st.toast(f"Error: {str(e)}", icon="x")
 
         # --- All Mappings ---
         with cat_tab3:
@@ -256,10 +229,10 @@ try:
                     results = category_service.apply_mappings_to_transactions()
                     total = sum(results.values())
                     if total > 0:
-                        st.toast(f"Updated {total:,} transactions", icon="✅")
+                        st.toast(f"Updated {total:,} transactions", icon="check")
                         st.rerun()
                     else:
-                        st.toast("No transactions needed updating", icon="ℹ️")
+                        st.toast("No transactions needed updating", icon="info")
 
     # ========================================================================
     # TAB 2: RULES
@@ -285,7 +258,7 @@ try:
         st.markdown("")  # Spacing
 
         # Add New Rule
-        with st.expander("➕ Add New Rule", expanded=False):
+        with st.expander("Add New Rule", expanded=False):
             col1, col2 = st.columns(2)
 
             all_categories_for_rules = get_all_categories()
@@ -326,12 +299,12 @@ try:
                             match_type=MatchType(rule_match_type),
                             description=rule_description.strip() if rule_description else None
                         )
-                        st.toast(f"Created rule: {new_rule.pattern}", icon="📋")
+                        st.toast(f"Created rule: {new_rule.pattern}", icon="check")
                         st.rerun()
                     except Exception as e:
-                        st.toast(f"Error: {str(e)}", icon="❌")
+                        st.toast(f"Error: {str(e)}", icon="x")
                 else:
-                    st.toast("Please enter a pattern", icon="⚠️")
+                    st.toast("Please enter a pattern", icon="warning")
 
         st.markdown("")  # Spacing
 
@@ -348,7 +321,7 @@ try:
                     'Category': rule.category or '-',
                     'Tags': ', '.join(rule.tags) if rule.tags else '-',
                     'Description': rule.description or '-',
-                    'On': '✅' if rule.enabled else '❌'
+                    'On': 'Yes' if rule.enabled else 'No'
                 })
 
             df_rules = pd.DataFrame(table_data)
@@ -374,14 +347,14 @@ try:
                     modified = results.get('modified', 0)
 
                     if dry_run:
-                        st.toast(f"Dry run: {modified}/{processed} would be modified", icon="🔍")
+                        st.toast(f"Dry run: {modified}/{processed} would be modified", icon="search")
                     else:
-                        st.toast(f"Applied: {modified}/{processed} modified", icon="✅")
+                        st.toast(f"Applied: {modified}/{processed} modified", icon="check")
                         if modified > 0:
                             invalidate_transaction_cache()
                             st.rerun()
                 except Exception as e:
-                    st.toast(f"Error: {str(e)}", icon="❌")
+                    st.toast(f"Error: {str(e)}", icon="x")
 
     # ========================================================================
     # TAB 3: TAGS
@@ -412,7 +385,7 @@ try:
         st.markdown("")  # Spacing
 
         # Create Tag
-        with st.expander("➕ Create New Tag", expanded=False):
+        with st.expander("Create New Tag", expanded=False):
             col1, col2 = st.columns([3, 1])
 
             with col1:
@@ -424,12 +397,12 @@ try:
                     if new_tag_name and new_tag_name.strip():
                         try:
                             tag = tag_service.get_or_create_tag(new_tag_name.strip())
-                            st.toast(f"Created tag: {tag.name}", icon="🏷️")
+                            st.toast(f"Created tag: {tag.name}", icon="tag")
                             st.rerun()
                         except Exception as e:
-                            st.toast(f"Error: {str(e)}", icon="❌")
+                            st.toast(f"Error: {str(e)}", icon="x")
                     else:
-                        st.toast("Please enter a tag name", icon="⚠️")
+                        st.toast("Please enter a tag name", icon="warning")
 
         st.markdown("")  # Spacing
 
@@ -473,10 +446,10 @@ try:
                     if new_tag_name_rename and new_tag_name_rename.strip():
                         success = tag_service.rename_tag(old_tag_name, new_tag_name_rename.strip())
                         if success:
-                            st.toast("Tag renamed successfully", icon="✅")
+                            st.toast("Tag renamed successfully", icon="check")
                             st.rerun()
                         else:
-                            st.toast("Failed to rename tag", icon="❌")
+                            st.toast("Failed to rename tag", icon="x")
 
             with col2:
                 st.markdown("**Delete Tag**")
@@ -489,10 +462,10 @@ try:
                 if st.button("Delete Tag", type="secondary", use_container_width=True, key="delete_tag_btn"):
                     success = tag_service.delete_tag(delete_tag_name)
                     if success:
-                        st.toast(f"Deleted tag: {delete_tag_name}", icon="🗑️")
+                        st.toast(f"Deleted tag: {delete_tag_name}", icon="trash")
                         st.rerun()
                     else:
-                        st.toast("Failed to delete tag", icon="❌")
+                        st.toast("Failed to delete tag", icon="x")
 
         # Bulk Tagging
         st.markdown("")  # Spacing
@@ -531,10 +504,10 @@ try:
                             try:
                                 count = tag_service.bulk_tag_by_merchant(merchant_pattern.strip(), tags_list)
                                 st.session_state['merchant_preview_ready'] = False
-                                st.toast(f"Tagged {count} transactions", icon="🏷️")
+                                st.toast(f"Tagged {count} transactions", icon="tag")
                                 st.rerun()
                             except Exception as e:
-                                st.toast(f"Error: {str(e)}", icon="❌")
+                                st.toast(f"Error: {str(e)}", icon="x")
 
         with bulk_tab2:
             user_categories = session.query(Transaction.user_category).filter(Transaction.user_category.isnot(None)).distinct().all()
@@ -589,10 +562,10 @@ try:
                                             count += 1
 
                                     st.session_state['category_preview_ready'] = False
-                                    st.toast(f"Tagged {count} transactions", icon="🏷️")
+                                    st.toast(f"Tagged {count} transactions", icon="tag")
                                     st.rerun()
                                 except Exception as e:
-                                    st.toast(f"Error: {str(e)}", icon="❌")
+                                    st.toast(f"Error: {str(e)}", icon="x")
 
 except Exception as e:
     st.error(f"Error loading page: {str(e)}")
