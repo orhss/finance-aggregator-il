@@ -157,8 +157,38 @@ For detailed file/function navigation, see `.claude/codemap.md`
 - **SIMPLE**: Minimal code to solve the actual problem, no speculative features
 - Avoid premature abstraction - three similar lines beats a premature helper
 
-### Unit Testing
-When writing or generating tests, follow @.claude/rules/python-unit-tests.md
+### Testing
+
+**When to Write Tests**:
+- After implementing new service methods or CLI commands
+- When fixing bugs (write a failing test first that reproduces the issue)
+- When modifying business logic in `services/`
+
+**Unit Tests**: Follow @.claude/rules/python-unit-tests.md
+- Location: `tests/services/`
+- Target: Services layer (`services/`)
+- Uses in-memory SQLite with factory functions from `tests/conftest.py`
+
+**Integration Tests**: See @plans/INTEGRATION_TESTING_PLAN.md
+- Location: `tests/integration/`
+- Target: CLI commands, multi-service workflows
+- Mock scrapers, use real DB
+- Fixtures: `tests/integration/conftest.py`
+
+**Smoke Tests**: Verify imports work
+- Location: `tests/smoke/`
+- Catch missing dependencies, circular imports
+
+**Running Tests**:
+```bash
+pytest                          # All tests
+pytest tests/services -v        # Unit tests only
+pytest tests/integration -v     # Integration tests only
+pytest tests/smoke -v           # Smoke tests only
+pytest -m integration           # Integration tests by marker
+pytest --cov=services           # With coverage
+pytest -k "test_sync"           # By name pattern
+```
 
 ### Database and Services
 - **SQLite database**: `~/.fin/financial_data.db` (initialized via `fin-cli init`)

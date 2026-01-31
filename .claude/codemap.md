@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-01-31 18:26
+# Auto-generated: 2026-01-31 22:36
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -107,6 +107,11 @@ scrapers → services → db → cli/streamlit_app
 
 ## tests/
 - tests/conftest.py: fn:db_engine,db_session,sample_account,sample_accounts,create_account
+- tests/integration/conftest.py: fn:cli_runner,integration_db_engine,integration_db_session,patched_session_local,patched_db_exists
+- tests/integration/test_category_commands.py: fn:test_categories_list_empty,test_categories_list_shows_mappings,test_categories_list_filters_by_provider,test_categories_map_creates_mapping,test_categories_map_updates_existing
+- tests/integration/test_service_integration.py: fn:service_db_session,credit_card_service,category_service,analytics_service,temp_rules_file
+- tests/integration/test_sync_commands.py: fn:test_sync_cal_success_output,test_sync_cal_shows_card_count,test_sync_max_success_output,test_sync_isracard_success_output,test_sync_no_database_shows_error
 - tests/services/test_analytics_service.py: fn:analytics_service,sample_account,test_get_all_accounts_empty,test_get_all_accounts_returns_all,test_get_all_accounts_active_filter
 - tests/services/test_category_service.py: fn:category_service,sample_account,sample_mapping,sample_merchant_mapping,test_normalize_category_happy_flow
 - tests/services/test_rules_service.py: fn:temp_rules_file,rules_service,sample_account,test_rule_matches_match_types,test_rule_matches_regex
+- tests/smoke/test_imports.py: fn:test_cli_main_imports,test_cli_commands_import,test_cli_tui_imports,test_services_import,test_models_import
