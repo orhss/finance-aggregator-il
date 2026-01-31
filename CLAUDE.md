@@ -157,6 +157,9 @@ For detailed file/function navigation, see `.claude/codemap.md`
 - **SIMPLE**: Minimal code to solve the actual problem, no speculative features
 - Avoid premature abstraction - three similar lines beats a premature helper
 
+### Unit Testing
+When writing or generating tests, follow @.claude/rules/python-unit-tests.md
+
 ### Database and Services
 - **SQLite database**: `~/.fin/financial_data.db` (initialized via `fin-cli init`)
 - **Services layer**: Use services (not scrapers directly) for business logic

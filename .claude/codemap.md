@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-01-31 00:32
+# Auto-generated: 2026-01-31 18:26
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -104,3 +104,9 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/views/organize.py: Organize Page - Unified management for Categories, Rules, an
 - streamlit_app/views/settings.py: fn:render_theme_settings,render_privacy_settings,render_budget_settings,render_mobile_settings,render_desktop_settings
 - streamlit_app/views/transactions.py: fn:render_mobile_transactions,render_desktop_transactions
+
+## tests/
+- tests/conftest.py: fn:db_engine,db_session,sample_account,sample_accounts,create_account
+- tests/services/test_analytics_service.py: fn:analytics_service,sample_account,test_get_all_accounts_empty,test_get_all_accounts_returns_all,test_get_all_accounts_active_filter
+- tests/services/test_category_service.py: fn:category_service,sample_account,sample_mapping,sample_merchant_mapping,test_normalize_category_happy_flow
+- tests/services/test_rules_service.py: fn:temp_rules_file,rules_service,sample_account,test_rule_matches_match_types,test_rule_matches_regex
