@@ -270,6 +270,26 @@
     color: var(--color-text-secondary);
 }
 
+.budget-card.no-budget {
+    border-style: dashed;
+    border-color: var(--color-border);
+}
+
+.budget-spent {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.budget-bar.empty {
+    width: 0;
+}
+
+.budget-prompt {
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
 /* ===== INSIGHT BANNER ===== */
 .insight-banner {
     border-radius: var(--radius-md);

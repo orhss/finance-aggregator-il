@@ -28,7 +28,7 @@ from streamlit_app.components.theme import apply_theme, render_page_header
 
 
 def render_budget_progress():
-    """Render budget progress card if budget is set."""
+    """Render budget progress card."""
     try:
         from services.budget_service import BudgetService
 
@@ -36,10 +36,24 @@ def render_budget_progress():
         progress = budget_service.get_current_progress()
         budget_service.close()
 
-        if progress['budget'] is None:
-            return  # No budget set
-
         spent = progress['spent']
+
+        if progress['budget'] is None:
+            # No budget set - show spending with prompt
+            spent_display = format_amount_private(spent) if spent else "₪0"
+
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                summary_card(
+                    title="Monthly Spending",
+                    value=spent_display,
+                    secondary="No budget set",
+                )
+            with col2:
+                if st.button("Set", key="mobile_set_budget", use_container_width=True):
+                    st.switch_page("views/settings.py")
+            return
+
         budget = progress['budget']
         percent = progress['percent_actual']
         remaining = progress['remaining']

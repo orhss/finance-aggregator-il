@@ -102,7 +102,7 @@ class Transaction(Base):
     @property
     def tags(self) -> List[str]:
         """Get list of tag names for this transaction"""
-        return [tt.tag.name for tt in self.transaction_tags]
+        return [tt.tag.name for tt in self.transaction_tags if tt.tag is not None]
 
     @property
     def effective_category(self) -> Optional[str]:

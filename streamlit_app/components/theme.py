@@ -466,7 +466,13 @@ def generate_css_variables(theme: Theme) -> str:
         border: 1px solid rgba(255,255,255,0.05) !important;
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2) !important;
     }}
+    .budget-card.no-budget {{
+        border: 1px dashed rgba(255,255,255,0.15) !important;
+    }}
     .budget-title {{
+        color: {p.text_primary} !important;
+    }}
+    .budget-spent {{
         color: {p.text_primary} !important;
     }}
     .budget-bar-bg {{
@@ -477,6 +483,9 @@ def generate_css_variables(theme: Theme) -> str:
     }}
     .budget-details span {{
         color: #94a3b8 !important;
+    }}
+    .budget-prompt {{
+        color: {p.text_muted} !important;
     }}
 
     /* Insight banner */

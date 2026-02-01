@@ -141,16 +141,40 @@ def render_hero_and_metrics(stats: dict):
 
 
 def render_budget_progress():
-    """Render budget progress bar below hero metrics if budget is set."""
+    """Render budget progress bar below hero metrics."""
     try:
         budget_service = BudgetService()
         progress = budget_service.get_current_progress()
         budget_service.close()
 
-        if progress['budget'] is None:
-            return  # No budget set, don't show anything
-
         spent = progress['spent']
+
+        if progress['budget'] is None:
+            # No budget set - show spending with prompt to set budget
+            spent_display = format_amount_private(spent) if spent else "₪0"
+
+            col1, col2 = st.columns([5, 1])
+            with col1:
+                st.markdown(
+                    f'<div class="budget-card no-budget">'
+                    f'<div class="budget-header">'
+                    f'<span class="budget-title">Monthly Spending</span>'
+                    f'<span class="budget-spent">{spent_display}</span>'
+                    f'</div>'
+                    f'<div class="budget-bar-bg">'
+                    f'<div class="budget-bar empty"></div>'
+                    f'</div>'
+                    f'<div class="budget-details">'
+                    f'<span class="budget-prompt">No budget set</span>'
+                    f'</div>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+            with col2:
+                if st.button("Set Budget", use_container_width=True, type="secondary"):
+                    st.switch_page("views/settings.py")
+            return
+
         budget = progress['budget']
         percent = progress['percent_actual']
         remaining = progress['remaining']
