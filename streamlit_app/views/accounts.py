@@ -541,6 +541,7 @@ def render_desktop_accounts():
                     sync_target = INSTITUTION_MAP.get(institution, institution.lower())
                     st.toast(f"Starting sync for {institution}...", icon="🔄")
                     start_sync(sync_target)
+                    st.rerun()
 
                 st.markdown("")
 
@@ -581,6 +582,7 @@ def render_desktop_accounts():
                 if st.button("Sync All", type="primary", disabled=st.session_state.sync_running, use_container_width=True):
                     st.toast("Starting sync for all institutions...", icon="🔄")
                     start_sync("all", headless_mode, months_back, months_forward)
+                    st.rerun()
 
             with col2:
                 st.caption("CLI: `fin-cli sync all`")
