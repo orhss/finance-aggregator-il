@@ -249,7 +249,7 @@ class ErrorBoundary:
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, _exc_tb):
         if exc_type is not None:
             logger.error(f"Error in ErrorBoundary: {str(exc_val)}")
             if self.show_traceback:

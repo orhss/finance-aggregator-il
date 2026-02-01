@@ -4,11 +4,15 @@ Detect and remove unused code using vulture.
 
 ## Step 1: Run vulture
 
-Run vulture with 90% minimum confidence to find unused code:
+Run vulture with 80% minimum confidence, including the whitelist for known false positives:
 
 ```bash
-pipx run vulture . --min-confidence 80 --exclude ".venv,venv,__pycache__,node_modules,.git"
+pipx run vulture . .vulture_whitelist.py --min-confidence 80 --exclude ".venv,venv,__pycache__,node_modules,.git"
 ```
+
+The `.vulture_whitelist.py` file contains intentionally "unused" items like:
+- Pytest fixtures used for side effects (patching)
+- Smoke test imports that verify module loading
 
 ## Step 2: Review output
 
@@ -36,6 +40,15 @@ For each verified unused item:
 - **Skip CLI entry points** - Functions called by Typer/Click decorators
 - **Skip abstract methods** - Implementations may exist in subclasses
 - **Skip dataclass fields** - May be used for serialization
+
+## Adding to whitelist
+
+If you find a false positive that will recur, add it to `.vulture_whitelist.py`:
+
+```python
+# Description of why this is intentionally unused
+some_identifier  # noqa
+```
 
 ## After cleanup
 

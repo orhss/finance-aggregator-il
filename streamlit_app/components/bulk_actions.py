@@ -204,7 +204,6 @@ def quick_bulk_preview(
     query_pattern: str,
     get_matches_func: Callable[[str], List[Any]],
     format_preview_func: Callable[[List[Any]], List[Dict[str, Any]]],
-    preview_title: str = "Preview Matches"
 ) -> Optional[List[Any]]:
     """
     Quick preview helper for pattern-based bulk operations
@@ -213,7 +212,6 @@ def quick_bulk_preview(
         query_pattern: The search pattern entered by user
         get_matches_func: Function that takes pattern and returns matching items
         format_preview_func: Function that formats items for preview table
-        preview_title: Title for the preview section
 
     Returns:
         List of matching items or None

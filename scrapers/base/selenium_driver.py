@@ -69,7 +69,7 @@ class SeleniumDriver:
         """Context manager entry - setup and return driver"""
         return self.setup()
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, _exc_type, _exc_val, _exc_tb):
         """Context manager exit - cleanup driver"""
         self.cleanup()
 

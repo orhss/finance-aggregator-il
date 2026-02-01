@@ -77,7 +77,6 @@ def mobile_card(
 def responsive_metrics(
     metrics: List[dict],
     desktop_columns: int = 4,
-    mobile_columns: int = 2
 ) -> None:
     """
     Display metrics in responsive grid
@@ -85,7 +84,6 @@ def responsive_metrics(
     Args:
         metrics: List of metric dicts with keys: label, value, delta
         desktop_columns: Number of columns on desktop
-        mobile_columns: Number of columns on mobile (used for column calculation)
 
     Example:
         responsive_metrics([
@@ -106,14 +104,12 @@ def responsive_metrics(
 
 
 def responsive_table_config(
-    hide_on_mobile: Optional[List[str]] = None,
     truncate_on_mobile: Optional[dict] = None
 ) -> dict:
     """
     Generate responsive table configuration
 
     Args:
-        hide_on_mobile: List of column names to hide on mobile
         truncate_on_mobile: Dict of {column_name: max_length} for mobile truncation
 
     Returns:
@@ -121,16 +117,11 @@ def responsive_table_config(
 
     Example:
         config = responsive_table_config(
-            hide_on_mobile=["Account", "Institution"],
             truncate_on_mobile={"Description": 30}
         )
         st.dataframe(df, column_config=config)
     """
     config = {}
-
-    # Note: Streamlit doesn't have built-in responsive column hiding
-    # This returns configuration structure for future use
-    # For now, we recommend using column selection in table customization
 
     if truncate_on_mobile:
         for col, max_len in truncate_on_mobile.items():
@@ -217,17 +208,12 @@ def compact_form(
     return None
 
 
-def responsive_tabs(
-    tabs: List[str],
-    use_expanders_on_mobile: bool = False
-) -> List:
+def responsive_tabs(tabs: List[str]) -> List:
     """
-    Create responsive tabs that can convert to expanders on mobile
+    Create responsive tabs (wrapper for st.tabs)
 
     Args:
         tabs: List of tab names
-        use_expanders_on_mobile: If True, suggests using expanders for mobile
-                                  (Note: Streamlit tabs work well on mobile already)
 
     Returns:
         List of tab objects
@@ -237,24 +223,19 @@ def responsive_tabs(
         with tabs[0]:
             st.write("Overview content")
     """
-    # Streamlit's native tabs are already responsive
-    # This is a semantic wrapper for consistency
     return st.tabs(tabs)
 
 
-def hide_on_mobile(content_func, placeholder_text: Optional[str] = None):
+def hide_on_mobile(content_func):
     """
     Conditionally hide content on mobile (conceptual helper)
 
-    Note: Streamlit doesn't provide device detection, so this is a placeholder
-    for future implementation. Consider using st.expander for optional content.
+    Note: Streamlit doesn't provide device detection, so this just renders content.
+    Consider using st.expander for optional content.
 
     Args:
         content_func: Function that renders content
-        placeholder_text: Text to show instead on mobile
     """
-    # For now, always show content
-    # Future: Could use custom component for device detection
     content_func()
 
 

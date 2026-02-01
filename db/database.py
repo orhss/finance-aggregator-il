@@ -30,7 +30,7 @@ def get_database_url(db_path: Path = DEFAULT_DB_PATH) -> str:
     return f"sqlite:///{db_path}"
 
 
-def enable_foreign_keys(dbapi_conn, connection_record):
+def enable_foreign_keys(dbapi_conn, _connection_record):
     """Enable foreign key constraints for SQLite"""
     cursor = dbapi_conn.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
