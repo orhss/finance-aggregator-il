@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-02-06 21:15
+# Auto-generated: 2026-02-06 22:05
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -67,12 +67,12 @@ scrapers → services → db → cli/streamlit_app
 
 ## services/ - Services package for data synchronization and anal
 - services/analytics_service.py: class:AnalyticsService
-- services/base_service.py: class:BaseSyncService
-- services/broker_service.py: class:BrokerSyncResult,BrokerService
+- services/base_service.py: class:SessionMixin,SyncResult,BaseSyncService
+- services/broker_service.py: class:BrokerService
 - services/budget_service.py: class:BudgetService
 - services/category_service.py: class:CategoryService
-- services/credit_card_service.py: class:CreditCardSyncResult,CreditCardService
-- services/pension_service.py: class:PensionSyncResult,PensionService
+- services/credit_card_service.py: class:CreditCardService
+- services/pension_service.py: class:PensionService
 - services/rules_service.py: class:MatchType,Rule,RulesService
 - services/tag_service.py: class:TagService
 
@@ -119,6 +119,7 @@ scrapers → services → db → cli/streamlit_app
 - tests/scrapers/credit_cards/test_shared_helpers.py: class:MockTransaction,TestIterateMonths,TestCalculateDateRange,TestFilterTransactionsByDate,TestExtractInstallments
 - tests/scrapers/credit_cards/test_shared_models.py: class:TestTransactionStatus,TestTransactionType,TestInstallments,TestTransaction,TestCardAccount
 - tests/services/test_analytics_service.py: fn:analytics_service,sample_account,test_get_all_accounts_empty,test_get_all_accounts_returns_all,test_get_all_accounts_active_filter
+- tests/services/test_base_service.py: class:TestSyncResult,TestBaseSyncService,TestSessionMixin
 - tests/services/test_category_service.py: fn:category_service,sample_account,sample_mapping,sample_merchant_mapping,test_normalize_category_happy_flow
 - tests/services/test_rules_service.py: fn:temp_rules_file,rules_service,sample_account,test_rule_matches_match_types,test_rule_matches_regex
 - tests/smoke/test_imports.py: fn:test_cli_main_imports,test_cli_commands_import,test_cli_tui_imports,test_services_import,test_models_import
