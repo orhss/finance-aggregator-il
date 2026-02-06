@@ -17,7 +17,18 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-from scrapers.base.selenium_driver import SeleniumDriver, DriverConfig
+from scrapers.base.selenium_driver import DriverConfig
+from scrapers.credit_cards.base_scraper import BaseCreditCardScraper
+from scrapers.credit_cards.shared_models import (
+    TransactionStatus,
+    TransactionType,
+    Installments,
+    Transaction,
+    MaxScraperError,
+    MaxLoginError,
+    MaxAPIError,
+)
+from scrapers.credit_cards.shared_helpers import get_cookies, extract_installments
 
 logger = logging.getLogger(__name__)
 
@@ -30,19 +41,7 @@ class MaxCredentials:
     password: str
 
 
-# Transaction Enums and Models
-class TransactionStatus(Enum):
-    """Transaction status"""
-    PENDING = "pending"
-    COMPLETED = "completed"
-
-
-class TransactionType(Enum):
-    """Transaction type"""
-    NORMAL = "normal"  # Regular charge
-    INSTALLMENTS = "installments"  # Payment plan
-
-
+# Max-specific enums
 class MaxPlanName(Enum):
     """Max transaction plan type names"""
     NORMAL = "רגילה"
@@ -70,54 +69,13 @@ class MaxPlanName(Enum):
 
 
 @dataclass
-class Installments:
-    """Installment information"""
-    number: int  # Current installment number
-    total: int  # Total number of installments
-
-
-@dataclass
-class Transaction:
-    """Standardized transaction model"""
-    date: str  # ISO format transaction date
-    processed_date: str  # ISO format processing/debit date
-    original_amount: float  # Original transaction amount
-    original_currency: str  # Original currency
-    charged_amount: float  # Amount charged in account currency
-    charged_currency: Optional[str]  # Account currency (None for pending)
-    description: str  # Merchant name
-    status: TransactionStatus
-    transaction_type: TransactionType
-    identifier: Optional[str] = None  # Transaction ID (ARN)
-    memo: Optional[str] = None
-    category: Optional[str] = None
-    installments: Optional[Installments] = None
-
-
-@dataclass
 class CardAccount:
-    """Card account with transactions"""
+    """Card account with transactions."""
     account_number: str  # Card number (short)
     transactions: List[Transaction]
 
 
-# Exceptions
-class MaxScraperError(Exception):
-    """Base exception for Max scraper errors"""
-    pass
-
-
-class MaxLoginError(MaxScraperError):
-    """Login failed"""
-    pass
-
-
-class MaxAPIError(MaxScraperError):
-    """API request failed"""
-    pass
-
-
-class MaxCreditCardScraper:
+class MaxCreditCardScraper(BaseCreditCardScraper['MaxCredentials', 'CardAccount']):
     """
     Automated scraper for Max credit card transactions.
 
@@ -143,26 +101,8 @@ class MaxCreditCardScraper:
     CURRENCY_EUR = 978
 
     def __init__(self, credentials: MaxCredentials, headless: bool = True):
-        self.credentials = credentials
-        self.headless = headless
-        self._selenium_driver: Optional[SeleniumDriver] = None
-        self.driver = None  # Will be set by setup_driver
+        super().__init__(credentials, headless)
         self.categories: Dict[int, str] = {}
-
-    def setup_driver(self):
-        """Setup Chrome WebDriver using centralized SeleniumDriver"""
-        config = DriverConfig(headless=self.headless)
-        self._selenium_driver = SeleniumDriver(config)
-        self.driver = self._selenium_driver.setup()
-
-    def cleanup(self):
-        """Clean up resources"""
-        logger.debug("Starting cleanup process...")
-        if self._selenium_driver:
-            self._selenium_driver.cleanup()
-            self._selenium_driver = None
-        self.driver = None
-        logger.debug("Cleanup completed")
 
     def wait_for_element(self, selector: str, timeout: int = 10, clickable: bool = False):
         """Wait for element to be present or clickable"""
@@ -275,18 +215,15 @@ class MaxCreditCardScraper:
         except Exception as e:
             raise MaxLoginError(f"Login failed: {e}")
 
-    def get_cookies(self) -> Dict[str, str]:
-        """Get cookies as dictionary"""
-        cookies = {}
-        for cookie in self.driver.get_cookies():
-            cookies[cookie['name']] = cookie['value']
-        return cookies
+    def get_cookies_dict(self) -> Dict[str, str]:
+        """Get cookies as dictionary using shared helper"""
+        return get_cookies(self.driver)
 
     def load_categories(self):
         """Load transaction categories from API"""
         try:
             logger.debug("Loading categories...")
-            cookies = self.get_cookies()
+            cookies = self.get_cookies_dict()
 
             response = requests.get(
                 self.CATEGORIES_ENDPOINT,
@@ -353,7 +290,7 @@ class MaxCreditCardScraper:
         try:
             logger.debug(f"Fetching transactions for {month}/{year}...")
             url = self.get_transactions_url(month, year)
-            cookies = self.get_cookies()
+            cookies = self.get_cookies_dict()
 
             response = requests.get(url, cookies=cookies, timeout=30)
             response.raise_for_status()
@@ -440,21 +377,8 @@ class MaxCreditCardScraper:
                 return TransactionType.NORMAL
 
     def _get_installments_info(self, comments: str) -> Optional[Installments]:
-        """Extract installment info from comments"""
-        if not comments:
-            return None
-
-        # Extract numbers from comments (e.g., "תשלום 2 מתוך 12")
-        import re
-        matches = re.findall(r'\d+', comments)
-
-        if len(matches) >= 2:
-            return Installments(
-                number=int(matches[0]),
-                total=int(matches[1])
-            )
-
-        return None
+        """Extract installment info from comments using shared helper"""
+        return extract_installments(comments)
 
     def _get_charged_currency(self, currency_id: Optional[int]) -> Optional[str]:
         """Convert currency ID to currency code"""
@@ -618,37 +542,6 @@ class MaxCreditCardScraper:
             ))
 
         return accounts
-
-    def scrape(
-        self,
-        start_date: Optional[datetime] = None,
-        months_back: int = 12,
-        months_forward: int = 1
-    ) -> List[CardAccount]:
-        """
-        Complete scraping flow: login and fetch transactions.
-
-        Args:
-            start_date: Start date for fetching transactions
-            months_back: Number of months to fetch backwards (default: 12)
-            months_forward: Number of months to fetch forward (default: 1)
-
-        Returns:
-            List of CardAccount objects with transactions
-        """
-        try:
-            logger.info("Starting Max credit card scraper...")
-
-            # Login
-            self.login()
-
-            # Fetch transactions
-            accounts = self.fetch_transactions(start_date, months_back, months_forward)
-
-            return accounts
-
-        finally:
-            self.cleanup()
 
 
 def main():

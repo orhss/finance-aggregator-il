@@ -17,7 +17,18 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-from scrapers.base.selenium_driver import SeleniumDriver, DriverConfig
+from scrapers.base.selenium_driver import DriverConfig
+from scrapers.credit_cards.base_scraper import BaseCreditCardScraper
+from scrapers.credit_cards.shared_models import (
+    TransactionStatus,
+    TransactionType,
+    Installments,
+    Transaction,
+    CALScraperError,
+    CALLoginError,
+    CALAuthorizationError,
+    CALAPIError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,51 +41,13 @@ class CALCredentials:
     password: str
 
 
-# Transaction Enums and Models
-class TransactionStatus(Enum):
-    """Transaction status"""
-    PENDING = "pending"
-    COMPLETED = "completed"
-
-
-class TransactionType(Enum):
-    """Transaction type"""
-    NORMAL = "normal"  # Regular charge
-    INSTALLMENTS = "installments"  # Payment plan
-    CREDIT = "credit"  # Refund
-
-
+# CAL-specific enums
 class TrnTypeCode(Enum):
     """CAL transaction type codes"""
     REGULAR = "5"
     CREDIT = "6"
     INSTALLMENTS = "8"
     STANDING_ORDER = "9"
-
-
-@dataclass
-class Installments:
-    """Installment information"""
-    number: int  # Current installment number
-    total: int  # Total number of installments
-
-
-@dataclass
-class Transaction:
-    """Standardized transaction model"""
-    date: str  # ISO format transaction date
-    processed_date: str  # ISO format processing/debit date
-    original_amount: float  # Original transaction amount
-    original_currency: str  # Original currency
-    charged_amount: float  # Amount charged in account currency
-    charged_currency: Optional[str]  # Account currency (None for pending)
-    description: str  # Merchant name
-    status: TransactionStatus
-    transaction_type: TransactionType
-    identifier: Optional[str] = None  # Transaction ID (None for pending)
-    memo: Optional[str] = None
-    category: Optional[str] = None
-    installments: Optional[Installments] = None
 
 
 @dataclass
@@ -85,28 +58,7 @@ class CardAccount:
     transactions: List[Transaction]
 
 
-# Exceptions
-class CALScraperError(Exception):
-    """Base exception for CAL scraper errors"""
-    pass
-
-
-class CALLoginError(CALScraperError):
-    """Login failed"""
-    pass
-
-
-class CALAuthorizationError(CALScraperError):
-    """Authorization token extraction failed"""
-    pass
-
-
-class CALAPIError(CALScraperError):
-    """API request failed"""
-    pass
-
-
-class CALCreditCardScraper:
+class CALCreditCardScraper(BaseCreditCardScraper['CALCredentials', 'CardAccount']):
     """
     Automated scraper for CAL (Visa CAL) credit card transactions.
 
@@ -122,30 +74,16 @@ class CALCreditCardScraper:
     X_SITE_ID = "09031987-273E-2311-906C-8AF85B17C8D9"
 
     def __init__(self, credentials: CALCredentials, headless: bool = True):
-        self.credentials = credentials
-        self.headless = headless
-        self._selenium_driver: Optional[SeleniumDriver] = None
-        self.driver = None  # Will be set by setup_driver
+        super().__init__(credentials, headless)
         self.authorization_token: Optional[str] = None
         self.cards: List[Dict[str, str]] = []
 
-    def setup_driver(self):
-        """Setup Chrome WebDriver using centralized SeleniumDriver"""
-        config = DriverConfig(
+    def _create_driver_config(self) -> DriverConfig:
+        """CAL requires performance logging to capture authorization token."""
+        return DriverConfig(
             headless=self.headless,
-            enable_performance_logging=True  # Needed to capture authorization token
+            enable_performance_logging=True
         )
-        self._selenium_driver = SeleniumDriver(config)
-        self.driver = self._selenium_driver.setup()
-
-    def cleanup(self):
-        """Clean up resources"""
-        logger.debug("Starting cleanup process...")
-        if self._selenium_driver:
-            self._selenium_driver.cleanup()
-            self._selenium_driver = None
-        self.driver = None
-        logger.debug("Cleanup completed")
 
     def wait_for_iframe(self, timeout: int = 10) -> Any:
         """Wait for and switch to login iframe"""

@@ -4,7 +4,6 @@ Automated transaction extraction for Israeli Isracard credit cards
 """
 
 import logging
-import re
 import time
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
@@ -13,7 +12,19 @@ from enum import Enum
 
 from selenium.common.exceptions import TimeoutException
 
-from scrapers.base.selenium_driver import SeleniumDriver, DriverConfig
+from scrapers.base.selenium_driver import DriverConfig
+from scrapers.credit_cards.base_scraper import BaseCreditCardScraper
+from scrapers.credit_cards.shared_models import (
+    TransactionStatus,
+    TransactionType,
+    Installments,
+    Transaction,
+    IsracardScraperError,
+    IsracardLoginError,
+    IsracardAPIError,
+    IsracardChangePasswordError,
+)
+from scrapers.credit_cards.shared_helpers import get_cookies, extract_installments
 
 logger = logging.getLogger(__name__)
 
@@ -27,73 +38,15 @@ class IsracardCredentials:
     card_6_digits: str  # Last 6 digits of card
 
 
-# Transaction Enums and Models
-class TransactionStatus(Enum):
-    """Transaction status"""
-    COMPLETED = "completed"
-
-
-class TransactionType(Enum):
-    """Transaction type"""
-    NORMAL = "normal"  # Regular charge
-    INSTALLMENTS = "installments"  # Payment plan
-
-
-@dataclass
-class Installments:
-    """Installment information"""
-    number: int  # Current installment number
-    total: int  # Total number of installments
-
-
-@dataclass
-class Transaction:
-    """Standardized transaction model"""
-    date: str  # ISO format transaction date
-    processed_date: str  # ISO format processing/debit date
-    original_amount: float  # Original transaction amount
-    original_currency: str  # Original currency
-    charged_amount: float  # Amount charged in account currency
-    charged_currency: str  # Account currency
-    description: str  # Merchant name
-    status: TransactionStatus
-    transaction_type: TransactionType
-    identifier: Optional[int] = None  # Transaction ID
-    memo: Optional[str] = None
-    category: Optional[str] = None
-    installments: Optional[Installments] = None
-
-
 @dataclass
 class CardAccount:
-    """Card account with transactions"""
+    """Card account with transactions - Isracard uses index instead of card_unique_id"""
     account_number: str  # Card number
     index: int  # Card index for API calls
     transactions: List[Transaction]
 
 
-# Exceptions
-class IsracardScraperError(Exception):
-    """Base exception for Isracard scraper errors"""
-    pass
-
-
-class IsracardLoginError(IsracardScraperError):
-    """Login failed"""
-    pass
-
-
-class IsracardAPIError(IsracardScraperError):
-    """API request failed"""
-    pass
-
-
-class IsracardChangePasswordError(IsracardScraperError):
-    """Password change required"""
-    pass
-
-
-class IsracardCreditCardScraper:
+class IsracardCreditCardScraper(BaseCreditCardScraper['IsracardCredentials', 'CardAccount']):
     """
     Automated scraper for Isracard credit card transactions.
 
@@ -132,44 +85,29 @@ class IsracardCreditCardScraper:
             headless: Run browser in headless mode
             fetch_categories: Fetch additional category information (slower)
         """
-        self.credentials = credentials
+        super().__init__(credentials, headless)
         self.base_url = base_url
         self.company_code = company_code
-        self.headless = headless
         self.fetch_categories = fetch_categories
-        self._selenium_driver: Optional[SeleniumDriver] = None
-        self.driver = None  # Will be set by setup_driver
         self.services_url = f"{base_url}/services/ProxyRequestHandler.ashx"
 
-    def setup_driver(self):
-        """Setup Chrome WebDriver using centralized SeleniumDriver"""
-        config = DriverConfig(
+    def _create_driver_config(self) -> DriverConfig:
+        """Isracard requires Hebrew language support."""
+        return DriverConfig(
             headless=self.headless,
-            extra_arguments=['--lang=he-IL']  # Hebrew language support
+            extra_arguments=['--lang=he-IL']
         )
-        self._selenium_driver = SeleniumDriver(config)
-        self.driver = self._selenium_driver.setup()
 
+    def setup_driver(self) -> None:
+        """Setup driver with Isracard-specific timeouts."""
+        super().setup_driver()
         self.driver.implicitly_wait(10)
-        # Set script timeout for async operations (API calls)
         self.driver.set_script_timeout(30)
         logger.info("Chrome driver initialized successfully")
 
-    def cleanup(self):
-        """Clean up resources"""
-        logger.debug("Starting cleanup process...")
-        if self._selenium_driver:
-            self._selenium_driver.cleanup()
-            self._selenium_driver = None
-        self.driver = None
-        logger.debug("Cleanup completed")
-
-    def get_cookies(self) -> Dict[str, str]:
-        """Get cookies as dictionary"""
-        cookies = {}
-        for cookie in self.driver.get_cookies():
-            cookies[cookie['name']] = cookie['value']
-        return cookies
+    def get_cookies_dict(self) -> Dict[str, str]:
+        """Get cookies as dictionary using shared helper"""
+        return get_cookies(self.driver)
 
     def api_request(
             self,
@@ -442,18 +380,11 @@ class IsracardCreditCardScraper:
         return currency_str
 
     def get_installments_info(self, more_info: Optional[str]) -> Optional[Installments]:
-        """Extract installment information from moreInfo field"""
+        """Extract installment information from moreInfo field using shared helper"""
+        # Isracard-specific: only extract if keyword present
         if not more_info or self.INSTALLMENTS_KEYWORD not in more_info:
             return None
-
-        matches = re.findall(r'\d+', more_info)
-        if len(matches) >= 2:
-            return Installments(
-                number=int(matches[0]),
-                total=int(matches[1])
-            )
-
-        return None
+        return extract_installments(more_info)
 
     def get_transaction_type(self, more_info: Optional[str]) -> TransactionType:
         """Determine transaction type"""
@@ -501,9 +432,9 @@ class IsracardCreditCardScraper:
         )
         charged_currency = self.convert_currency(txn.get('currencyId', self.SHEKEL_CURRENCY))
 
-        # Get identifier
+        # Get identifier (keep as string for consistency with other scrapers)
         identifier_str = txn.get('voucherNumberRatzOutbound') if is_outbound else txn.get('voucherNumberRatz')
-        identifier = int(identifier_str) if identifier_str and identifier_str != '000000000' else None
+        identifier = identifier_str if identifier_str and identifier_str != '000000000' else None
 
         # Get description
         description = txn.get('fullSupplierNameOutbound') if is_outbound else txn.get('fullSupplierNameHeb', '')
@@ -830,37 +761,6 @@ class IsracardCreditCardScraper:
             accounts.append(account)
 
         return accounts
-
-    def scrape(
-            self,
-            start_date: Optional[datetime] = None,
-            months_back: int = 12,
-            months_forward: int = 1
-    ) -> List[CardAccount]:
-        """
-        Complete scraping flow: login and fetch transactions.
-
-        Args:
-            start_date: Start date for fetching transactions
-            months_back: Number of months to fetch backwards (default: 12)
-            months_forward: Number of months to fetch forward (default: 1)
-
-        Returns:
-            List of CardAccount objects with transactions
-        """
-        try:
-            logger.info("Starting Isracard credit card scraper...")
-
-            # Login
-            self.login()
-
-            # Fetch transactions
-            accounts = self.fetch_transactions(start_date, months_back, months_forward)
-
-            return accounts
-
-        finally:
-            self.cleanup()
 
 
 def main():
