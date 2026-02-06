@@ -16,8 +16,8 @@ import yaml
 from sqlalchemy.orm import Session
 
 from db.models import Transaction
-from db.database import get_db
 from services.tag_service import TagService
+from services.base_service import SessionMixin
 from config.settings import CONFIG_DIR
 
 logger = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ class Rule:
         )
 
 
-class RulesService:
+class RulesService(SessionMixin):
     """Service for managing and applying categorization rules"""
 
     def __init__(self, rules_file: Optional[Path] = None, session: Optional[Session] = None):
@@ -130,17 +130,10 @@ class RulesService:
             rules_file: Path to rules YAML file (default: ~/.fin/category_rules.yaml)
             session: SQLAlchemy session (if None, creates a new one)
         """
+        super().__init__(session=session)
         self.rules_file = rules_file or RULES_FILE
-        self._session = session
         self._rules: List[Rule] = []
         self._loaded = False
-
-    @property
-    def session(self) -> Session:
-        """Get or create session"""
-        if self._session is None:
-            self._session = next(get_db())
-        return self._session
 
     def _ensure_loaded(self) -> None:
         """Ensure rules are loaded from file"""

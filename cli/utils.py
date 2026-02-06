@@ -235,3 +235,50 @@ def fix_rtl(text: Optional[str]) -> str:
         return get_display(text)
 
     return text
+
+
+# ==================== Amount Formatting Utilities ====================
+
+def format_amount(amount: float, currency: str = "₪", colored: bool = True) -> str:
+    """
+    Format amount with optional color (red negative, green positive).
+
+    Args:
+        amount: Numeric amount to format
+        currency: Currency symbol (default: ₪)
+        colored: Whether to apply Rich color markup (default: True)
+
+    Returns:
+        Formatted string like "₪1,234.56" or "[green]₪1,234.56[/green]"
+    """
+    formatted = f"{currency}{abs(amount):,.2f}"
+    if amount < 0:
+        formatted = f"-{formatted}"
+
+    if not colored:
+        return formatted
+
+    color = "red" if amount < 0 else "green"
+    return f"[{color}]{formatted}[/{color}]"
+
+
+def format_status(status: str) -> str:
+    """
+    Format status with appropriate color.
+
+    Args:
+        status: Status string (success, failed, pending, completed, etc.)
+
+    Returns:
+        Rich-formatted string with color markup
+    """
+    colors = {
+        "success": "green",
+        "failed": "red",
+        "pending": "yellow",
+        "completed": "green",
+        "in_progress": "yellow",
+        "error": "red",
+    }
+    color = colors.get(status.lower(), "white")
+    return f"[{color}]{status}[/{color}]"

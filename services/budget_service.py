@@ -10,38 +10,16 @@ from typing import Optional, Dict, Any
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from db.models import Budget, Transaction
-from db.database import get_db
 from db.query_utils import effective_amount_expr
+from services.base_service import SessionMixin
 
 logger = logging.getLogger(__name__)
 
 
-class BudgetService:
+class BudgetService(SessionMixin):
     """
     Service for managing monthly budgets.
     """
-
-    def __init__(self, session: Optional[Session] = None):
-        """
-        Initialize budget service.
-
-        Args:
-            session: SQLAlchemy session (if None, creates a new one)
-        """
-        self._session = session
-        self._owns_session = session is None
-
-    @property
-    def session(self) -> Session:
-        """Get or create session"""
-        if self._session is None:
-            self._session = next(get_db())
-        return self._session
-
-    def close(self):
-        """Close session if owned"""
-        if self._owns_session and self._session:
-            self._session.close()
 
     # ==================== Budget CRUD ====================
 

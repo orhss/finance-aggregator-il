@@ -9,33 +9,16 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy import func, distinct
 from sqlalchemy.orm import Session
 from db.models import CategoryMapping, MerchantMapping, Transaction, Account
-from db.database import get_db
 from config.constants import Institution
+from services.base_service import SessionMixin
 
 logger = logging.getLogger(__name__)
 
 
-class CategoryService:
+class CategoryService(SessionMixin):
     """
     Service for managing category mappings and normalization.
     """
-
-    def __init__(self, session: Optional[Session] = None):
-        """
-        Initialize category service.
-
-        Args:
-            session: SQLAlchemy session (if None, creates a new one)
-        """
-        self._session = session
-        self._owns_session = session is None
-
-    @property
-    def session(self) -> Session:
-        """Get or create session"""
-        if self._session is None:
-            self._session = next(get_db())
-        return self._session
 
     # ==================== Core Normalization ====================
 

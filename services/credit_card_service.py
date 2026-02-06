@@ -9,7 +9,7 @@ from typing import Optional, List, Dict, Any, Tuple
 from db.models import Account, Transaction as DBTransaction
 from config.constants import AccountType, Institution, SyncType
 from config.settings import get_card_holder_name
-from services.base_service import BaseSyncService
+from services.base_service import BaseSyncService, SyncResult
 from services.tag_service import TagService
 from services.category_service import CategoryService
 from scrapers.credit_cards.cal_credit_card_client import (
@@ -28,19 +28,6 @@ from scrapers.credit_cards.isracard_credit_card_client import (
     IsracardCredentials,
     IsracardScraperError
 )
-
-
-class CreditCardSyncResult:
-    """Result of a credit card sync operation"""
-
-    def __init__(self):
-        self.success = False
-        self.cards_synced = 0
-        self.transactions_added = 0
-        self.transactions_updated = 0
-        self.error_message: Optional[str] = None
-        self.sync_history_id: Optional[int] = None
-        self.unmapped_categories: List[Dict[str, Any]] = []  # [{raw_category, count}, ...]
 
 
 class CreditCardService(BaseSyncService):
@@ -87,7 +74,7 @@ class CreditCardService(BaseSyncService):
         months_back: int = 3,
         months_forward: int = 1,
         headless: bool = True
-    ) -> CreditCardSyncResult:
+    ) -> SyncResult:
         """
         Sync CAL credit card data.
 
@@ -99,9 +86,9 @@ class CreditCardService(BaseSyncService):
             headless: Run browser in headless mode (default: True)
 
         Returns:
-            CreditCardSyncResult with sync operation details
+            SyncResult with sync operation details
         """
-        result = CreditCardSyncResult()
+        result = SyncResult()
         self._reset_category_tracking(Institution.CAL)
 
         try:
@@ -156,7 +143,7 @@ class CreditCardService(BaseSyncService):
         months_back: int = 3,
         months_forward: int = 1,
         headless: bool = True
-    ) -> CreditCardSyncResult:
+    ) -> SyncResult:
         """
         Sync Max credit card data.
 
@@ -168,9 +155,9 @@ class CreditCardService(BaseSyncService):
             headless: Run browser in headless mode (default: True)
 
         Returns:
-            CreditCardSyncResult with sync operation details
+            SyncResult with sync operation details
         """
-        result = CreditCardSyncResult()
+        result = SyncResult()
         self._reset_category_tracking(Institution.MAX)
 
         try:
@@ -225,7 +212,7 @@ class CreditCardService(BaseSyncService):
         months_back: int = 3,
         months_forward: int = 1,
         headless: bool = True
-    ) -> CreditCardSyncResult:
+    ) -> SyncResult:
         """
         Sync Isracard credit card data.
 
@@ -237,9 +224,9 @@ class CreditCardService(BaseSyncService):
             headless: Run browser in headless mode (default: True)
 
         Returns:
-            CreditCardSyncResult with sync operation details
+            SyncResult with sync operation details
         """
-        result = CreditCardSyncResult()
+        result = SyncResult()
         self._reset_category_tracking(Institution.ISRACARD)
 
         try:

@@ -4,12 +4,94 @@ Provides transaction management and shared methods for all sync services.
 """
 
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime, date
-from typing import Optional, Generator
+from typing import Optional, Generator, List, Dict, Any
 from sqlalchemy.orm import Session
 
 from db.models import Account, Balance, SyncHistory
+from db.database import get_db
 from config.constants import SyncStatus
+
+
+class SessionMixin:
+    """
+    Mixin providing session management for services.
+
+    Provides lazy session creation and proper cleanup. Use for services
+    that don't inherit from BaseSyncService (e.g., CategoryService, TagService).
+
+    Usage:
+        class MyService(SessionMixin):
+            def do_something(self):
+                self.session.query(...)
+
+        # With external session (no cleanup needed)
+        service = MyService(session=existing_session)
+
+        # With auto-created session (call close() when done)
+        service = MyService()
+        try:
+            service.do_something()
+        finally:
+            service.close()
+    """
+
+    def __init__(self, session: Optional[Session] = None):
+        """
+        Initialize with optional session.
+
+        Args:
+            session: SQLAlchemy session (if None, creates one lazily)
+        """
+        self._session = session
+        self._owns_session = session is None
+
+    @property
+    def session(self) -> Session:
+        """Get or create session."""
+        if self._session is None:
+            self._session = next(get_db())
+        return self._session
+
+    def close(self):
+        """Close session if owned by this instance."""
+        if self._owns_session and self._session:
+            self._session.close()
+            self._session = None
+
+
+@dataclass
+class SyncResult:
+    """
+    Generic sync operation result.
+
+    Consolidates BrokerSyncResult, PensionSyncResult, and CreditCardSyncResult
+    into a single class with optional type-specific fields.
+
+    Usage:
+        result = SyncResult()
+        result.success = True
+        result.accounts_synced = 2
+        result.balances_added = 3
+    """
+
+    # Common fields
+    success: bool = False
+    error_message: Optional[str] = None
+    sync_history_id: Optional[int] = None
+
+    # Count fields (use appropriate ones based on sync type)
+    accounts_synced: int = 0
+    cards_synced: int = 0
+    balances_added: int = 0
+    balances_updated: int = 0
+    transactions_added: int = 0
+    transactions_updated: int = 0
+
+    # Type-specific optional fields
+    financial_data: Optional[Dict[str, Any]] = None  # Pension
+    unmapped_categories: List[Dict[str, Any]] = field(default_factory=list)  # Credit Card
 
 
 class BaseSyncService:
@@ -177,3 +259,32 @@ class BaseSyncService:
         )
         self.db.add(balance)
         return True
+
+    def get_balances_by_type(
+        self,
+        account_type: str,
+        institution: Optional[str] = None,
+        limit: int = 100
+    ) -> List[Balance]:
+        """
+        Get balances for a specific account type.
+
+        Args:
+            account_type: Type of account ('broker', 'pension', 'credit_card', 'savings')
+            institution: Optional institution filter
+            limit: Maximum number of records to return
+
+        Returns:
+            List of Balance model instances, ordered by date descending
+        """
+        query = self.db.query(Balance).join(Account)
+
+        query = query.filter(Account.account_type == account_type)
+
+        if institution:
+            query = query.filter(Account.institution == institution)
+
+        query = query.order_by(Balance.balance_date.desc())
+        query = query.limit(limit)
+
+        return query.all()

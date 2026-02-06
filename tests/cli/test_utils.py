@@ -229,3 +229,58 @@ class TestSpinner:
         with patch('cli.utils.Progress'):
             with spinner("Test...") as result:
                 assert result is None
+
+
+# ==================== Amount Formatting Tests ====================
+
+class TestFormatAmount:
+    """Tests for format_amount function."""
+
+    @pytest.mark.parametrize("amount,currency,colored,expected", [
+        pytest.param(1234.56, "₪", False, "₪1,234.56", id="positive_no_color"),
+        pytest.param(-1234.56, "₪", False, "-₪1,234.56", id="negative_no_color"),
+        pytest.param(0, "₪", False, "₪0.00", id="zero"),
+        pytest.param(1000000, "$", False, "$1,000,000.00", id="large_usd"),
+        pytest.param(99.9, "€", False, "€99.90", id="euro"),
+    ])
+    def test_format_amount_no_color(self, amount, currency, colored, expected):
+        """Should format amounts correctly without color."""
+        from cli.utils import format_amount
+        result = format_amount(amount, currency=currency, colored=colored)
+        assert result == expected
+
+    @pytest.mark.parametrize("amount,expected_color", [
+        pytest.param(100, "green", id="positive_is_green"),
+        pytest.param(-100, "red", id="negative_is_red"),
+    ])
+    def test_format_amount_with_color(self, amount, expected_color):
+        """Should apply correct colors based on amount sign."""
+        from cli.utils import format_amount
+        result = format_amount(amount, colored=True)
+        assert f"[{expected_color}]" in result
+        assert f"[/{expected_color}]" in result
+
+    def test_format_amount_default_currency(self):
+        """Should use ₪ as default currency."""
+        from cli.utils import format_amount
+        result = format_amount(100, colored=False)
+        assert result.startswith("₪")
+
+
+class TestFormatStatus:
+    """Tests for format_status function."""
+
+    @pytest.mark.parametrize("status,expected_color", [
+        pytest.param("success", "green", id="success"),
+        pytest.param("SUCCESS", "green", id="success_uppercase"),
+        pytest.param("completed", "green", id="completed"),
+        pytest.param("failed", "red", id="failed"),
+        pytest.param("pending", "yellow", id="pending"),
+        pytest.param("unknown", "white", id="unknown_default"),
+    ])
+    def test_format_status_colors(self, status, expected_color):
+        """Should apply correct color based on status."""
+        from cli.utils import format_status
+        result = format_status(status)
+        assert f"[{expected_color}]" in result
+        assert status in result

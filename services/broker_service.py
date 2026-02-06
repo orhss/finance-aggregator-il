@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from db.models import Account, Balance
 from config.constants import AccountType, Institution, SyncType
-from services.base_service import BaseSyncService
+from services.base_service import BaseSyncService, SyncResult
 from scrapers.brokers.excellence_broker_client import BrokerClientFactory
 from scrapers.base.broker_base import LoginCredentials, BrokerAPIError
 from scrapers.brokers.meitav_broker_client import (
@@ -16,18 +16,6 @@ from scrapers.brokers.meitav_broker_client import (
     MeitavCredentials,
     MeitavScraperError
 )
-
-
-class BrokerSyncResult:
-    """Result of a broker sync operation"""
-
-    def __init__(self):
-        self.success = False
-        self.accounts_synced = 0
-        self.balances_added = 0
-        self.balances_updated = 0
-        self.error_message: Optional[str] = None
-        self.sync_history_id: Optional[int] = None
 
 
 class BrokerService(BaseSyncService):
@@ -42,7 +30,7 @@ class BrokerService(BaseSyncService):
         password: str,
         headless: bool = True,
         currency: str = "ILS"
-    ) -> BrokerSyncResult:
+    ) -> SyncResult:
         """
         Sync Excellence broker data.
 
@@ -53,9 +41,9 @@ class BrokerService(BaseSyncService):
             currency: Currency for balance retrieval (default: ILS)
 
         Returns:
-            BrokerSyncResult with sync operation details
+            SyncResult with sync operation details
         """
-        result = BrokerSyncResult()
+        result = SyncResult()
         client = None
 
         try:
@@ -134,7 +122,7 @@ class BrokerService(BaseSyncService):
         password: str,
         headless: bool = True,
         currency: str = "ILS"
-    ) -> BrokerSyncResult:
+    ) -> SyncResult:
         """
         Sync Meitav broker data.
 
@@ -145,9 +133,9 @@ class BrokerService(BaseSyncService):
             currency: Currency for balance retrieval (default: ILS)
 
         Returns:
-            BrokerSyncResult with sync operation details
+            SyncResult with sync operation details
         """
-        result = BrokerSyncResult()
+        result = SyncResult()
 
         try:
             with self.sync_transaction(SyncType.BROKER, Institution.MEITAV) as sync_record:
@@ -214,16 +202,9 @@ class BrokerService(BaseSyncService):
         Returns:
             List of balance dictionaries
         """
-        query = self.db.query(Balance).join(Account)
-
-        if institution:
-            query = query.filter(Account.institution == institution)
-
-        query = query.filter(Account.account_type == AccountType.BROKER)
-        query = query.order_by(Balance.balance_date.desc())
-        query = query.limit(limit)
-
-        balances = query.all()
+        balances = self.get_balances_by_type(
+            AccountType.BROKER, institution=institution, limit=limit
+        )
 
         return [
             {

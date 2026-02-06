@@ -9,7 +9,7 @@ import re
 
 from db.models import Account, Balance
 from config.constants import AccountType, Institution, SyncType
-from services.base_service import BaseSyncService
+from services.base_service import BaseSyncService, SyncResult
 from scrapers.pensions.migdal_pension_client import (
     MigdalEmailMFARetriever,
     MigdalSeleniumMFAAutomator
@@ -19,19 +19,6 @@ from scrapers.pensions.phoenix_pension_client import (
     PhoenixSeleniumMFAAutomator
 )
 from scrapers.base.email_retriever import EmailConfig, MFAConfig
-
-
-class PensionSyncResult:
-    """Result of a pension sync operation"""
-
-    def __init__(self):
-        self.success = False
-        self.accounts_synced = 0
-        self.balances_added = 0
-        self.balances_updated = 0
-        self.error_message: Optional[str] = None
-        self.sync_history_id: Optional[int] = None
-        self.financial_data: Optional[Dict[str, Any]] = None
 
 
 class PensionService(BaseSyncService):
@@ -46,7 +33,7 @@ class PensionService(BaseSyncService):
         email_address: str,
         email_password: str,
         headless: bool = True
-    ) -> PensionSyncResult:
+    ) -> SyncResult:
         """
         Sync Migdal pension data.
 
@@ -57,9 +44,9 @@ class PensionService(BaseSyncService):
             headless: Run browser in headless mode (default: True)
 
         Returns:
-            PensionSyncResult with sync operation details
+            SyncResult with sync operation details
         """
-        result = PensionSyncResult()
+        result = SyncResult()
         automator = None
 
         try:
@@ -154,7 +141,7 @@ class PensionService(BaseSyncService):
         email_address: str,
         email_password: str,
         headless: bool = True
-    ) -> PensionSyncResult:
+    ) -> SyncResult:
         """
         Sync Phoenix pension data.
 
@@ -165,9 +152,9 @@ class PensionService(BaseSyncService):
             headless: Run browser in headless mode (default: True)
 
         Returns:
-            PensionSyncResult with sync operation details
+            SyncResult with sync operation details
         """
-        result = PensionSyncResult()
+        result = SyncResult()
         automator = None
 
         try:
@@ -322,16 +309,9 @@ class PensionService(BaseSyncService):
         Returns:
             List of balance dictionaries
         """
-        query = self.db.query(Balance).join(Account)
-
-        if institution:
-            query = query.filter(Account.institution == institution)
-
-        query = query.filter(Account.account_type == AccountType.PENSION)
-        query = query.order_by(Balance.balance_date.desc())
-        query = query.limit(limit)
-
-        balances = query.all()
+        balances = self.get_balances_by_type(
+            AccountType.PENSION, institution=institution, limit=limit
+        )
 
         return [
             {
