@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-02-06 20:31
+# Auto-generated: 2026-02-06 23:05
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -83,7 +83,7 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/components/cards.py: fn:get_tokens,get_base_card_css,render_card,render_metric_row,render_account_card
 - streamlit_app/components/charts.py: fn:spending_donut,trend_line,category_bar,balance_history,spending_by_day
 - streamlit_app/components/empty_states.py: fn:empty_transactions_state,empty_search_results,empty_accounts_state,empty_analytics_state,empty_dashboard_state
-- streamlit_app/components/filters.py: fn:date_range_filter,account_filter,institution_filter,status_filter,category_filter
+- streamlit_app/components/filters.py: fn:date_range_picker,account_filter,institution_filter,status_filter,category_filter
 - streamlit_app/components/heatmap.py: fn:calendar_heatmap,monthly_heatmap
 - streamlit_app/components/loading.py: class:ProgressTracker | fn:show_progress_steps,contextual_spinner,skeleton_table,skeleton_metrics,show_loading_message
 - streamlit_app/components/mobile_ui.py: fn:apply_mobile_css,hero_balance_card,summary_card,transaction_list,bottom_navigation
@@ -102,9 +102,9 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/utils/insights.py: fn:generate_spending_insight,generate_balance_insight,generate_pending_insight,generate_category_insight,get_time_greeting
 - streamlit_app/utils/mobile.py: fn:detect_mobile,render_mobile_toggle,is_mobile,mobile_page_config,force_mobile_mode
 - streamlit_app/utils/rtl.py: fn:has_hebrew,fix_rtl,format_description,mixed_rtl_ltr,clean_merchant_name
-- streamlit_app/utils/session.py: fn:format_amount_private,get_accounts_display,get_dashboard_stats_display,get_transactions_display,get_tags_display
+- streamlit_app/utils/session.py: fn:format_amount_private,get_accounts_display,init_session_state,get_analytics_service,get_tag_service
 - streamlit_app/views/accounts.py: fn:get_status_indicator,run_sync_in_thread,start_sync,init_sync_state,render_mobile_accounts
-- streamlit_app/views/analytics.py: fn:render_mobile_analytics,time_range_selector,render_desktop_analytics
+- streamlit_app/views/analytics.py: fn:render_mobile_analytics,render_desktop_analytics
 - streamlit_app/views/organize.py: Organize Page - Unified management for Categories, Rules, an
 - streamlit_app/views/settings.py: fn:render_theme_settings,render_privacy_settings,render_budget_settings,render_mobile_settings,render_desktop_settings
 - streamlit_app/views/transactions.py: fn:render_mobile_transactions,render_desktop_transactions
@@ -125,3 +125,4 @@ scrapers → services → db → cli/streamlit_app
 - tests/services/test_rules_service.py: fn:temp_rules_file,rules_service,sample_account,test_rule_matches_match_types,test_rule_matches_regex
 - tests/smoke/test_imports.py: fn:test_cli_main_imports,test_cli_commands_import,test_cli_tui_imports,test_services_import,test_models_import
 - tests/streamlit_app/test_analytics_helpers.py: class:TestGetPeriodOptions,TestTransactionsToDataframe,TestCalculateSpendingMetrics,TestGetSpendingByDayOfWeek
+- tests/streamlit_app/test_filters.py: class:TestDateRangePickerLogic

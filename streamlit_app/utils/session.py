@@ -3,10 +3,13 @@ Session state management for Streamlit application
 Handles service instances and shared state across pages
 """
 
+import logging
 import streamlit as st
 from typing import Optional
 from pathlib import Path
 import sys
+
+logger = logging.getLogger(__name__)
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -241,6 +244,7 @@ def get_all_categories() -> list[str]:
     Get all unique categories from transactions (user_category, normalized category, raw_category).
     Returns a sorted list of category names.
     """
+    from sqlalchemy.exc import SQLAlchemyError
     try:
         from db.database import get_session
         from db.models import Transaction
@@ -267,7 +271,12 @@ def get_all_categories() -> list[str]:
         categories.update([c[0] for c in raw_cats if c[0]])
 
         return sorted(list(categories))
+    except SQLAlchemyError as e:
+        logger.error(f"Database error fetching categories: {e}")
+        st.error("Failed to fetch categories from database")
+        return []
     except Exception as e:
+        logger.exception(f"Unexpected error fetching categories: {e}")
         st.error(f"Failed to fetch categories: {e}")
         return []
 
@@ -278,6 +287,7 @@ def get_unified_categories() -> list[str]:
     Get all unified category names from mappings.
     Returns a sorted list of unified category names.
     """
+    from sqlalchemy.exc import SQLAlchemyError
     try:
         from db.database import get_session
         from db.models import CategoryMapping
@@ -288,7 +298,12 @@ def get_unified_categories() -> list[str]:
             CategoryMapping.unified_category
         ).all()
         return [c[0] for c in cats if c[0]]
+    except SQLAlchemyError as e:
+        logger.error(f"Database error fetching unified categories: {e}")
+        st.error("Failed to fetch unified categories from database")
+        return []
     except Exception as e:
+        logger.exception(f"Unexpected error fetching unified categories: {e}")
         st.error(f"Failed to fetch unified categories: {e}")
         return []
 
@@ -299,6 +314,7 @@ def get_all_tags() -> list[str]:
     Get all tag names from the database.
     Returns a sorted list of tag names.
     """
+    from sqlalchemy.exc import SQLAlchemyError
     try:
         from db.database import get_session
         from db.models import Tag
@@ -306,6 +322,11 @@ def get_all_tags() -> list[str]:
         session = get_session()
         tags = session.query(Tag.name).order_by(Tag.name).all()
         return [tag[0] for tag in tags]
+    except SQLAlchemyError as e:
+        logger.error(f"Database error fetching tags: {e}")
+        st.error("Failed to fetch tags from database")
+        return []
     except Exception as e:
+        logger.exception(f"Unexpected error fetching tags: {e}")
         st.error(f"Failed to fetch tags: {e}")
         return []

@@ -8,7 +8,7 @@ from rich.table import Table
 from rich.prompt import Confirm
 
 from services.tag_service import TagService
-from cli.utils import fix_rtl
+from cli.utils import fix_rtl, print_success, print_error, print_warning, print_info
 
 app = typer.Typer(help="Manage transaction tags")
 console = Console()
@@ -28,7 +28,7 @@ def list_tags(
         untagged_total = tag_service.get_untagged_total()
 
         if not stats and untagged_count == 0:
-            console.print("[yellow]No tags found. Use 'fin-cli tags migrate' to auto-tag from categories.[/yellow]")
+            print_warning("No tags found. Use 'fin-cli tags migrate' to auto-tag from categories.")
             return
 
         # Sort stats
@@ -77,7 +77,7 @@ def list_tags(
         console.print(f"\n[dim]{total_tags} tags, {total_tagged} tagged transactions, {untagged_count} untagged[/dim]")
 
     except Exception as e:
-        console.print(f"[red]Error listing tags: {e}[/red]")
+        print_error(f"Error listing tags: {e}")
         raise typer.Exit(code=1)
 
 
@@ -95,31 +95,31 @@ def rename_tag(
         # Check if old tag exists
         old_tag = tag_service.get_tag_by_name(old_name)
         if not old_tag:
-            console.print(f"[red]Tag '{old_name}' not found[/red]")
+            print_error(f"Tag '{old_name}' not found")
             raise typer.Exit(code=1)
 
         # Check if merging
         new_tag = tag_service.get_tag_by_name(new_name)
         if new_tag and new_tag.id != old_tag.id:
             if not Confirm.ask(f"Tag '{new_name}' already exists. Merge '{old_name}' into it?"):
-                console.print("[yellow]Cancelled[/yellow]")
+                print_warning("Cancelled")
                 return
 
         success = tag_service.rename_tag(old_name, new_name)
 
         if success:
             if new_tag and new_tag.id != old_tag.id:
-                console.print(f"[green]Merged tag '{old_name}' into '{new_name}'[/green]")
+                print_success(f"Merged tag '{old_name}' into '{new_name}'")
             else:
-                console.print(f"[green]Renamed tag '{old_name}' to '{new_name}'[/green]")
+                print_success(f"Renamed tag '{old_name}' to '{new_name}'")
         else:
-            console.print(f"[red]Failed to rename tag[/red]")
+            print_error("Failed to rename tag")
             raise typer.Exit(code=1)
 
     except typer.Exit:
         raise
     except Exception as e:
-        console.print(f"[red]Error renaming tag: {e}[/red]")
+        print_error(f"Error renaming tag: {e}")
         raise typer.Exit(code=1)
 
 
@@ -137,7 +137,7 @@ def delete_tag(
         # Check if tag exists
         tag = tag_service.get_tag_by_name(name)
         if not tag:
-            console.print(f"[red]Tag '{name}' not found[/red]")
+            print_error(f"Tag '{name}' not found")
             raise typer.Exit(code=1)
 
         # Get stats for confirmation
@@ -147,21 +147,21 @@ def delete_tag(
 
         if not force:
             if not Confirm.ask(f"Delete tag '{name}'? ({count} transactions will be untagged)"):
-                console.print("[yellow]Cancelled[/yellow]")
+                print_warning("Cancelled")
                 return
 
         success = tag_service.delete_tag(name)
 
         if success:
-            console.print(f"[green]Deleted tag '{name}'[/green]")
+            print_success(f"Deleted tag '{name}'")
         else:
-            console.print(f"[red]Failed to delete tag[/red]")
+            print_error("Failed to delete tag")
             raise typer.Exit(code=1)
 
     except typer.Exit:
         raise
     except Exception as e:
-        console.print(f"[red]Error deleting tag: {e}[/red]")
+        print_error(f"Error deleting tag: {e}")
         raise typer.Exit(code=1)
 
 
@@ -175,12 +175,12 @@ def migrate_categories(
     try:
         tag_service = TagService()
 
-        console.print("[cyan]Scanning transactions for categories...[/cyan]")
+        print_info("Scanning transactions for categories...")
 
         results = tag_service.migrate_categories_to_tags(dry_run=dry_run)
 
         if not results:
-            console.print("[yellow]No transactions to migrate. All categories are already tagged or no categories exist.[/yellow]")
+            print_warning("No transactions to migrate. All categories are already tagged or no categories exist.")
             return
 
         # Display results
@@ -203,10 +203,10 @@ def migrate_categories(
         console.print(table)
 
         if dry_run:
-            console.print("\n[yellow]This was a dry run. Run without --dry-run to apply changes.[/yellow]")
+            print_warning("This was a dry run. Run without --dry-run to apply changes.")
         else:
-            console.print(f"\n[green]Successfully tagged {total} transactions across {len(results)} categories[/green]")
+            print_success(f"Successfully tagged {total} transactions across {len(results)} categories")
 
     except Exception as e:
-        console.print(f"[red]Error migrating categories: {e}[/red]")
+        print_error(f"Error migrating categories: {e}")
         raise typer.Exit(code=1)
