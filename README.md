@@ -2,15 +2,20 @@
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-Python automation framework for extracting financial data from Israeli institutions (brokers, pension funds, and credit cards).
+Python automation framework for extracting and managing financial data from Israeli institutions (brokers, pension funds, and credit cards).
 
 ## Features
 
 - **Multi-source support**: Brokers, pension funds, and credit card companies
+- **Multi-account support**: Multiple accounts per institution (e.g., personal + business cards)
 - **MFA automation**: Email-based MFA code retrieval and automated entry
-- **Selenium-based scraping**: Human-like browser automation
-- **API integration**: Direct API calls where available (CAL credit cards, Excellence broker)
-- **Standardized data models**: Unified transaction and balance models across all sources
+- **Hybrid scraping**: Selenium login + direct API calls for efficient data fetching
+- **Category normalization**: Unified categories across all providers with custom mappings
+- **Budget tracking**: Monthly budget goals with progress tracking
+- **Rules engine**: Auto-categorize and tag transactions based on patterns
+- **Streamlit Web UI**: Modern, mobile-friendly dashboard for viewing and managing data
+- **CLI & TUI**: Full command-line interface with interactive transaction browser
+- **Data export**: Export to CSV/JSON with filtering options
 
 ## Quick Start
 
@@ -35,12 +40,21 @@ fin-cli transactions list
 
 # 7. View statistics
 fin-cli reports stats
+
+# 8. Set up category mappings (optional)
+fin-cli categories analyze
+fin-cli categories setup
+
+# 9. Set a monthly budget (optional)
+fin-cli budget set 5000
+fin-cli budget show
 ```
 
 ## Supported Institutions
 
 ### Brokers
 - **Excellence (ExtradePro)** - REST API client
+- **Meitav** - REST API client
 
 ### Pension Funds
 - **Migdal** - Selenium + Email MFA
@@ -48,28 +62,68 @@ fin-cli reports stats
 
 ### Credit Cards
 - **CAL (Visa CAL)** - Hybrid Selenium login + API data fetching
+- **Max** - Hybrid Selenium login + API data fetching
+- **Isracard** - Hybrid Selenium login + API data fetching
 
 ## Project Structure
 
 ```
 Fin/
-├── scrapers/              # All scraper implementations
-│   ├── base/              # Abstract base classes
-│   │   ├── broker_base.py
-│   │   └── pension_base.py
-│   ├── brokers/           # Broker implementations
-│   │   └── excellence_broker_client.py
-│   ├── pensions/          # Pension fund implementations
-│   │   ├── migdal_pension_client.py
-│   │   └── phoenix_pension_client.py
-│   └── credit_cards/      # Credit card implementations
-│       └── cal_credit_card_client.py
-├── examples/              # Usage examples
-│   └── example_cal_usage.py
-├── .env                   # Environment variables (credentials)
+├── cli/                   # Command-line interface
+│   ├── commands/          # CLI command modules
+│   │   ├── accounts.py    # Account listing and details
+│   │   ├── budget.py      # Budget management
+│   │   ├── categories.py  # Category mapping and normalization
+│   │   ├── config.py      # Credential configuration
+│   │   ├── export.py      # CSV/JSON export
+│   │   ├── maintenance.py # Backup, cleanup, migrations
+│   │   ├── reports.py     # Analytics and reports
+│   │   ├── rules.py       # Auto-categorization rules
+│   │   ├── sync.py        # Data synchronization
+│   │   ├── tags.py        # Tag management
+│   │   └── transactions.py # Transaction queries
+│   ├── tui/               # Terminal UI (transaction browser)
+│   └── main.py            # CLI entry point
+├── config/                # Configuration management
+│   ├── constants.py       # Application constants
+│   └── settings.py        # Credentials and settings
+├── db/                    # Database layer
+│   ├── models.py          # SQLAlchemy models
+│   ├── database.py        # Database initialization
+│   └── migrations/        # Schema migrations
+├── services/              # Business logic layer
+│   ├── analytics_service.py   # Queries and reporting
+│   ├── budget_service.py      # Budget tracking
+│   ├── category_service.py    # Category normalization
+│   ├── credit_card_service.py # Credit card sync
+│   ├── broker_service.py      # Broker sync
+│   ├── pension_service.py     # Pension sync
+│   ├── rules_service.py       # Auto-categorization
+│   └── tag_service.py         # Tag management
+├── scrapers/              # Financial institution scrapers
+│   ├── base/              # Modular base components
+│   │   ├── broker_base.py     # REST API client base
+│   │   ├── email_retriever.py # IMAP MFA code retrieval
+│   │   ├── mfa_handler.py     # MFA code entry
+│   │   ├── pension_automator.py # Pension login flows
+│   │   ├── selenium_driver.py # WebDriver management
+│   │   └── web_actions.py     # Form filling, clicking
+│   ├── brokers/           # Excellence, Meitav
+│   ├── pensions/          # Migdal, Phoenix
+│   ├── credit_cards/      # CAL, Max, Isracard
+│   └── utils/             # Retry, smart waits
+├── streamlit_app/         # Web UI
+│   ├── views/             # Page views
+│   ├── components/        # Reusable UI components
+│   ├── utils/             # Formatting, caching
+│   └── app.py             # Main dashboard
+├── tests/                 # Test suite
+│   ├── services/          # Unit tests
+│   ├── integration/       # CLI integration tests
+│   └── smoke/             # Import smoke tests
+├── plans/                 # Implementation documentation
 ├── requirements.txt       # Python dependencies
-├── CLAUDE.md             # Development guide for Claude Code
-└── CLI_PLAN.md           # Planned CLI interface design
+└── CLAUDE.md              # Development guide
 ```
 
 ## Installation
@@ -104,11 +158,18 @@ Fin/
    fin-cli config setup
    ```
 
-   Or set individual credentials:
+   Or manage accounts individually:
    ```bash
-   fin-cli config set cal.username "myuser"
-   fin-cli config set cal.password "mypass"
+   # Add credit card accounts (supports multiple per institution)
+   fin-cli config add-account cal --username "user" --password "pass" --label "Personal"
+   fin-cli config add-account cal --username "user2" --password "pass2" --label "Business"
+
+   # List configured accounts
+   fin-cli config list-accounts cal
+
+   # Set email for MFA
    fin-cli config set email.address "user@gmail.com"
+   fin-cli config set email.password "app_password"
    ```
 
 ### Option 2: Docker Installation (Easy Deployment)
@@ -263,15 +324,34 @@ Bookmark the page for quick access, or add to your home screen:
    EXCELLENCE_USERNAME=your_username
    EXCELLENCE_PASSWORD=your_password
 
+   # Meitav Broker
+   MEITAV_USERNAME=your_username
+   MEITAV_PASSWORD=your_password
+
    # Migdal Pension
    MIGDAL_USER_ID=your_id
 
    # Phoenix Pension
    PHOENIX_USER_ID=your_id
 
-   # CAL Credit Card
+   # Credit Cards (single account)
    CAL_USERNAME=your_username
    CAL_PASSWORD=your_password
+
+   MAX_USERNAME=your_username
+   MAX_PASSWORD=your_password
+
+   ISRACARD_USERNAME=your_username
+   ISRACARD_PASSWORD=your_password
+
+   # Credit Cards (multi-account, numbered)
+   CAL_1_USERNAME=personal_user
+   CAL_1_PASSWORD=personal_pass
+   CAL_1_LABEL=Personal
+
+   CAL_2_USERNAME=business_user
+   CAL_2_PASSWORD=business_pass
+   CAL_2_LABEL=Business
 
    # Email (for MFA)
    USER_EMAIL=your_email@gmail.com
@@ -307,9 +387,17 @@ fin-cli sync all
 
 # Sync specific institution
 fin-cli sync cal          # CAL credit card
+fin-cli sync max          # Max credit card
+fin-cli sync isracard     # Isracard credit card
 fin-cli sync excellence   # Excellence broker
-fin-cli sync migdal      # Migdal pension
-fin-cli sync phoenix     # Phoenix pension
+fin-cli sync meitav       # Meitav broker
+fin-cli sync migdal       # Migdal pension
+fin-cli sync phoenix      # Phoenix pension
+
+# Sync specific accounts (multi-account support)
+fin-cli sync cal --account 0              # By index
+fin-cli sync cal --account personal       # By label
+fin-cli sync cal -a 0 -a 2                # Multiple accounts
 ```
 
 #### Query Accounts
@@ -397,11 +485,69 @@ fin-cli export transactions --from 2024-01-01 --to 2024-12-31 --output txns_2024
 fin-cli export transactions --account 1 --status pending --output pending.json
 ```
 
+#### Category Management
+```bash
+# Analyze category coverage
+fin-cli categories analyze
+
+# Interactive setup wizard
+fin-cli categories setup
+
+# List all mappings
+fin-cli categories list
+fin-cli categories list --provider cal
+
+# Show unmapped categories
+fin-cli categories unmapped
+
+# Map a category
+fin-cli categories map cal "מזון" groceries
+
+# Merchant pattern mappings (for Isracard, etc.)
+fin-cli categories suggest                    # Show uncategorized by merchant
+fin-cli categories assign-wizard              # Interactive merchant categorization
+fin-cli categories merchants                  # List saved merchant mappings
+```
+
+#### Budget Management
+```bash
+# View current month's budget progress
+fin-cli budget show
+
+# Set monthly budget
+fin-cli budget set 5000
+
+# Delete budget
+fin-cli budget delete
+```
+
+#### Rules and Tags
+```bash
+# List auto-categorization rules
+fin-cli rules list
+
+# Add a rule
+fin-cli rules add "wolt" --category food_delivery --tags delivery
+
+# Apply rules to existing transactions
+fin-cli rules apply
+
+# List all tags
+fin-cli tags list
+
+# Rename or delete tags
+fin-cli tags rename "old_tag" "new_tag"
+fin-cli tags delete "unused_tag"
+```
+
 #### Maintenance Commands
 ```bash
 # Create database backup
 fin-cli maintenance backup
 fin-cli maintenance backup --output /path/to/backup.db
+
+# Apply database migrations
+fin-cli maintenance migrate
 
 # Clean old data
 fin-cli maintenance cleanup --older-than 365
@@ -412,34 +558,75 @@ fin-cli maintenance cleanup --older-than 90 --yes       # Skip confirmation
 fin-cli maintenance verify
 ```
 
+#### Transaction Browser (TUI)
+```bash
+# Launch interactive transaction browser
+fin-cli transactions browse
+
+# Browse with filters
+fin-cli transactions browse --from 2024-01-01 --to 2024-12-31
+fin-cli transactions browse --account 1
+```
+
+**Keybindings:**
+- `j/k` or `↑/↓` - Navigate transactions
+- `Enter` - View details
+- `e` - Edit category
+- `t` - Add/remove tags
+- `/` - Search
+- `q` - Quit
+
+### Streamlit Web UI
+
+Launch the web dashboard:
+```bash
+# Direct launch
+streamlit run streamlit_app/app.py
+
+# With network access
+streamlit run streamlit_app/app.py --server.address=0.0.0.0
+
+# Or use the helper script
+./scripts/run_server.sh
+```
+
+**Features:**
+- Dashboard with balance overview and spending charts
+- Transaction list with filtering and search
+- Analytics with category breakdown and trends
+- Category mapping management
+- Mobile-friendly responsive design
+- Privacy mode (mask balances)
+
 ### Programmatic Usage
 
 You can also use the scrapers directly in Python code:
 
-#### CAL Credit Card Scraper
+#### Credit Card Scrapers (CAL, Max, Isracard)
 
 ```python
-from scrapers.credit_cards import CALCreditCardScraper, CALCredentials
+from scrapers.credit_cards.cal_credit_card_client import CALCreditCardScraper, CALCredentials
+# Also available: MaxCreditCardScraper, IsracardCreditCardScraper
 
 credentials = CALCredentials(
     username="your_username",
     password="your_password"
 )
 
-scraper = CALCreditCardScraper(credentials, headless=True)
-accounts = scraper.scrape(months_back=3)
+with CALCreditCardScraper(credentials, headless=True) as scraper:
+    accounts = scraper.scrape(months_back=3)
 
-for account in accounts:
-    print(f"Card {account.account_number}: {len(account.transactions)} transactions")
-    for txn in account.transactions:
-        print(f"  {txn.date[:10]} | {txn.description} | {txn.charged_amount}")
+    for account in accounts:
+        print(f"Card {account.card_number}: {len(account.transactions)} transactions")
+        for txn in account.transactions:
+            print(f"  {txn.transaction_date} | {txn.description} | {txn.charged_amount}")
 ```
 
-### Excellence Broker
+### Broker Clients (Excellence, Meitav)
 
 ```python
-from scrapers.brokers import ExtraDeProAPIClient
-from scrapers.base import LoginCredentials
+from scrapers.brokers.excellence_broker_client import ExtraDeProAPIClient
+from scrapers.base.broker_base import LoginCredentials
 
 credentials = LoginCredentials(
     user="your_username",
@@ -454,11 +641,11 @@ print(f"Total: {balance.total_amount}, P/L: {balance.profit_loss}")
 client.logout()
 ```
 
-### Migdal Pension
+### Pension Scrapers (Migdal, Phoenix)
 
 ```python
-from scrapers.pensions import MigdalEmailMFARetriever, MigdalSeleniumMFAAutomator
-from scrapers.base import EmailConfig, MFAConfig
+from scrapers.pensions.migdal_pension_client import MigdalEmailMFARetriever, MigdalSeleniumMFAAutomator
+from scrapers.base.email_retriever import EmailConfig, MFAConfig
 
 email_config = EmailConfig(
     email_address="your_email@gmail.com",
@@ -470,22 +657,14 @@ mfa_config = MFAConfig(
     code_pattern=r'\b\d{6}\b'
 )
 
-retriever = MigdalEmailMFARetriever(email_config, mfa_config)
-automator = MigdalSeleniumMFAAutomator(retriever, headless=False)
-
-financial_data = automator.execute(
-    site_url="https://my.migdal.co.il/mymigdal/process/login",
-    credentials={'id': 'your_id'},
-    selectors={
-        'id_selector': '#username',
-        'login_button_selector': 'button[type="submit"]',
-        'email_label_selector': 'label[for="otpToEmail"]',
-        'continue_button_selector': 'button.form-btn'
-    }
-)
-
-print(f"Pension balance: {financial_data.get('pension_balance')}")
-automator.cleanup()
+with MigdalSeleniumMFAAutomator(
+    user_id="your_id",
+    email_config=email_config,
+    mfa_config=mfa_config,
+    headless=False
+) as automator:
+    financial_data = automator.login_and_extract()
+    print(f"Pension balance: {financial_data.get('pension_balance')}")
 ```
 
 ## Examples
@@ -495,40 +674,59 @@ See the `examples/` folder for complete, runnable examples:
 
 ## CLI Implementation Status
 
-The unified CLI interface is feature-complete:
-- ✅ **Phase 1**: Database initialization and credential management
-- ✅ **Phase 2**: Data synchronization for all institutions
-- ✅ **Phase 3**: Querying, reporting, and analytics
-- ✅ **Phase 4**: Data export (CSV/JSON) and maintenance commands
-- 📋 **Phase 5**: Testing and polish (in progress)
+The unified CLI interface is **feature-complete**:
+- ✅ Database initialization and credential management
+- ✅ Data synchronization for all institutions (with multi-account support)
+- ✅ Querying, reporting, and analytics
+- ✅ Data export (CSV/JSON) and maintenance commands
+- ✅ Category normalization and merchant mappings
+- ✅ Budget tracking
+- ✅ Rules engine and tagging
+- ✅ Interactive transaction browser (TUI)
+- ✅ Unit and integration tests
 
-See `CLI_PLAN.md` for detailed implementation status and future enhancements.
+See `plans/` directory for architecture documentation.
 
 ## Architecture
 
 ### Design Patterns
 
-- **Abstract Base Classes**: `BrokerAPIClient`, `EmailMFARetrieverBase`, `SeleniumMFAAutomatorBase`
+- **Modular Composition**: Scraper components (driver, web actions, MFA handler) composed at runtime
 - **Strategy Pattern**: Separate retriever and automator classes for different MFA flows
-- **Template Method**: Base classes define automation flow structure
-- **Hybrid Approach**: Selenium for login + direct API calls for data (CAL scraper)
+- **Service Layer**: Business logic separated from scrapers and UI
+- **Hybrid Scraping**: Selenium for login + direct API calls for data fetching
 
 ### Key Components
 
-1. **Base Layer** (`scrapers/base/`):
-   - Abstract interfaces for all scraper types
-   - Common DTOs and exceptions
+1. **Scraper Layer** (`scrapers/`):
+   - **Base components**: `SeleniumDriver`, `WebActions`, `MFAHandler`, `EmailMFARetriever`
+   - **Institution implementations**: CAL, Max, Isracard, Excellence, Meitav, Migdal, Phoenix
+   - **Utilities**: Retry with backoff, smart waits
 
-2. **Implementation Layer** (`scrapers/{brokers,pensions,credit_cards}/`):
-   - Institution-specific scraper implementations
-   - MFA flow handling
-   - Data extraction and normalization
+2. **Service Layer** (`services/`):
+   - `CreditCardService`, `BrokerService`, `PensionService` - Data sync with transaction management
+   - `CategoryService` - Category normalization (provider + merchant mappings)
+   - `RulesService` - Auto-categorization based on patterns
+   - `AnalyticsService` - Queries, aggregations, reporting
+   - `BudgetService` - Monthly budget tracking
+   - `TagService` - Transaction tagging
 
-3. **Service Layer**:
-   - `BrokerService`, `PensionService`, `CreditCardService` - Data sync services
-   - `AnalyticsService` - Querying and reporting
-   - Database integration with SQLAlchemy
-   - Transaction deduplication logic
+3. **Database Layer** (`db/`):
+   - SQLAlchemy models: `Account`, `Transaction`, `Balance`, `Tag`, `CategoryMapping`, `MerchantMapping`
+   - SQLite storage with automatic migrations
+   - Transaction deduplication via unique constraints
+
+4. **UI Layer**:
+   - **CLI** (`cli/`): Typer-based commands for all operations
+   - **TUI** (`cli/tui/`): Interactive transaction browser with vim-like keybindings
+   - **Web UI** (`streamlit_app/`): Mobile-friendly dashboard with charts and analytics
+
+### Category System
+
+Three-tier category hierarchy with `effective_category` property:
+1. `user_category` - Manual override (highest priority)
+2. `category` - Normalized via `CategoryMapping` (provider) or `MerchantMapping` (description pattern)
+3. `raw_category` - Original from provider API
 
 ## Security Notes
 
@@ -539,15 +737,47 @@ See `CLI_PLAN.md` for detailed implementation status and future enhancements.
 
 ## Dependencies
 
+**Core:**
 - `requests` - HTTP client for API calls
 - `selenium` - Browser automation
+- `sqlalchemy` - Database ORM
+- `typer` - CLI framework
+- `rich` - Terminal formatting
+
+**Web UI:**
+- `streamlit` - Web dashboard framework
+- `plotly` - Interactive charts
+
+**Development:**
+- `pytest` - Testing framework
+- `pytest-cov` - Test coverage
 - `python-dotenv` - Environment variable management
 
 ## Development
 
-For detailed development guidelines, see:
+### Running Tests
+```bash
+# All tests
+pytest
+
+# Unit tests only
+pytest tests/services -v
+
+# Integration tests
+pytest tests/integration -v
+
+# With coverage
+pytest --cov=services --cov=cli
+```
+
+### Documentation
 - `CLAUDE.md` - Architecture, patterns, and implementation notes
-- `CLI_PLAN.md` - Future CLI interface design
+- `plans/` - Implementation plans and architecture docs:
+  - `CATEGORY_NORMALIZATION_PLAN.md` - Category system design
+  - `MULTI_ACCOUNT_PLAN.md` - Multi-account support
+  - `SCRAPER_REFACTORING_PLAN.md` - Scraper architecture
+  - `SERVICE_REFACTORING_PLAN.md` - Service layer design
+  - `INTEGRATION_TESTING_PLAN.md` - Testing strategy
 
 ## Contributing
 
