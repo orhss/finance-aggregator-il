@@ -165,8 +165,8 @@ For detailed file/function navigation, see `.claude/codemap.md`
 - When modifying business logic in `services/`
 
 **Unit Tests**: Follow @.claude/rules/python-unit-tests.md
-- Location: `tests/services/`
-- Target: Services layer (`services/`)
+- Location: `tests/services/`, `tests/scrapers/`
+- Target: Services layer (`services/`), credit card scrapers (`scrapers/credit_cards/`)
 - Uses in-memory SQLite with factory functions from `tests/conftest.py`
 
 **Integration Tests**: See @plans/INTEGRATION_TESTING_PLAN.md

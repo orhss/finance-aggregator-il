@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-02-02 00:32
+# Auto-generated: 2026-02-06 17:04
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -53,13 +53,16 @@ scrapers → services → db → cli/streamlit_app
 - scrapers/brokers/excellence_broker_client.py: class:BrokerAPIError,AuthenticationError,AccountError,BalanceError,ExtraDeProAPIClient | fn:main
 - scrapers/brokers/meitav_broker_client.py: class:MeitavCredentials,MeitavBalance,MeitavHolding,MeitavAccount,MeitavScraperError | fn:main
 - scrapers/config/logging_config.py: fn:add_logging_args,setup_logging_from_args,setup_logging
-- scrapers/credit_cards/cal_credit_card_client.py: class:CALCredentials,TransactionStatus,TransactionType,TrnTypeCode,Installments | fn:main
-- scrapers/credit_cards/isracard_credit_card_client.py: class:IsracardCredentials,TransactionStatus,TransactionType,Installments,Transaction | fn:main
-- scrapers/credit_cards/max_credit_card_client.py: class:MaxCredentials,TransactionStatus,TransactionType,MaxPlanName,Installments | fn:main
+- scrapers/credit_cards/base_scraper.py: class:BaseCreditCardScraper
+- scrapers/credit_cards/cal_credit_card_client.py: class:CALCredentials,TrnTypeCode,CardAccount,CALCreditCardScraper | fn:main
+- scrapers/credit_cards/isracard_credit_card_client.py: class:IsracardCredentials,CardAccount,IsracardCreditCardScraper | fn:main
+- scrapers/credit_cards/max_credit_card_client.py: class:MaxCredentials,MaxPlanName,CardAccount,MaxCreditCardScraper | fn:main
+- scrapers/credit_cards/shared_helpers.py: fn:iterate_months,calculate_date_range,filter_transactions_by_date,extract_installments,get_cookies
+- scrapers/credit_cards/shared_models.py: class:TransactionStatus,TransactionType,Installments,Transaction,CreditCardScraperError
 - scrapers/exceptions.py: class:ScraperError,AuthenticationError,LoginFailedError,MFAFailedError,SessionExpiredError
 - scrapers/pensions/migdal_pension_client.py: class:MigdalEmailMFARetriever,MigdalSeleniumMFAAutomator | fn:main
 - scrapers/pensions/phoenix_pension_client.py: class:PhoenixEmailMFARetriever,PhoenixSeleniumMFAAutomator | fn:main
-- scrapers/utils/retry.py: fn:retry_with_backoff,retry_selenium_action,retry_api_call
+- scrapers/utils/retry.py: class:RetryableHTTPError | fn:retry_with_backoff,retry_selenium_action,retry_api_call,retry_on_server_error
 - scrapers/utils/wait_conditions.py: class:SmartWait
 
 ## services/ - Services package for data synchronization and anal
@@ -111,6 +114,9 @@ scrapers → services → db → cli/streamlit_app
 - tests/integration/test_category_commands.py: fn:test_categories_list_empty,test_categories_list_shows_mappings,test_categories_list_filters_by_provider,test_categories_map_creates_mapping,test_categories_map_updates_existing
 - tests/integration/test_service_integration.py: fn:service_db_session,credit_card_service,category_service,analytics_service,temp_rules_file
 - tests/integration/test_sync_commands.py: fn:mock_db_session,test_sync_cal_success_output,test_sync_cal_shows_card_count,test_sync_max_success_output,test_sync_isracard_success_output
+- tests/scrapers/credit_cards/test_base_scraper.py: class:MockCredentials,MockSeleniumDriver,TestBaseScraperLifecycle,TestScraperConfiguration,TestCurrentScraperBehavior
+- tests/scrapers/credit_cards/test_shared_helpers.py: class:MockTransaction,TestIterateMonths,TestCalculateDateRange,TestFilterTransactionsByDate,TestExtractInstallments
+- tests/scrapers/credit_cards/test_shared_models.py: class:TestTransactionStatus,TestTransactionType,TestInstallments,TestTransaction,TestCardAccount
 - tests/services/test_analytics_service.py: fn:analytics_service,sample_account,test_get_all_accounts_empty,test_get_all_accounts_returns_all,test_get_all_accounts_active_filter
 - tests/services/test_category_service.py: fn:category_service,sample_account,sample_mapping,sample_merchant_mapping,test_normalize_category_happy_flow
 - tests/services/test_rules_service.py: fn:temp_rules_file,rules_service,sample_account,test_rule_matches_match_types,test_rule_matches_regex
