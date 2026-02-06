@@ -23,10 +23,14 @@ console = Console()
 @app.command("all")
 def sync_all(
     headless: bool = typer.Option(True, "--headless/--visible", help="Run browsers in headless mode"),
-    months_back: int = typer.Option(3, "--months-back", help="Months to sync (for credit cards)"),
+    months_back: int = typer.Option(3, "--months-back", help="Months to sync backwards (for credit cards)"),
+    months_forward: int = typer.Option(1, "--months-forward", help="Months to sync forward (for credit cards)"),
 ):
     """
-    Sync all financial data sources
+    Sync all financial data sources.
+
+    Continues syncing other institutions even if one fails.
+    Shows summary of successes/failures at the end.
     """
     console.print("[bold cyan]Starting full synchronization...[/bold cyan]\n")
 
@@ -35,21 +39,52 @@ def sync_all(
         console.print("[bold red]Error: Database not initialized. Run 'fin-cli init' first.[/bold red]")
         raise typer.Exit(1)
 
-    # Load credentials
-    credentials = load_credentials()
+    # Define sync operations: (name, function, kwargs)
+    sync_operations = [
+        ("Excellence", sync_excellence, {"headless": headless}),
+        ("Meitav", sync_meitav, {"headless": headless}),
+        ("Migdal", sync_migdal, {"headless": headless, "account": None}),
+        ("Phoenix", sync_phoenix, {"headless": headless, "account": None}),
+        ("CAL", sync_cal, {"headless": headless, "months_back": months_back, "months_forward": months_forward, "account": None}),
+        ("Max", sync_max, {"headless": headless, "months_back": months_back, "months_forward": months_forward, "account": None}),
+        ("Isracard", sync_isracard, {"headless": headless, "months_back": months_back, "months_forward": months_forward, "account": None}),
+    ]
 
-    # Sync each source
-    sync_excellence(headless=headless)
-    sync_meitav(headless=headless)
-    # Pensions now sync all configured accounts
-    sync_migdal(headless=headless, account=None)  # None = all accounts
-    sync_phoenix(headless=headless, account=None)  # None = all accounts
-    # Credit cards now sync all configured accounts
-    sync_cal(headless=headless, months_back=months_back, account=None)  # None = all accounts
-    sync_max(headless=headless, months_back=months_back, account=None)  # None = all accounts
-    sync_isracard(headless=headless, months_back=months_back, account=None)  # None = all accounts
+    succeeded = []
+    failed = []
+    skipped = []
 
-    console.print("\n[bold green]✓ Full synchronization complete![/bold green]")
+    for name, sync_func, kwargs in sync_operations:
+        try:
+            sync_func(**kwargs)
+            succeeded.append(name)
+        except typer.Exit as e:
+            # typer.Exit(1) means failure, Exit(0) or no code means success
+            if e.exit_code != 0:
+                failed.append(name)
+            else:
+                succeeded.append(name)
+        except Exception as e:
+            console.print(f"[red]✗ {name} failed unexpectedly: {e}[/red]")
+            failed.append(name)
+
+    # Print summary
+    console.print("\n" + "━" * 60)
+    console.print("[bold]Sync Summary[/bold]")
+    console.print("━" * 60)
+
+    if succeeded:
+        console.print(f"[green]✓ Succeeded ({len(succeeded)}): {', '.join(succeeded)}[/green]")
+    if failed:
+        console.print(f"[red]✗ Failed ({len(failed)}): {', '.join(failed)}[/red]")
+
+    total = len(succeeded) + len(failed)
+    if failed:
+        console.print(f"\n[yellow]Completed with errors: {len(succeeded)}/{total} institutions synced successfully[/yellow]")
+        if len(failed) == total:
+            raise typer.Exit(1)
+    else:
+        console.print(f"\n[bold green]✓ Full synchronization complete! ({total}/{total} succeeded)[/bold green]")
 
 
 @app.command("excellence")

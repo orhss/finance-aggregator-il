@@ -91,7 +91,7 @@ def retry_selenium_action(max_attempts: int = 3):
 
 
 def retry_api_call(max_attempts: int = 3):
-    """Retry decorator for API calls"""
+    """Retry decorator for API calls (timeouts and connection errors)"""
     import requests
 
     return retry_with_backoff(
@@ -99,5 +99,35 @@ def retry_api_call(max_attempts: int = 3):
         exceptions=(
             requests.exceptions.Timeout,
             requests.exceptions.ConnectionError
+        )
+    )
+
+
+class RetryableHTTPError(Exception):
+    """Raised for HTTP errors that should be retried (5xx server errors)"""
+    pass
+
+
+def retry_on_server_error(max_attempts: int = 3, initial_delay: float = 2.0):
+    """
+    Retry decorator for HTTP requests that may fail with 5xx server errors.
+
+    Usage:
+        @retry_on_server_error(max_attempts=3)
+        def make_api_call():
+            response = session.get(url)
+            response.raise_for_status()
+            return response.json()
+    """
+    import requests
+
+    return retry_with_backoff(
+        max_attempts=max_attempts,
+        initial_delay=initial_delay,
+        backoff_factor=2.0,
+        exceptions=(
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+            RetryableHTTPError,
         )
     )

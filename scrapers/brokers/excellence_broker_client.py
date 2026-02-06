@@ -14,6 +14,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 from scrapers.base.broker_base import AccountInfo, BalanceInfo, LoginCredentials, BrokerAPIClient
 from scrapers.base.selenium_driver import SeleniumDriver, DriverConfig
+from scrapers.utils.retry import retry_on_server_error, RetryableHTTPError
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -86,6 +87,17 @@ class ExtraDeProAPIClient(BrokerAPIClient):
     def _human_delay(self, min_sec: float = 1.0, max_sec: float = 2.0) -> None:
         """Add a randomized delay to mimic human behavior"""
         time.sleep(random.uniform(min_sec, max_sec))
+
+    def _raise_for_status_with_retry(self, response: requests.Response) -> None:
+        """
+        Like raise_for_status(), but raises RetryableHTTPError for 5xx errors.
+        This allows the retry decorator to catch and retry server errors.
+        """
+        if 500 <= response.status_code < 600:
+            raise RetryableHTTPError(
+                f"{response.status_code} Server Error: {response.reason} for url: {response.url}"
+            )
+        response.raise_for_status()
 
     def _dismiss_popups(self, max_attempts: int = 5):
         """
@@ -309,11 +321,16 @@ class ExtraDeProAPIClient(BrokerAPIClient):
 
         self._human_delay(1.0, 2.0)
 
-        url = f"{self.API_URL}/accounts"
-        params = {"key": self.session_key}  # Session key required as query parameter
-        response = self.api_session.get(url, headers=self._headers, params=params)
-        response.raise_for_status()
-        response_data = response.json()
+        # Wrap API call with retry logic for server errors
+        @retry_on_server_error(max_attempts=3, initial_delay=2.0)
+        def _fetch_accounts():
+            url = f"{self.API_URL}/accounts"
+            params = {"key": self.session_key}
+            response = self.api_session.get(url, headers=self._headers, params=params)
+            self._raise_for_status_with_retry(response)
+            return response.json()
+
+        response_data = _fetch_accounts()
 
         user_accounts = response_data.get("UserAccounts", {}).get("UserAccount", [])
         if not user_accounts:
@@ -334,22 +351,27 @@ class ExtraDeProAPIClient(BrokerAPIClient):
         # API requires at least 1000ms between requests
         self._human_delay(1.2, 1.5)
 
-        url = f"{self.API_URL}/account/view/balances"
-        params = {
-            "account": account.key,
-            "fields": "Balance,Available,Used,Blocked,IsBlocked,IsMargin,IsShorting,IsForeign",
-            "currency": currency,
-            "key": self.session_key  # Session key required as query parameter
-        }
+        # Wrap API call with retry logic for server errors (500s)
+        @retry_on_server_error(max_attempts=3, initial_delay=2.0)
+        def _fetch_balance():
+            url = f"{self.API_URL}/account/view/balances"
+            params = {
+                "account": account.key,
+                "fields": "Balance,Available,Used,Blocked,IsBlocked,IsMargin,IsShorting,IsForeign",
+                "currency": currency,
+                "key": self.session_key
+            }
 
-        response = self.api_session.get(url, headers=self._headers, params=params)
+            response = self.api_session.get(url, headers=self._headers, params=params)
 
-        # Log response for debugging
-        logger.debug(f"Balance API response status: {response.status_code}")
-        logger.debug(f"Balance API response: {response.text[:500] if response.text else 'empty'}")
+            # Log response for debugging
+            logger.debug(f"Balance API response status: {response.status_code}")
+            logger.debug(f"Balance API response: {response.text[:500] if response.text else 'empty'}")
 
-        response.raise_for_status()
-        response_data = response.json()
+            self._raise_for_status_with_retry(response)
+            return response.json()
+
+        response_data = _fetch_balance()
 
         view_data = response_data.get("View", {}).get("Account", {})
         if not view_data:
