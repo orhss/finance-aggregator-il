@@ -5,9 +5,7 @@ Tag management CLI commands
 import typer
 from rich.console import Console
 from rich.table import Table
-from rich.panel import Panel
 from rich.prompt import Confirm
-from typing import Optional
 
 from services.tag_service import TagService
 from cli.utils import fix_rtl

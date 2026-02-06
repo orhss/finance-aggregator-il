@@ -2,7 +2,6 @@
 Database connection and session management
 """
 
-import os
 from pathlib import Path
 from typing import Generator
 import logging

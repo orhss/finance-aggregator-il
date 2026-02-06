@@ -1,0 +1,133 @@
+[project]
+name = "fin-cli"
+version = "0.1.0"
+description = "Financial Data Aggregator CLI - Extract and analyze financial data from Israeli financial institutions"
+readme = "README.md"
+license = { text = "AGPL-3.0" }
+authors = [{ name = "Or Hasson" }]
+requires-python = ">=3.10"
+keywords = ["finance", "scraping", "cli", "israeli-banks", "credit-cards", "pension-funds"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Office/Business :: Financial",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    # Core scraping
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "selenium>=4.15.0",
+
+    # CLI framework and UI
+    "typer>=0.9.0",
+    "rich>=13.7.0",
+    "textual>=0.45.0",
+
+    # Database ORM
+    "sqlalchemy>=2.0.0",
+
+    # Configuration and validation
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "PyYAML>=6.0",
+
+    # Date/time utilities
+    "python-dateutil>=2.8.2",
+
+    # RTL/Hebrew text support
+    "python-bidi>=0.4.2",
+
+    # Secure credential storage
+    "cryptography>=41.0.0",
+    "bcrypt>=4.0.0",
+
+    # Streamlit UI
+    "streamlit>=1.35.0",
+    "streamlit-authenticator>=0.4.0",
+    "plotly>=5.17.0",
+    "pandas>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "freezegun>=1.2.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+fin-cli = "cli.main:main"
+
+[project.urls]
+Homepage = "https://github.com/orhasson/finance-aggregator-il"
+Repository = "https://github.com/orhasson/finance-aggregator-il"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cli", "config", "db", "scrapers", "services", "streamlit_app"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "freezegun>=1.2.0",
+    "ruff>=0.1.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+markers = [
+    "integration: marks tests as integration tests",
+    "slow: marks tests as slow",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["cli", "config", "db", "scrapers", "services", "streamlit_app"]
+
+[tool.coverage.run]
+source = ["cli", "services", "scrapers"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]

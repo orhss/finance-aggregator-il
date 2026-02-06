@@ -11,7 +11,7 @@ from rich.table import Table
 from rich import box
 from sqlalchemy import func
 
-from db.database import get_db, get_db_path, migrate_tags_schema, migrate_category_normalization_schema, migrate_merchant_mapping_schema, migrate_budget_schema
+from db.database import get_db_path, migrate_tags_schema, migrate_category_normalization_schema, migrate_merchant_mapping_schema, migrate_budget_schema
 from db.models import Account, Transaction, Balance, SyncHistory
 from services.analytics_service import AnalyticsService
 

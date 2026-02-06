@@ -5,13 +5,10 @@ Sync command for financial data synchronization
 import typer
 from typing import Optional, List
 from rich.console import Console
-from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from pathlib import Path
 
-from db.database import check_database_exists, DEFAULT_DB_PATH
-from cli.utils import get_db_session
-from config.settings import load_credentials, get_settings, select_accounts_to_sync, select_pension_accounts_to_sync
+from db.database import check_database_exists
+from cli.utils import get_db_session, spinner
+from config.settings import load_credentials, select_accounts_to_sync, select_pension_accounts_to_sync
 from services.broker_service import BrokerService
 from services.pension_service import PensionService
 from services.credit_card_service import CreditCardService
@@ -111,13 +108,7 @@ def sync_excellence(
         raise typer.Exit(1)
 
     with get_db_session() as db:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Syncing Excellence...", total=None)
-
+        with spinner("Syncing Excellence..."):
             # Create service and sync
             service = BrokerService(db)
             result = service.sync_excellence(
@@ -125,8 +116,6 @@ def sync_excellence(
                 password=credentials.excellence.password,
                 headless=headless
             )
-
-            progress.update(task, completed=True)
 
         # Display results
         if result.success:
@@ -161,13 +150,7 @@ def sync_meitav(
         raise typer.Exit(1)
 
     with get_db_session() as db:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Syncing Meitav (may take a while)...", total=None)
-
+        with spinner("Syncing Meitav (may take a while)..."):
             # Create service and sync
             service = BrokerService(db)
             result = service.sync_meitav(
@@ -175,8 +158,6 @@ def sync_meitav(
                 password=credentials.meitav.password,
                 headless=headless
             )
-
-            progress.update(task, completed=True)
 
         # Display results
         if result.success:
@@ -242,14 +223,8 @@ def _sync_pension_multi_account(
                 errors.append(f"Account {idx}{label}: Email credentials missing")
                 continue
 
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console,
-            ) as progress:
-                task = progress.add_task("  Syncing (MFA may take a while)...", total=None)
-
-                try:
+            try:
+                with spinner("  Syncing (MFA may take a while)..."):
                     service = PensionService(db)
                     # Call the appropriate service method dynamically
                     result = getattr(service, service_method)(
@@ -259,22 +234,19 @@ def _sync_pension_multi_account(
                         headless=headless
                     )
 
-                    progress.update(task, completed=True)
-
-                    if result.success:
-                        console.print(f"  [green]✓ Success![/green]")
-                        console.print(f"    Balances synced: {result.balances_added + result.balances_updated}")
-                        succeeded += 1
-                    else:
-                        console.print(f"  [red]✗ Failed: {result.error_message}[/red]")
-                        failed += 1
-                        errors.append(f"Account {idx}{label}: {result.error_message}")
-
-                except Exception as e:
-                    progress.update(task, completed=True)
-                    console.print(f"  [red]✗ Failed: {e}[/red]")
+                if result.success:
+                    console.print(f"  [green]✓ Success![/green]")
+                    console.print(f"    Balances synced: {result.balances_added + result.balances_updated}")
+                    succeeded += 1
+                else:
+                    console.print(f"  [red]✗ Failed: {result.error_message}[/red]")
                     failed += 1
-                    errors.append(f"Account {idx}{label}: {str(e)}")
+                    errors.append(f"Account {idx}{label}: {result.error_message}")
+
+            except Exception as e:
+                console.print(f"  [red]✗ Failed: {e}[/red]")
+                failed += 1
+                errors.append(f"Account {idx}{label}: {str(e)}")
 
         # Print summary
         console.print("\n" + "━" * 60)
@@ -413,14 +385,8 @@ def _sync_credit_card_multi_account(
             label = f" ({account_creds.label})" if account_creds.label else ""
             console.print(f"\n[bold cyan][{current}/{total_accounts}] Account {idx}{label}[/bold cyan]")
 
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console,
-            ) as progress:
-                task = progress.add_task("  Syncing...", total=None)
-
-                try:
+            try:
+                with spinner("  Syncing..."):
                     service = CreditCardService(db)
                     # Call the appropriate service method dynamically
                     result = getattr(service, service_method)(
@@ -431,36 +397,33 @@ def _sync_credit_card_multi_account(
                         headless=headless
                     )
 
-                    progress.update(task, completed=True)
+                if result.success:
+                    console.print(f"  [green]✓ Success![/green]")
+                    console.print(f"    Cards synced: {result.cards_synced}")
+                    console.print(f"    Transactions added: {result.transactions_added}")
+                    console.print(f"    Transactions updated: {result.transactions_updated}")
 
-                    if result.success:
-                        console.print(f"  [green]✓ Success![/green]")
-                        console.print(f"    Cards synced: {result.cards_synced}")
-                        console.print(f"    Transactions added: {result.transactions_added}")
-                        console.print(f"    Transactions updated: {result.transactions_updated}")
+                    # Report unmapped categories
+                    if result.unmapped_categories:
+                        unmapped_txns = sum(u['count'] for u in result.unmapped_categories)
+                        console.print(f"  [yellow]  Unmapped categories: {len(result.unmapped_categories)} ({unmapped_txns} transactions)[/yellow]")
+                        total_unmapped_categories += len(result.unmapped_categories)
 
-                        # Report unmapped categories
-                        if result.unmapped_categories:
-                            unmapped_txns = sum(u['count'] for u in result.unmapped_categories)
-                            console.print(f"  [yellow]  Unmapped categories: {len(result.unmapped_categories)} ({unmapped_txns} transactions)[/yellow]")
-                            total_unmapped_categories += len(result.unmapped_categories)
+                    succeeded += 1
+                    total_cards += result.cards_synced
+                    total_added += result.transactions_added
+                    total_updated += result.transactions_updated
 
-                        succeeded += 1
-                        total_cards += result.cards_synced
-                        total_added += result.transactions_added
-                        total_updated += result.transactions_updated
-
-                        _apply_rules_after_sync(db, result.transactions_added + result.transactions_updated)
-                    else:
-                        console.print(f"  [red]✗ Failed: {result.error_message}[/red]")
-                        failed += 1
-                        errors.append(f"Account {idx}{label}: {result.error_message}")
-
-                except Exception as e:
-                    progress.update(task, completed=True)
-                    console.print(f"  [red]✗ Failed: {e}[/red]")
+                    _apply_rules_after_sync(db, result.transactions_added + result.transactions_updated)
+                else:
+                    console.print(f"  [red]✗ Failed: {result.error_message}[/red]")
                     failed += 1
-                    errors.append(f"Account {idx}{label}: {str(e)}")
+                    errors.append(f"Account {idx}{label}: {result.error_message}")
+
+            except Exception as e:
+                console.print(f"  [red]✗ Failed: {e}[/red]")
+                failed += 1
+                errors.append(f"Account {idx}{label}: {str(e)}")
 
         # Print summary
         console.print("\n" + "━" * 60)

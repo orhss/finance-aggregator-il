@@ -11,7 +11,6 @@ from config.settings import (
     load_credentials,
     save_credentials,
     update_credential,
-    Credentials,
     CreditCardCredentials,
     PensionCredentials,
     CREDENTIALS_FILE,

@@ -11,3 +11,7 @@ retry_api_call  # noqa
 LoginFailedError  # noqa
 date_range_filter  # noqa
 streamlit_app  # noqa
+
+# Context manager __exit__ parameters - required by Python protocol
+# even if not used in the implementation
+exc_tb  # noqa

@@ -9,10 +9,8 @@ from pathlib import Path
 from datetime import date, datetime
 from typing import Optional
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from cli.utils import parse_date_range, get_analytics
-from db.models import Transaction, Balance, Account
+from cli.utils import parse_date_range, get_analytics, spinner
 
 app = typer.Typer(help="Export financial data to CSV or JSON")
 console = Console()
@@ -50,13 +48,7 @@ def export_transactions(
 
         with get_analytics() as analytics:
             # Fetch transactions
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console
-            ) as progress:
-                progress.add_task(description="Fetching transactions...", total=None)
-
+            with spinner("Fetching transactions..."):
                 transactions = analytics.get_transactions(
                     account_id=account_id,
                     institution=institution,
@@ -187,13 +179,7 @@ def export_balances(
 
         with get_analytics() as analytics:
             # Fetch balances
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console
-            ) as progress:
-                progress.add_task(description="Fetching balances...", total=None)
-
+            with spinner("Fetching balances..."):
                 if account_id:
                     balances = analytics.get_balance_history(account_id, from_date_obj, to_date_obj)
                 else:
@@ -297,13 +283,7 @@ def export_accounts(
 
         with get_analytics() as analytics:
             # Fetch accounts
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console
-            ) as progress:
-                progress.add_task(description="Fetching accounts...", total=None)
-
+            with spinner("Fetching accounts..."):
                 if account_type:
                     accounts = analytics.get_accounts_by_type(account_type)
                 elif institution:

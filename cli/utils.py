@@ -5,7 +5,7 @@ CLI utility functions for improved user experience
 import re
 from contextlib import contextmanager
 from datetime import date, datetime
-from typing import Optional, Any, Tuple, Generator
+from typing import Optional, Tuple, Generator
 from rich.console import Console
 from bidi.algorithm import get_display
 from rich.table import Table
@@ -100,6 +100,29 @@ def get_db_session() -> Generator["Session", None, None]:
         yield session
     finally:
         session.close()
+
+
+@contextmanager
+def spinner(description: str) -> Generator[None, None, None]:
+    """
+    Context manager for progress spinner.
+
+    Shows a spinner with description while code executes.
+
+    Usage:
+        with spinner("Fetching data..."):
+            data = fetch_data()
+
+    Args:
+        description: Text to display next to spinner
+    """
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        progress.add_task(description=description, total=None)
+        yield
 
 
 def print_success(message: str):

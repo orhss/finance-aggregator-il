@@ -23,12 +23,17 @@ Python automation framework for financial institutions (brokers, pension funds, 
 
 ### Environment Setup
 ```bash
+# Install dependencies with uv (recommended)
+uv sync
+
 # Activate virtual environment
 source .venv/bin/activate
 
-# Install dependencies and CLI tool
-pip install -r requirements.txt
-pip install -e .  # Installs fin-cli command
+# Or run commands directly without activating
+uv run fin-cli <command>
+
+# Alternative: Install with pip
+pip install -e ".[dev]"
 ```
 
 ### CLI Quick Start
@@ -181,6 +186,15 @@ with get_db_session() as db:
 ```
 
 **Why context managers?** Resources are automatically closed even if exceptions occur - no need for `try/finally: analytics.close()`.
+
+**Progress Spinner**: Use `spinner()` from `cli/utils.py` for long-running operations:
+```python
+from cli.utils import spinner
+
+with spinner("Fetching data..."):
+    data = fetch_data()
+# Spinner automatically clears when done
+```
 
 ### Testing
 

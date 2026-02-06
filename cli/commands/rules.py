@@ -6,7 +6,6 @@ import typer
 from typing import Optional, List
 from rich.console import Console
 from rich.table import Table
-from rich.panel import Panel
 
 from services.rules_service import RulesService, MatchType, RULES_FILE
 from cli.utils import fix_rtl

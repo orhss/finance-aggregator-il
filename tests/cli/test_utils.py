@@ -169,3 +169,63 @@ class TestGetDbSession:
                     raise ValueError("Test error")
 
         mock_session.close.assert_called_once()
+
+
+# ==================== Spinner Context Manager Tests ====================
+
+class TestSpinner:
+    """Tests for spinner context manager."""
+
+    def test_spinner_executes_code_block(self):
+        """Should execute code inside the context."""
+        from cli.utils import spinner
+
+        executed = False
+        with patch('cli.utils.Progress'):
+            with spinner("Test..."):
+                executed = True
+
+        assert executed
+
+    def test_spinner_creates_progress_with_description(self):
+        """Should create Progress and add task with description."""
+        from cli.utils import spinner
+
+        mock_progress_instance = MagicMock()
+        mock_progress_class = MagicMock(return_value=mock_progress_instance)
+        mock_progress_instance.__enter__ = MagicMock(return_value=mock_progress_instance)
+        mock_progress_instance.__exit__ = MagicMock(return_value=False)
+
+        with patch('cli.utils.Progress', mock_progress_class):
+            with spinner("Loading data..."):
+                pass
+
+        # Verify add_task was called with the description
+        mock_progress_instance.add_task.assert_called_once()
+        call_kwargs = mock_progress_instance.add_task.call_args
+        assert "Loading data..." in str(call_kwargs)
+
+    def test_spinner_exits_on_exception(self):
+        """Should properly exit Progress context even when exception raised."""
+        from cli.utils import spinner
+
+        mock_progress_instance = MagicMock()
+        mock_progress_class = MagicMock(return_value=mock_progress_instance)
+        mock_progress_instance.__enter__ = MagicMock(return_value=mock_progress_instance)
+        mock_progress_instance.__exit__ = MagicMock(return_value=False)
+
+        with patch('cli.utils.Progress', mock_progress_class):
+            with pytest.raises(ValueError):
+                with spinner("Test..."):
+                    raise ValueError("Test error")
+
+        # Verify __exit__ was called (cleanup happened)
+        mock_progress_instance.__exit__.assert_called_once()
+
+    def test_spinner_yields_nothing(self):
+        """Spinner should not yield any value (simple context manager)."""
+        from cli.utils import spinner
+
+        with patch('cli.utils.Progress'):
+            with spinner("Test...") as result:
+                assert result is None

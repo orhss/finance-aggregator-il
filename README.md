@@ -20,32 +20,36 @@ Python automation framework for extracting and managing financial data from Isra
 ## Quick Start
 
 ```bash
-# 1. Install the CLI
-pip install -e .
+# 1. Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 2. Initialize database
+# 2. Install dependencies and CLI
+uv sync
+source .venv/bin/activate  # Or: uv run fin-cli ...
+
+# 3. Initialize database
 fin-cli init
 
-# 3. Configure credentials
+# 4. Configure credentials
 fin-cli config setup
 
-# 4. Sync your data
+# 5. Sync your data
 fin-cli sync all
 
-# 5. View your accounts
+# 6. View your accounts
 fin-cli accounts list
 
-# 6. Check your transactions
+# 7. Check your transactions
 fin-cli transactions list
 
-# 7. View statistics
+# 8. View statistics
 fin-cli reports stats
 
-# 8. Set up category mappings (optional)
+# 9. Set up category mappings (optional)
 fin-cli categories analyze
 fin-cli categories setup
 
-# 9. Set a monthly budget (optional)
+# 10. Set a monthly budget (optional)
 fin-cli budget set 5000
 fin-cli budget show
 ```
@@ -128,32 +132,40 @@ Fin/
 
 ## Installation
 
-### Option 1: CLI Installation (Recommended)
+### Option 1: Using uv (Recommended)
 
-1. **Clone the repository**:
+[uv](https://github.com/astral-sh/uv) is a fast Python package manager. This is the recommended installation method.
+
+1. **Install uv** (if not already installed):
    ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+2. **Clone and enter the repository**:
+   ```bash
+   git clone https://github.com/orhasson/finance-aggregator-il.git
    cd Fin
    ```
 
-2. **Create virtual environment**:
+3. **Install dependencies**:
    ```bash
-   python3 -m venv .venv
+   uv sync
+   ```
+
+   This creates a virtual environment and installs all dependencies including the `fin-cli` command.
+
+4. **Activate the environment** (or use `uv run`):
+   ```bash
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   # Or run commands directly: uv run fin-cli init
    ```
 
-3. **Install the package**:
-   ```bash
-   pip install -e .
-   ```
-
-   This installs the CLI tool as `fin-cli` command.
-
-4. **Initialize database**:
+5. **Initialize database**:
    ```bash
    fin-cli init
    ```
 
-5. **Configure credentials**:
+6. **Configure credentials**:
    ```bash
    fin-cli config setup
    ```
@@ -299,10 +311,13 @@ Bookmark the page for quick access, or add to your home screen:
 
 **Important**: This app is designed for local/home network use. If you need internet access, use a VPN or set up a reverse proxy (nginx, Caddy) with HTTPS.
 
-### Option 3: Manual Installation (for development)
+### Option 3: Using pip (Alternative)
+
+If you prefer pip over uv:
 
 1. **Clone the repository**:
    ```bash
+   git clone https://github.com/orhasson/finance-aggregator-il.git
    cd Fin
    ```
 
@@ -312,9 +327,9 @@ Bookmark the page for quick access, or add to your home screen:
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
-3. **Install dependencies**:
+3. **Install the package**:
    ```bash
-   pip install -r requirements.txt
+   pip install -e ".[dev]"
    ```
 
 4. **Configure credentials**:
@@ -755,19 +770,38 @@ Three-tier category hierarchy with `effective_category` property:
 
 ## Development
 
+### Setup
+```bash
+# Install with dev dependencies
+uv sync
+
+# Or with pip
+pip install -e ".[dev]"
+```
+
 ### Running Tests
 ```bash
 # All tests
-pytest
+uv run pytest
 
 # Unit tests only
-pytest tests/services -v
+uv run pytest tests/services -v
 
 # Integration tests
-pytest tests/integration -v
+uv run pytest tests/integration -v
 
 # With coverage
-pytest --cov=services --cov=cli
+uv run pytest --cov=services --cov=cli
+
+# Or if venv is activated, just use pytest directly
+pytest
+```
+
+### Code Quality
+```bash
+# Lint and format
+uv run ruff check .
+uv run ruff format .
 ```
 
 ### Documentation

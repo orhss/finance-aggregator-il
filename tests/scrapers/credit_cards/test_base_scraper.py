@@ -6,7 +6,7 @@ that will be extracted to base_scraper.py.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 from dataclasses import dataclass
 from typing import Optional
 
