@@ -157,6 +157,31 @@ For detailed file/function navigation, see `.claude/codemap.md`
 - **SIMPLE**: Minimal code to solve the actual problem, no speculative features
 - Avoid premature abstraction - three similar lines beats a premature helper
 
+### CLI Patterns
+
+**Date Parsing**: Use `parse_date_range()` from `cli/utils.py` for commands with `--from`/`--to` options:
+```python
+from cli.utils import parse_date_range
+
+from_date_obj, to_date_obj = parse_date_range(from_date, to_date)
+```
+
+**Service Context Managers**: Use `get_analytics()` and `get_db_session()` from `cli/utils.py` for automatic resource cleanup:
+```python
+from cli.utils import get_analytics, get_db_session
+
+# For analytics queries
+with get_analytics() as analytics:
+    data = analytics.get_transactions(...)
+
+# For direct database access
+with get_db_session() as db:
+    service = SomeService(db)
+    result = service.do_something()
+```
+
+**Why context managers?** Resources are automatically closed even if exceptions occur - no need for `try/finally: analytics.close()`.
+
 ### Testing
 
 **When to Write Tests**:

@@ -11,7 +11,7 @@ from typing import Optional
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from services.analytics_service import AnalyticsService
+from cli.utils import parse_date_range, get_analytics
 from db.models import Transaction, Balance, Account
 
 app = typer.Typer(help="Export financial data to CSV or JSON")
@@ -41,64 +41,45 @@ def export_transactions(
     Export transactions to CSV or JSON
     """
     try:
-        analytics = AnalyticsService()
-
-        # Parse dates
-        from_date_obj = None
-        to_date_obj = None
-
-        if from_date:
-            try:
-                from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
-            except ValueError:
-                console.print("[red]Invalid from date format. Use YYYY-MM-DD[/red]")
-                raise typer.Exit(code=1)
-
-        if to_date:
-            try:
-                to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
-            except ValueError:
-                console.print("[red]Invalid to date format. Use YYYY-MM-DD[/red]")
-                raise typer.Exit(code=1)
+        from_date_obj, to_date_obj = parse_date_range(from_date, to_date)
 
         # Validate format
         if format.lower() not in ["csv", "json"]:
             console.print("[red]Invalid format. Use 'csv' or 'json'[/red]")
             raise typer.Exit(code=1)
 
-        # Fetch transactions
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        ) as progress:
-            progress.add_task(description="Fetching transactions...", total=None)
+        with get_analytics() as analytics:
+            # Fetch transactions
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                progress.add_task(description="Fetching transactions...", total=None)
 
-            transactions = analytics.get_transactions(
-                account_id=account_id,
-                institution=institution,
-                from_date=from_date_obj,
-                to_date=to_date_obj,
-                status=status,
-                limit=None  # Get all transactions
-            )
+                transactions = analytics.get_transactions(
+                    account_id=account_id,
+                    institution=institution,
+                    from_date=from_date_obj,
+                    to_date=to_date_obj,
+                    status=status,
+                    limit=None  # Get all transactions
+                )
 
-        if not transactions:
-            console.print("[yellow]No transactions found with the given filters[/yellow]")
-            analytics.close()
-            return
+            if not transactions:
+                console.print("[yellow]No transactions found with the given filters[/yellow]")
+                return
 
-        # Export based on format
-        output_path = Path(output)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+            # Export based on format
+            output_path = Path(output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if format.lower() == "csv":
-            export_transactions_csv(transactions, output_path)
-        else:
-            export_transactions_json(transactions, output_path)
+            if format.lower() == "csv":
+                export_transactions_csv(transactions, output_path)
+            else:
+                export_transactions_json(transactions, output_path)
 
-        console.print(f"[green]Successfully exported {len(transactions)} transactions to {output}[/green]")
-        analytics.close()
+            console.print(f"[green]Successfully exported {len(transactions)} transactions to {output}[/green]")
 
     except Exception as e:
         console.print(f"[red]Error exporting transactions: {str(e)}[/red]")
@@ -197,61 +178,42 @@ def export_balances(
     Export account balances to CSV or JSON
     """
     try:
-        analytics = AnalyticsService()
-
-        # Parse dates
-        from_date_obj = None
-        to_date_obj = None
-
-        if from_date:
-            try:
-                from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
-            except ValueError:
-                console.print("[red]Invalid from date format. Use YYYY-MM-DD[/red]")
-                raise typer.Exit(code=1)
-
-        if to_date:
-            try:
-                to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
-            except ValueError:
-                console.print("[red]Invalid to date format. Use YYYY-MM-DD[/red]")
-                raise typer.Exit(code=1)
+        from_date_obj, to_date_obj = parse_date_range(from_date, to_date)
 
         # Validate format
         if format.lower() not in ["csv", "json"]:
             console.print("[red]Invalid format. Use 'csv' or 'json'[/red]")
             raise typer.Exit(code=1)
 
-        # Fetch balances
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        ) as progress:
-            progress.add_task(description="Fetching balances...", total=None)
+        with get_analytics() as analytics:
+            # Fetch balances
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                progress.add_task(description="Fetching balances...", total=None)
 
-            if account_id:
-                balances = analytics.get_balance_history(account_id, from_date_obj, to_date_obj)
+                if account_id:
+                    balances = analytics.get_balance_history(account_id, from_date_obj, to_date_obj)
+                else:
+                    # Get all balances
+                    balances = analytics.get_all_balances(from_date_obj, to_date_obj)
+
+            if not balances:
+                console.print("[yellow]No balances found with the given filters[/yellow]")
+                return
+
+            # Export based on format
+            output_path = Path(output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            if format.lower() == "csv":
+                export_balances_csv(balances, output_path)
             else:
-                # Get all balances
-                balances = analytics.get_all_balances(from_date_obj, to_date_obj)
+                export_balances_json(balances, output_path)
 
-        if not balances:
-            console.print("[yellow]No balances found with the given filters[/yellow]")
-            analytics.close()
-            return
-
-        # Export based on format
-        output_path = Path(output)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        if format.lower() == "csv":
-            export_balances_csv(balances, output_path)
-        else:
-            export_balances_json(balances, output_path)
-
-        console.print(f"[green]Successfully exported {len(balances)} balance records to {output}[/green]")
-        analytics.close()
+            console.print(f"[green]Successfully exported {len(balances)} balance records to {output}[/green]")
 
     except Exception as e:
         console.print(f"[red]Error exporting balances: {str(e)}[/red]")
@@ -328,44 +290,41 @@ def export_accounts(
     Export accounts to CSV or JSON
     """
     try:
-        analytics = AnalyticsService()
-
         # Validate format
         if format.lower() not in ["csv", "json"]:
             console.print("[red]Invalid format. Use 'csv' or 'json'[/red]")
             raise typer.Exit(code=1)
 
-        # Fetch accounts
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        ) as progress:
-            progress.add_task(description="Fetching accounts...", total=None)
+        with get_analytics() as analytics:
+            # Fetch accounts
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                progress.add_task(description="Fetching accounts...", total=None)
 
-            if account_type:
-                accounts = analytics.get_accounts_by_type(account_type)
-            elif institution:
-                accounts = analytics.get_accounts_by_institution(institution)
+                if account_type:
+                    accounts = analytics.get_accounts_by_type(account_type)
+                elif institution:
+                    accounts = analytics.get_accounts_by_institution(institution)
+                else:
+                    accounts = analytics.get_all_accounts()
+
+            if not accounts:
+                console.print("[yellow]No accounts found with the given filters[/yellow]")
+                return
+
+            # Export based on format
+            output_path = Path(output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            if format.lower() == "csv":
+                export_accounts_csv(accounts, output_path)
             else:
-                accounts = analytics.get_all_accounts()
+                export_accounts_json(accounts, output_path)
 
-        if not accounts:
-            console.print("[yellow]No accounts found with the given filters[/yellow]")
-            analytics.close()
-            return
-
-        # Export based on format
-        output_path = Path(output)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        if format.lower() == "csv":
-            export_accounts_csv(accounts, output_path)
-        else:
-            export_accounts_json(accounts, output_path)
-
-        console.print(f"[green]Successfully exported {len(accounts)} accounts to {output}[/green]")
-        analytics.close()
+            console.print(f"[green]Successfully exported {len(accounts)} accounts to {output}[/green]")
 
     except Exception as e:
         console.print(f"[red]Error exporting accounts: {str(e)}[/red]")

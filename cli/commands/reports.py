@@ -11,8 +11,7 @@ from rich.text import Text
 from rich import box
 from typing import Optional, List, Dict, Any
 
-from cli.utils import fix_rtl
-from services.analytics_service import AnalyticsService
+from cli.utils import fix_rtl, parse_date, parse_date_range, get_analytics
 
 app = typer.Typer(help="Generate reports and analytics")
 console = Console()
@@ -213,40 +212,38 @@ def overall_stats():
     Show overall statistics
     """
     try:
-        analytics = AnalyticsService()
-        stats = analytics.get_overall_stats()
+        with get_analytics() as analytics:
+            stats = analytics.get_overall_stats()
 
-        # Create info panel
-        info_lines = [
-            f"[bold cyan]Account Statistics:[/bold cyan]",
-            f"[bold]Total Accounts:[/bold] {stats['total_accounts']}",
-            "",
-            f"[bold cyan]Transaction Statistics:[/bold cyan]",
-            f"[bold]Total Transactions:[/bold] {stats['total_transactions']:,}",
-            f"[bold]Pending Transactions:[/bold] {stats['pending_transactions']:,}",
-            "",
-            f"[bold cyan]Balance Information:[/bold cyan]",
-            f"[bold]Total Balance:[/bold] {stats['total_balance']:,.2f} ILS",
-        ]
-
-        if stats['last_sync']:
-            info_lines.extend([
+            # Create info panel
+            info_lines = [
+                f"[bold cyan]Account Statistics:[/bold cyan]",
+                f"[bold]Total Accounts:[/bold] {stats['total_accounts']}",
                 "",
-                f"[bold cyan]Sync Information:[/bold cyan]",
-                f"[bold]Last Successful Sync:[/bold] {stats['last_sync'].strftime('%Y-%m-%d %H:%M')}",
-            ])
-        else:
-            info_lines.extend([
+                f"[bold cyan]Transaction Statistics:[/bold cyan]",
+                f"[bold]Total Transactions:[/bold] {stats['total_transactions']:,}",
+                f"[bold]Pending Transactions:[/bold] {stats['pending_transactions']:,}",
                 "",
-                f"[bold cyan]Sync Information:[/bold cyan]",
-                f"[bold]Last Successful Sync:[/bold] [yellow]Never[/yellow]",
-            ])
+                f"[bold cyan]Balance Information:[/bold cyan]",
+                f"[bold]Total Balance:[/bold] {stats['total_balance']:,.2f} ILS",
+            ]
 
-        info_text = "\n".join(info_lines)
-        panel = Panel(info_text, title="Overall Statistics", border_style="cyan", box=box.ROUNDED)
-        console.print(panel)
+            if stats['last_sync']:
+                info_lines.extend([
+                    "",
+                    f"[bold cyan]Sync Information:[/bold cyan]",
+                    f"[bold]Last Successful Sync:[/bold] {stats['last_sync'].strftime('%Y-%m-%d %H:%M')}",
+                ])
+            else:
+                info_lines.extend([
+                    "",
+                    f"[bold cyan]Sync Information:[/bold cyan]",
+                    f"[bold]Last Successful Sync:[/bold] [yellow]Never[/yellow]",
+                ])
 
-        analytics.close()
+            info_text = "\n".join(info_lines)
+            panel = Panel(info_text, title="Overall Statistics", border_style="cyan", box=box.ROUNDED)
+            console.print(panel)
 
     except Exception as e:
         console.print(f"[red]Error generating statistics: {str(e)}[/red]")
@@ -263,8 +260,6 @@ def monthly_report(
     Generate monthly spending report
     """
     try:
-        analytics = AnalyticsService()
-
         # Use current date if not provided
         today = date.today()
         if year is None:
@@ -281,134 +276,131 @@ def monthly_report(
         month_name = date(year, month, 1).strftime("%B %Y")
         console.print(f"\n[bold cyan]Monthly Report - {month_name}[/bold cyan]\n")
 
-        # If grouping by tags, show tag breakdown
-        if group_by == "tags":
-            breakdown = analytics.get_monthly_tag_breakdown(year, month)
+        with get_analytics() as analytics:
+            # If grouping by tags, show tag breakdown
+            if group_by == "tags":
+                breakdown = analytics.get_monthly_tag_breakdown(year, month)
 
-            if not breakdown:
-                console.print("[yellow]No transactions found for this month[/yellow]")
-                analytics.close()
+                if not breakdown:
+                    console.print("[yellow]No transactions found for this month[/yellow]")
+                    return
+
+                # Create table
+                table = Table(title=f"Spending by Tag - {month_name}", show_header=True, header_style="bold cyan", box=box.ROUNDED)
+                table.add_column("Tag", style="bold", width=25)
+                table.add_column("Amount", justify="right", width=15)
+                table.add_column("% of Total", justify="right", width=12)
+                table.add_column("Count", justify="right", width=10)
+
+                # Sort by amount descending
+                items = sorted(breakdown.items(), key=lambda x: abs(x[1]['total_amount']), reverse=True)
+
+                total_transactions = 0
+                grand_total = 0
+
+                # Separate untagged from tagged for display
+                tagged_items = [(k, v) for k, v in items if k != '(untagged)']
+                untagged_item = next(((k, v) for k, v in items if k == '(untagged)'), None)
+
+                for tag_name, data in tagged_items:
+                    amount = data['total_amount']
+                    amount_str = f"₪{amount:,.2f}"
+                    if amount < 0:
+                        amount_str = f"[red]{amount_str}[/red]"
+                    else:
+                        amount_str = f"[green]{amount_str}[/green]"
+
+                    table.add_row(
+                        f"[cyan]{fix_rtl(tag_name)}[/cyan]",
+                        amount_str,
+                        f"{data['percentage']:.1f}%",
+                        str(data['count'])
+                    )
+                    total_transactions += data['count']
+                    grand_total += abs(amount)
+
+                # Add separator and untagged row
+                if untagged_item:
+                    table.add_section()
+                    tag_name, data = untagged_item
+                    amount = data['total_amount']
+                    amount_str = f"₪{amount:,.2f}"
+                    if amount < 0:
+                        amount_str = f"[red]{amount_str}[/red]"
+
+                    table.add_row(
+                        f"[dim]{fix_rtl(tag_name)}[/dim]",
+                        f"[dim]{amount_str}[/dim]",
+                        f"[dim]{data['percentage']:.1f}%[/dim]",
+                        f"[dim]{data['count']}[/dim]"
+                    )
+                    total_transactions += data['count']
+                    grand_total += abs(amount)
+
+                # Add total row
+                table.add_section()
+                table.add_row(
+                    "[bold]TOTAL[/bold]",
+                    f"[bold]₪{grand_total:,.2f}[/bold]",
+                    "[bold]100%[/bold]",
+                    f"[bold]{total_transactions}[/bold]"
+                )
+
+                console.print(table)
                 return
 
-            # Create table
-            table = Table(title=f"Spending by Tag - {month_name}", show_header=True, header_style="bold cyan", box=box.ROUNDED)
-            table.add_column("Tag", style="bold", width=25)
-            table.add_column("Amount", justify="right", width=15)
-            table.add_column("% of Total", justify="right", width=12)
-            table.add_column("Count", justify="right", width=10)
+            # Standard monthly report
+            summary = analytics.get_monthly_summary(year, month)
 
-            # Sort by amount descending
-            items = sorted(breakdown.items(), key=lambda x: abs(x[1]['total_amount']), reverse=True)
+            # Transaction count and amounts
+            info_lines = [
+                f"[bold]Total Transactions:[/bold] {summary['transaction_count']:,}",
+                f"[bold]Total Amount:[/bold] {summary['total_amount']:,.2f} ILS",
+            ]
 
-            total_transactions = 0
-            grand_total = 0
+            if summary['total_charged'] > 0:
+                info_lines.append(f"[bold]Total Charged:[/bold] {summary['total_charged']:,.2f} ILS")
 
-            # Separate untagged from tagged for display
-            tagged_items = [(k, v) for k, v in items if k != '(untagged)']
-            untagged_item = next(((k, v) for k, v in items if k == '(untagged)'), None)
-
-            for tag_name, data in tagged_items:
-                amount = data['total_amount']
-                amount_str = f"₪{amount:,.2f}"
-                if amount < 0:
-                    amount_str = f"[red]{amount_str}[/red]"
-                else:
-                    amount_str = f"[green]{amount_str}[/green]"
-
-                table.add_row(
-                    f"[cyan]{fix_rtl(tag_name)}[/cyan]",
-                    amount_str,
-                    f"{data['percentage']:.1f}%",
-                    str(data['count'])
-                )
-                total_transactions += data['count']
-                grand_total += abs(amount)
-
-            # Add separator and untagged row
-            if untagged_item:
-                table.add_section()
-                tag_name, data = untagged_item
-                amount = data['total_amount']
-                amount_str = f"₪{amount:,.2f}"
-                if amount < 0:
-                    amount_str = f"[red]{amount_str}[/red]"
-
-                table.add_row(
-                    f"[dim]{fix_rtl(tag_name)}[/dim]",
-                    f"[dim]{amount_str}[/dim]",
-                    f"[dim]{data['percentage']:.1f}%[/dim]",
-                    f"[dim]{data['count']}[/dim]"
-                )
-                total_transactions += data['count']
-                grand_total += abs(amount)
-
-            # Add total row
-            table.add_section()
-            table.add_row(
-                "[bold]TOTAL[/bold]",
-                f"[bold]₪{grand_total:,.2f}[/bold]",
-                "[bold]100%[/bold]",
-                f"[bold]{total_transactions}[/bold]"
-            )
-
-            console.print(table)
-            analytics.close()
-            return
-
-        # Standard monthly report
-        summary = analytics.get_monthly_summary(year, month)
-
-        # Transaction count and amounts
-        info_lines = [
-            f"[bold]Total Transactions:[/bold] {summary['transaction_count']:,}",
-            f"[bold]Total Amount:[/bold] {summary['total_amount']:,.2f} ILS",
-        ]
-
-        if summary['total_charged'] > 0:
-            info_lines.append(f"[bold]Total Charged:[/bold] {summary['total_charged']:,.2f} ILS")
-
-        info_text = "\n".join(info_lines)
-        panel = Panel(info_text, title="Summary", border_style="cyan")
-        console.print(panel)
-        console.print()
-
-        # By status table
-        if summary['by_status'] and (group_by is None or group_by == "status"):
-            status_table = Table(title="Transactions by Status", show_header=True, header_style="bold cyan", box=box.ROUNDED)
-            status_table.add_column("Status", style="bold")
-            status_table.add_column("Count", justify="right")
-
-            for status, count in sorted(summary['by_status'].items()):
-                status_color = "yellow" if status == "pending" else "green" if status == "completed" else "white"
-                status_table.add_row(f"[{status_color}]{status}[/{status_color}]", str(count))
-
-            console.print(status_table)
+            info_text = "\n".join(info_lines)
+            panel = Panel(info_text, title="Summary", border_style="cyan")
+            console.print(panel)
             console.print()
 
-        # By type table
-        if summary['by_type'] and (group_by is None or group_by == "type"):
-            type_table = Table(title="Transactions by Type", show_header=True, header_style="bold cyan", box=box.ROUNDED)
-            type_table.add_column("Type", style="bold")
-            type_table.add_column("Count", justify="right")
+            # By status table
+            if summary['by_status'] and (group_by is None or group_by == "status"):
+                status_table = Table(title="Transactions by Status", show_header=True, header_style="bold cyan", box=box.ROUNDED)
+                status_table.add_column("Status", style="bold")
+                status_table.add_column("Count", justify="right")
 
-            for txn_type, count in sorted(summary['by_type'].items()):
-                type_table.add_row(txn_type, str(count))
+                for status, count in sorted(summary['by_status'].items()):
+                    status_color = "yellow" if status == "pending" else "green" if status == "completed" else "white"
+                    status_table.add_row(f"[{status_color}]{status}[/{status_color}]", str(count))
 
-            console.print(type_table)
-            console.print()
+                console.print(status_table)
+                console.print()
 
-        # By account table
-        if summary['by_account'] and (group_by is None or group_by == "account"):
-            account_table = Table(title="Transactions by Account", show_header=True, header_style="bold cyan", box=box.ROUNDED)
-            account_table.add_column("Account", style="bold")
-            account_table.add_column("Count", justify="right")
+            # By type table
+            if summary['by_type'] and (group_by is None or group_by == "type"):
+                type_table = Table(title="Transactions by Type", show_header=True, header_style="bold cyan", box=box.ROUNDED)
+                type_table.add_column("Type", style="bold")
+                type_table.add_column("Count", justify="right")
 
-            for account, count in sorted(summary['by_account'].items(), key=lambda x: x[1], reverse=True):
-                account_table.add_row(account, str(count))
+                for txn_type, count in sorted(summary['by_type'].items()):
+                    type_table.add_row(txn_type, str(count))
 
-            console.print(account_table)
+                console.print(type_table)
+                console.print()
 
-        analytics.close()
+            # By account table
+            if summary['by_account'] and (group_by is None or group_by == "account"):
+                account_table = Table(title="Transactions by Account", show_header=True, header_style="bold cyan", box=box.ROUNDED)
+                account_table.add_column("Account", style="bold")
+                account_table.add_column("Count", justify="right")
+
+                for account, count in sorted(summary['by_account'].items(), key=lambda x: x[1], reverse=True):
+                    account_table.add_row(account, str(count))
+
+                console.print(account_table)
 
     except Exception as e:
         console.print(f"[red]Error generating monthly report: {str(e)}[/red]")
@@ -434,12 +426,7 @@ def spending_report(
         fin-cli reports spending car --month 12 -t   # With transaction list
     """
     try:
-        analytics = AnalyticsService()
-
-        # Handle month/year shortcuts
-        from_date_obj = None
-        to_date_obj = None
-
+        # Handle month/year shortcuts or explicit date parsing
         if month or year:
             from calendar import monthrange
             today = date.today()
@@ -453,20 +440,7 @@ def spending_report(
             from_date_obj = date(y, m, 1)
             to_date_obj = date(y, m, monthrange(y, m)[1])
         else:
-            # Parse explicit dates
-            if from_date:
-                try:
-                    from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
-                except ValueError:
-                    console.print("[red]Invalid from date format. Use YYYY-MM-DD[/red]")
-                    raise typer.Exit(code=1)
-
-            if to_date:
-                try:
-                    to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
-                except ValueError:
-                    console.print("[red]Invalid to date format. Use YYYY-MM-DD[/red]")
-                    raise typer.Exit(code=1)
+            from_date_obj, to_date_obj = parse_date_range(from_date, to_date)
 
         # Build date range string for display
         date_range_str = ""
@@ -480,126 +454,123 @@ def spending_report(
         elif to_date_obj:
             date_range_str = f" (to {to_date_obj})"
 
-        if tag:
-            # Detailed breakdown for specific tag
-            data = analytics.get_spending_for_tag(tag, from_date=from_date_obj, to_date=to_date_obj)
+        with get_analytics() as analytics:
+            if tag:
+                # Detailed breakdown for specific tag
+                data = analytics.get_spending_for_tag(tag, from_date=from_date_obj, to_date=to_date_obj)
 
-            if data['count'] == 0:
-                console.print(f"[yellow]No transactions found for tag '{tag}'{date_range_str}[/yellow]")
-                analytics.close()
-                return
+                if data['count'] == 0:
+                    console.print(f"[yellow]No transactions found for tag '{tag}'{date_range_str}[/yellow]")
+                    return
 
-            # Header
-            console.print(f"\n[bold cyan]Spending: {fix_rtl(tag)}[/bold cyan]{date_range_str}")
-            console.print(f"[bold]Total:[/bold] ₪{data['total_amount']:,.2f}  ({data['count']} transactions)\n")
+                # Header
+                console.print(f"\n[bold cyan]Spending: {fix_rtl(tag)}[/bold cyan]{date_range_str}")
+                console.print(f"[bold]Total:[/bold] ₪{data['total_amount']:,.2f}  ({data['count']} transactions)\n")
 
-            # Category breakdown table
-            table = Table(title="By Category", show_header=True, header_style="bold cyan", box=box.ROUNDED)
-            table.add_column("Category", style="bold", width=25)
-            table.add_column("Amount", justify="right", width=15)
-            table.add_column("Count", justify="right", width=10)
+                # Category breakdown table
+                table = Table(title="By Category", show_header=True, header_style="bold cyan", box=box.ROUNDED)
+                table.add_column("Category", style="bold", width=25)
+                table.add_column("Amount", justify="right", width=15)
+                table.add_column("Count", justify="right", width=10)
 
-            # Sort by amount (absolute value)
-            sorted_categories = sorted(
-                data['by_category'].items(),
-                key=lambda x: abs(x[1]['total_amount']),
-                reverse=True
-            )
-
-            for category, cat_data in sorted_categories:
-                amount = cat_data['total_amount']
-                amount_str = f"₪{amount:,.2f}"
-                if amount < 0:
-                    amount_str = f"[red]{amount_str}[/red]"
-                else:
-                    amount_str = f"[green]{amount_str}[/green]"
-
-                table.add_row(
-                    fix_rtl(category),
-                    amount_str,
-                    str(cat_data['count'])
+                # Sort by amount (absolute value)
+                sorted_categories = sorted(
+                    data['by_category'].items(),
+                    key=lambda x: abs(x[1]['total_amount']),
+                    reverse=True
                 )
 
-            console.print(table)
-
-            # Transaction list (optional)
-            if show_transactions and data['transactions']:
-                console.print()
-                txn_table = Table(title="Transactions", show_header=True, header_style="bold cyan", box=box.ROUNDED)
-                txn_table.add_column("Date", width=12)
-                txn_table.add_column("Description", width=35)
-                txn_table.add_column("Amount", justify="right", width=15)
-                txn_table.add_column("Category", width=20)
-
-                for txn in data['transactions'][:50]:  # Limit to 50
-                    amount = txn['amount']
+                for category, cat_data in sorted_categories:
+                    amount = cat_data['total_amount']
                     amount_str = f"₪{amount:,.2f}"
                     if amount < 0:
                         amount_str = f"[red]{amount_str}[/red]"
                     else:
                         amount_str = f"[green]{amount_str}[/green]"
 
-                    txn_table.add_row(
-                        txn['date'].strftime("%Y-%m-%d"),
-                        fix_rtl(txn['description'][:35]) if txn['description'] else "",
+                    table.add_row(
+                        fix_rtl(category),
                         amount_str,
-                        fix_rtl(txn['category'][:20])
+                        str(cat_data['count'])
                     )
 
-                console.print(txn_table)
+                console.print(table)
 
-                if len(data['transactions']) > 50:
-                    console.print(f"[dim]Showing 50 of {len(data['transactions'])} transactions[/dim]")
+                # Transaction list (optional)
+                if show_transactions and data['transactions']:
+                    console.print()
+                    txn_table = Table(title="Transactions", show_header=True, header_style="bold cyan", box=box.ROUNDED)
+                    txn_table.add_column("Date", width=12)
+                    txn_table.add_column("Description", width=35)
+                    txn_table.add_column("Amount", justify="right", width=15)
+                    txn_table.add_column("Category", width=20)
 
-        else:
-            # General category breakdown (no tag filter)
-            categories = analytics.get_category_breakdown(from_date=from_date_obj, to_date=to_date_obj)
+                    for txn in data['transactions'][:50]:  # Limit to 50
+                        amount = txn['amount']
+                        amount_str = f"₪{amount:,.2f}"
+                        if amount < 0:
+                            amount_str = f"[red]{amount_str}[/red]"
+                        else:
+                            amount_str = f"[green]{amount_str}[/green]"
 
-            if not categories:
-                console.print(f"[yellow]No transactions found{date_range_str}[/yellow]")
-                analytics.close()
-                return
+                        txn_table.add_row(
+                            txn['date'].strftime("%Y-%m-%d"),
+                            fix_rtl(txn['description'][:35]) if txn['description'] else "",
+                            amount_str,
+                            fix_rtl(txn['category'][:20])
+                        )
 
-            # Create table
-            table = Table(title=f"Spending by Category{date_range_str}", show_header=True, header_style="bold cyan", box=box.ROUNDED)
-            table.add_column("Category", style="bold", width=25)
-            table.add_column("Amount", justify="right", width=15)
-            table.add_column("Count", justify="right", width=10)
-            table.add_column("Average", justify="right", width=12)
+                    console.print(txn_table)
 
-            # Sort by total amount descending
-            sorted_categories = sorted(categories.items(), key=lambda x: x[1]['total_amount'], reverse=True)
+                    if len(data['transactions']) > 50:
+                        console.print(f"[dim]Showing 50 of {len(data['transactions'])} transactions[/dim]")
 
-            total_transactions = 0
-            grand_total = 0
+            else:
+                # General category breakdown (no tag filter)
+                categories = analytics.get_category_breakdown(from_date=from_date_obj, to_date=to_date_obj)
 
-            for category, data in sorted_categories:
-                amount = data['total_amount']
-                amount_str = f"₪{amount:,.2f}"
-                if amount < 0:
-                    amount_str = f"[red]{amount_str}[/red]"
+                if not categories:
+                    console.print(f"[yellow]No transactions found{date_range_str}[/yellow]")
+                    return
 
+                # Create table
+                table = Table(title=f"Spending by Category{date_range_str}", show_header=True, header_style="bold cyan", box=box.ROUNDED)
+                table.add_column("Category", style="bold", width=25)
+                table.add_column("Amount", justify="right", width=15)
+                table.add_column("Count", justify="right", width=10)
+                table.add_column("Average", justify="right", width=12)
+
+                # Sort by total amount descending
+                sorted_categories = sorted(categories.items(), key=lambda x: x[1]['total_amount'], reverse=True)
+
+                total_transactions = 0
+                grand_total = 0
+
+                for category, cat_data in sorted_categories:
+                    amount = cat_data['total_amount']
+                    amount_str = f"₪{amount:,.2f}"
+                    if amount < 0:
+                        amount_str = f"[red]{amount_str}[/red]"
+
+                    table.add_row(
+                        fix_rtl(category) if category else "(uncategorized)",
+                        amount_str,
+                        str(cat_data['count']),
+                        f"₪{cat_data['avg_amount']:,.2f}"
+                    )
+                    total_transactions += cat_data['count']
+                    grand_total += amount
+
+                # Add total row
+                table.add_section()
                 table.add_row(
-                    fix_rtl(category) if category else "(uncategorized)",
-                    amount_str,
-                    str(data['count']),
-                    f"₪{data['avg_amount']:,.2f}"
+                    "[bold]TOTAL[/bold]",
+                    f"[bold]₪{grand_total:,.2f}[/bold]",
+                    f"[bold]{total_transactions}[/bold]",
+                    ""
                 )
-                total_transactions += data['count']
-                grand_total += amount
 
-            # Add total row
-            table.add_section()
-            table.add_row(
-                "[bold]TOTAL[/bold]",
-                f"[bold]₪{grand_total:,.2f}[/bold]",
-                f"[bold]{total_transactions}[/bold]",
-                ""
-            )
-
-            console.print(table)
-
-        analytics.close()
+                console.print(table)
 
     except typer.Exit:
         raise
@@ -618,118 +589,99 @@ def balance_report(
     Show account balance report
     """
     try:
-        analytics = AnalyticsService()
+        from_date_obj, to_date_obj = parse_date_range(from_date, to_date)
 
-        if account_id:
-            # Show balance history for specific account
-            account = analytics.get_account_by_id(account_id)
-            if not account:
-                console.print(f"[red]Account with ID {account_id} not found[/red]")
-                raise typer.Exit(code=1)
-
-            # Parse dates
-            from_date_obj = None
-            to_date_obj = None
-
-            if from_date:
-                try:
-                    from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
-                except ValueError:
-                    console.print("[red]Invalid from date format. Use YYYY-MM-DD[/red]")
+        with get_analytics() as analytics:
+            if account_id:
+                # Show balance history for specific account
+                account = analytics.get_account_by_id(account_id)
+                if not account:
+                    console.print(f"[red]Account with ID {account_id} not found[/red]")
                     raise typer.Exit(code=1)
 
-            if to_date:
-                try:
-                    to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
-                except ValueError:
-                    console.print("[red]Invalid to date format. Use YYYY-MM-DD[/red]")
-                    raise typer.Exit(code=1)
+                balances = analytics.get_balance_history(account_id, from_date_obj, to_date_obj)
 
-            balances = analytics.get_balance_history(account_id, from_date_obj, to_date_obj)
+                if not balances:
+                    console.print("[yellow]No balance history found for this account[/yellow]")
+                    return
 
-            if not balances:
-                console.print("[yellow]No balance history found for this account[/yellow]")
-                return
-
-            # Create table
-            table = Table(
-                title=f"Balance History - {account.institution} ({account.account_number})",
-                show_header=True,
-                header_style="bold cyan",
-                box=box.ROUNDED
-            )
-            table.add_column("Date", width=12)
-            table.add_column("Total", justify="right", width=15)
-            table.add_column("Available", justify="right", width=15)
-            table.add_column("Used", justify="right", width=15)
-            table.add_column("P/L", justify="right", width=15)
-            table.add_column("P/L %", justify="right", width=10)
-
-            for balance in balances:
-                # Profit/loss color
-                pl_color = "green" if (balance.profit_loss or 0) >= 0 else "red"
-                pl_sign = "+" if (balance.profit_loss or 0) >= 0 else ""
-                pl_str = f"[{pl_color}]{pl_sign}{balance.profit_loss:,.2f}[/{pl_color}]" if balance.profit_loss is not None else "-"
-
-                pl_pct_sign = "+" if (balance.profit_loss_percentage or 0) >= 0 else ""
-                pl_pct_str = f"[{pl_color}]{pl_pct_sign}{balance.profit_loss_percentage:.2f}%[/{pl_color}]" if balance.profit_loss_percentage is not None else "-"
-
-                table.add_row(
-                    balance.balance_date.strftime("%Y-%m-%d"),
-                    f"{balance.total_amount:,.2f}",
-                    f"{balance.available:,.2f}" if balance.available is not None else "-",
-                    f"{balance.used:,.2f}" if balance.used is not None else "-",
-                    pl_str,
-                    pl_pct_str
+                # Create table
+                table = Table(
+                    title=f"Balance History - {account.institution} ({account.account_number})",
+                    show_header=True,
+                    header_style="bold cyan",
+                    box=box.ROUNDED
                 )
+                table.add_column("Date", width=12)
+                table.add_column("Total", justify="right", width=15)
+                table.add_column("Available", justify="right", width=15)
+                table.add_column("Used", justify="right", width=15)
+                table.add_column("P/L", justify="right", width=15)
+                table.add_column("P/L %", justify="right", width=10)
 
-            console.print(table)
+                for balance in balances:
+                    # Profit/loss color
+                    pl_color = "green" if (balance.profit_loss or 0) >= 0 else "red"
+                    pl_sign = "+" if (balance.profit_loss or 0) >= 0 else ""
+                    pl_str = f"[{pl_color}]{pl_sign}{balance.profit_loss:,.2f}[/{pl_color}]" if balance.profit_loss is not None else "-"
 
-        else:
-            # Show latest balances for all accounts
-            latest_balances = analytics.get_latest_balances()
+                    pl_pct_sign = "+" if (balance.profit_loss_percentage or 0) >= 0 else ""
+                    pl_pct_str = f"[{pl_color}]{pl_pct_sign}{balance.profit_loss_percentage:.2f}%[/{pl_color}]" if balance.profit_loss_percentage is not None else "-"
 
-            if not latest_balances:
-                console.print("[yellow]No balance data found[/yellow]")
-                return
+                    table.add_row(
+                        balance.balance_date.strftime("%Y-%m-%d"),
+                        f"{balance.total_amount:,.2f}",
+                        f"{balance.available:,.2f}" if balance.available is not None else "-",
+                        f"{balance.used:,.2f}" if balance.used is not None else "-",
+                        pl_str,
+                        pl_pct_str
+                    )
 
-            # Create table
-            table = Table(title="Latest Balances", show_header=True, header_style="bold cyan", box=box.ROUNDED)
-            table.add_column("Account", width=25)
-            table.add_column("Type", width=12)
-            table.add_column("Date", width=12)
-            table.add_column("Total", justify="right", width=15)
-            table.add_column("P/L", justify="right", width=15)
-            table.add_column("P/L %", justify="right", width=10)
+                console.print(table)
 
-            total_balance = 0
+            else:
+                # Show latest balances for all accounts
+                latest_balances = analytics.get_latest_balances()
 
-            for account, balance in latest_balances:
-                # Profit/loss color
-                pl_color = "green" if (balance.profit_loss or 0) >= 0 else "red"
-                pl_sign = "+" if (balance.profit_loss or 0) >= 0 else ""
-                pl_str = f"[{pl_color}]{pl_sign}{balance.profit_loss:,.2f}[/{pl_color}]" if balance.profit_loss is not None else "-"
+                if not latest_balances:
+                    console.print("[yellow]No balance data found[/yellow]")
+                    return
 
-                pl_pct_sign = "+" if (balance.profit_loss_percentage or 0) >= 0 else ""
-                pl_pct_str = f"[{pl_color}]{pl_pct_sign}{balance.profit_loss_percentage:.2f}%[/{pl_color}]" if balance.profit_loss_percentage is not None else "-"
+                # Create table
+                table = Table(title="Latest Balances", show_header=True, header_style="bold cyan", box=box.ROUNDED)
+                table.add_column("Account", width=25)
+                table.add_column("Type", width=12)
+                table.add_column("Date", width=12)
+                table.add_column("Total", justify="right", width=15)
+                table.add_column("P/L", justify="right", width=15)
+                table.add_column("P/L %", justify="right", width=10)
 
-                account_name = f"{account.institution} ({account.account_number[:10]}...)" if len(account.account_number) > 10 else f"{account.institution} ({account.account_number})"
+                total_balance = 0
 
-                table.add_row(
-                    account_name,
-                    account.account_type,
-                    balance.balance_date.strftime("%Y-%m-%d"),
-                    f"{balance.total_amount:,.2f}",
-                    pl_str,
-                    pl_pct_str
-                )
+                for account, balance in latest_balances:
+                    # Profit/loss color
+                    pl_color = "green" if (balance.profit_loss or 0) >= 0 else "red"
+                    pl_sign = "+" if (balance.profit_loss or 0) >= 0 else ""
+                    pl_str = f"[{pl_color}]{pl_sign}{balance.profit_loss:,.2f}[/{pl_color}]" if balance.profit_loss is not None else "-"
 
-                total_balance += balance.total_amount
+                    pl_pct_sign = "+" if (balance.profit_loss_percentage or 0) >= 0 else ""
+                    pl_pct_str = f"[{pl_color}]{pl_pct_sign}{balance.profit_loss_percentage:.2f}%[/{pl_color}]" if balance.profit_loss_percentage is not None else "-"
 
-            console.print(table)
-            console.print(f"\n[bold]Total Balance:[/bold] {total_balance:,.2f} ILS")
+                    account_name = f"{account.institution} ({account.account_number[:10]}...)" if len(account.account_number) > 10 else f"{account.institution} ({account.account_number})"
 
-        analytics.close()
+                    table.add_row(
+                        account_name,
+                        account.account_type,
+                        balance.balance_date.strftime("%Y-%m-%d"),
+                        f"{balance.total_amount:,.2f}",
+                        pl_str,
+                        pl_pct_str
+                    )
+
+                    total_balance += balance.total_amount
+
+                console.print(table)
+                console.print(f"\n[bold]Total Balance:[/bold] {total_balance:,.2f} ILS")
 
     except Exception as e:
         console.print(f"[red]Error generating balance report: {str(e)}[/red]")
@@ -758,207 +710,203 @@ def spending_trends(
         fin-cli reports trends --card 1234        # Trends for specific card
     """
     try:
-        analytics = AnalyticsService()
-
-        # Get monthly spending data
-        monthly_data = analytics.get_monthly_spending_trends(
-            months=months,
-            tag=tag,
-            card_last4=card,
-            include_current=include_current
-        )
-
-        if not monthly_data:
-            filter_desc = ""
-            if tag:
-                filter_desc = f" for tag '{tag}'"
-            if card:
-                filter_desc += f" for card *{card}"
-            console.print(f"[yellow]No transaction data found{filter_desc}[/yellow]")
-            analytics.close()
-            return
-
-        # Build date range string
-        first_month = monthly_data[0]
-        last_month = monthly_data[-1]
-        month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-        date_range = f"{month_names[first_month['month']-1]} {first_month['year']} - {month_names[last_month['month']-1]} {last_month['year']}"
-
-        # Header panel
-        title_parts = ["SPENDING TRENDS REPORT"]
-        if tag:
-            title_parts.append(f"Tag: {fix_rtl(tag)}")
-        if card:
-            title_parts.append(f"Card: *{card}")
-
-        header_text = f"[bold cyan]{' | '.join(title_parts)}[/bold cyan]\n[dim]{date_range}[/dim]"
-        console.print(Panel(header_text, box=box.DOUBLE))
-        console.print()
-
-        # ==================== Monthly Overview Table ====================
-        max_amount = max(abs(m['total_amount']) for m in monthly_data) if monthly_data else 1
-
-        monthly_table = Table(
-            title="Monthly Spending Overview",
-            show_header=True,
-            header_style="bold cyan",
-            box=box.ROUNDED
-        )
-        monthly_table.add_column("Month", width=10)
-        monthly_table.add_column("Total", justify="right", width=12)
-        monthly_table.add_column("vs Prev", justify="right", width=10)
-        monthly_table.add_column("Trend", width=35)
-        monthly_table.add_column("Count", justify="right", width=8)
-
-        # Calculate average
-        total_spending = sum(abs(m['total_amount']) for m in monthly_data)
-        avg_spending = total_spending / len(monthly_data) if monthly_data else 0
-
-        # Display months (newest first for readability)
-        for i, m in enumerate(reversed(monthly_data)):
-            month_str = f"{month_names[m['month']-1]} {m['year']}"
-            amount = abs(m['total_amount'])
-            amount_str = f"₪{amount:,.0f}"
-
-            # Calculate change vs previous month
-            original_idx = len(monthly_data) - 1 - i
-            if original_idx > 0:
-                prev_amount = abs(monthly_data[original_idx - 1]['total_amount'])
-                change_str = format_change(amount, prev_amount)
-            else:
-                change_str = "[dim]baseline[/dim]"
-
-            # Create bar
-            bar = make_bar(amount, max_amount, width=30)
-
-            monthly_table.add_row(
-                month_str,
-                amount_str,
-                change_str,
-                bar,
-                str(m['transaction_count'])
+        with get_analytics() as analytics:
+            # Get monthly spending data
+            monthly_data = analytics.get_monthly_spending_trends(
+                months=months,
+                tag=tag,
+                card_last4=card,
+                include_current=include_current
             )
 
-        # Add average row
-        monthly_table.add_section()
-        monthly_table.add_row(
-            "[bold]Average[/bold]",
-            f"[bold]₪{avg_spending:,.0f}[/bold]",
-            "",
-            f"[dim]{months}-month avg[/dim]",
-            ""
-        )
+            if not monthly_data:
+                filter_desc = ""
+                if tag:
+                    filter_desc = f" for tag '{tag}'"
+                if card:
+                    filter_desc += f" for card *{card}"
+                console.print(f"[yellow]No transaction data found{filter_desc}[/yellow]")
+                return
 
-        console.print(monthly_table)
-        console.print()
+            # Build date range string
+            first_month = monthly_data[0]
+            last_month = monthly_data[-1]
+            month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+            date_range = f"{month_names[first_month['month']-1]} {first_month['year']} - {month_names[last_month['month']-1]} {last_month['year']}"
 
-        # ==================== Category Trends ====================
-        if show_categories and not tag:  # Don't show categories if filtering by tag
-            category_data = analytics.get_category_trends(months=months, top_n=5)
+            # Header panel
+            title_parts = ["SPENDING TRENDS REPORT"]
+            if tag:
+                title_parts.append(f"Tag: {fix_rtl(tag)}")
+            if card:
+                title_parts.append(f"Card: *{card}")
 
-            if category_data and category_data.get('categories'):
-                cat_table = Table(
-                    title="Category Trends (Top 5)",
-                    show_header=True,
-                    header_style="bold cyan",
-                    box=box.ROUNDED
-                )
-                cat_table.add_column("Category", width=20)
-                cat_table.add_column("Total", justify="right", width=12)
-                cat_table.add_column("Trend", width=8)
-                cat_table.add_column("Sparkline", width=12)
+            header_text = f"[bold cyan]{' | '.join(title_parts)}[/bold cyan]\n[dim]{date_range}[/dim]"
+            console.print(Panel(header_text, box=box.DOUBLE))
+            console.print()
 
-                # Sort by total
-                sorted_cats = sorted(
-                    category_data['totals'].items(),
-                    key=lambda x: x[1],
-                    reverse=True
-                )
+            # ==================== Monthly Overview Table ====================
+            max_amount = max(abs(m['total_amount']) for m in monthly_data) if monthly_data else 1
 
-                for cat_name, total in sorted_cats:
-                    cat_months = category_data['categories'].get(cat_name, [])
-                    amounts = [m['amount'] for m in cat_months]
-
-                    # Calculate trend
-                    if len(amounts) >= 2:
-                        first_half = sum(amounts[:len(amounts)//2]) or 1
-                        second_half = sum(amounts[len(amounts)//2:])
-                        trend_pct = ((second_half - first_half) / first_half) * 100
-
-                        if abs(trend_pct) < 5:
-                            trend_str = "[dim]→ stable[/dim]"
-                        elif trend_pct > 0:
-                            trend_str = f"[red]↗ +{trend_pct:.0f}%[/red]"
-                        else:
-                            trend_str = f"[green]↘ {trend_pct:.0f}%[/green]"
-                    else:
-                        trend_str = "[dim]—[/dim]"
-
-                    # Sparkline
-                    sparkline = make_sparkline(amounts, width=months)
-
-                    cat_table.add_row(
-                        fix_rtl(cat_name)[:20],
-                        f"₪{total:,.0f}",
-                        trend_str,
-                        f"[cyan]{sparkline}[/cyan]"
-                    )
-
-                console.print(cat_table)
-                console.print(f"[dim]Trend shows % change: recent {months//2} months vs. earlier {months//2} months[/dim]")
-                console.print()
-        else:
-            category_data = None
-
-        # ==================== Card Holder Breakdown ====================
-        if show_cards and not card:  # Don't show if already filtering by card
-            card_data = analytics.get_spending_by_card_holder(months=months)
-
-            if card_data:
-                card_table = Table(
-                    title="By Card Holder (Last 4 Digits)",
-                    show_header=True,
-                    header_style="bold cyan",
-                    box=box.ROUNDED
-                )
-                card_table.add_column("Card", width=10)
-                card_table.add_column("Total", justify="right", width=12)
-                card_table.add_column("% Share", justify="right", width=10)
-                card_table.add_column("Transactions", justify="right", width=12)
-
-                # Sort by amount
-                sorted_cards = sorted(
-                    card_data.items(),
-                    key=lambda x: x[1]['total_amount'],
-                    reverse=True
-                )
-
-                for last4, data in sorted_cards:
-                    card_table.add_row(
-                        f"*{last4}",
-                        f"₪{data['total_amount']:,.0f}",
-                        f"{data['percentage']:.0f}%",
-                        str(data['transaction_count'])
-                    )
-
-                console.print(card_table)
-                console.print()
-
-        # ==================== Insights ====================
-        insights = generate_insights(monthly_data, category_data)
-
-        if insights:
-            insight_lines = [f"  • {insight}" for insight in insights]
-            insight_text = "\n".join(insight_lines)
-            console.print(Panel(
-                insight_text,
-                title="[bold]Insights[/bold]",
-                border_style="dim",
+            monthly_table = Table(
+                title="Monthly Spending Overview",
+                show_header=True,
+                header_style="bold cyan",
                 box=box.ROUNDED
-            ))
+            )
+            monthly_table.add_column("Month", width=10)
+            monthly_table.add_column("Total", justify="right", width=12)
+            monthly_table.add_column("vs Prev", justify="right", width=10)
+            monthly_table.add_column("Trend", width=35)
+            monthly_table.add_column("Count", justify="right", width=8)
 
-        analytics.close()
+            # Calculate average
+            total_spending = sum(abs(m['total_amount']) for m in monthly_data)
+            avg_spending = total_spending / len(monthly_data) if monthly_data else 0
+
+            # Display months (newest first for readability)
+            for i, m in enumerate(reversed(monthly_data)):
+                month_str = f"{month_names[m['month']-1]} {m['year']}"
+                amount = abs(m['total_amount'])
+                amount_str = f"₪{amount:,.0f}"
+
+                # Calculate change vs previous month
+                original_idx = len(monthly_data) - 1 - i
+                if original_idx > 0:
+                    prev_amount = abs(monthly_data[original_idx - 1]['total_amount'])
+                    change_str = format_change(amount, prev_amount)
+                else:
+                    change_str = "[dim]baseline[/dim]"
+
+                # Create bar
+                bar = make_bar(amount, max_amount, width=30)
+
+                monthly_table.add_row(
+                    month_str,
+                    amount_str,
+                    change_str,
+                    bar,
+                    str(m['transaction_count'])
+                )
+
+            # Add average row
+            monthly_table.add_section()
+            monthly_table.add_row(
+                "[bold]Average[/bold]",
+                f"[bold]₪{avg_spending:,.0f}[/bold]",
+                "",
+                f"[dim]{months}-month avg[/dim]",
+                ""
+            )
+
+            console.print(monthly_table)
+            console.print()
+
+            # ==================== Category Trends ====================
+            if show_categories and not tag:  # Don't show categories if filtering by tag
+                category_data = analytics.get_category_trends(months=months, top_n=5)
+
+                if category_data and category_data.get('categories'):
+                    cat_table = Table(
+                        title="Category Trends (Top 5)",
+                        show_header=True,
+                        header_style="bold cyan",
+                        box=box.ROUNDED
+                    )
+                    cat_table.add_column("Category", width=20)
+                    cat_table.add_column("Total", justify="right", width=12)
+                    cat_table.add_column("Trend", width=8)
+                    cat_table.add_column("Sparkline", width=12)
+
+                    # Sort by total
+                    sorted_cats = sorted(
+                        category_data['totals'].items(),
+                        key=lambda x: x[1],
+                        reverse=True
+                    )
+
+                    for cat_name, total in sorted_cats:
+                        cat_months = category_data['categories'].get(cat_name, [])
+                        amounts = [m['amount'] for m in cat_months]
+
+                        # Calculate trend
+                        if len(amounts) >= 2:
+                            first_half = sum(amounts[:len(amounts)//2]) or 1
+                            second_half = sum(amounts[len(amounts)//2:])
+                            trend_pct = ((second_half - first_half) / first_half) * 100
+
+                            if abs(trend_pct) < 5:
+                                trend_str = "[dim]→ stable[/dim]"
+                            elif trend_pct > 0:
+                                trend_str = f"[red]↗ +{trend_pct:.0f}%[/red]"
+                            else:
+                                trend_str = f"[green]↘ {trend_pct:.0f}%[/green]"
+                        else:
+                            trend_str = "[dim]—[/dim]"
+
+                        # Sparkline
+                        sparkline = make_sparkline(amounts, width=months)
+
+                        cat_table.add_row(
+                            fix_rtl(cat_name)[:20],
+                            f"₪{total:,.0f}",
+                            trend_str,
+                            f"[cyan]{sparkline}[/cyan]"
+                        )
+
+                    console.print(cat_table)
+                    console.print(f"[dim]Trend shows % change: recent {months//2} months vs. earlier {months//2} months[/dim]")
+                    console.print()
+            else:
+                category_data = None
+
+            # ==================== Card Holder Breakdown ====================
+            if show_cards and not card:  # Don't show if already filtering by card
+                card_data = analytics.get_spending_by_card_holder(months=months)
+
+                if card_data:
+                    card_table = Table(
+                        title="By Card Holder (Last 4 Digits)",
+                        show_header=True,
+                        header_style="bold cyan",
+                        box=box.ROUNDED
+                    )
+                    card_table.add_column("Card", width=10)
+                    card_table.add_column("Total", justify="right", width=12)
+                    card_table.add_column("% Share", justify="right", width=10)
+                    card_table.add_column("Transactions", justify="right", width=12)
+
+                    # Sort by amount
+                    sorted_cards = sorted(
+                        card_data.items(),
+                        key=lambda x: x[1]['total_amount'],
+                        reverse=True
+                    )
+
+                    for last4, data in sorted_cards:
+                        card_table.add_row(
+                            f"*{last4}",
+                            f"₪{data['total_amount']:,.0f}",
+                            f"{data['percentage']:.0f}%",
+                            str(data['transaction_count'])
+                        )
+
+                    console.print(card_table)
+                    console.print()
+
+            # ==================== Insights ====================
+            insights = generate_insights(monthly_data, category_data)
+
+            if insights:
+                insight_lines = [f"  • {insight}" for insight in insights]
+                insight_text = "\n".join(insight_lines)
+                console.print(Panel(
+                    insight_text,
+                    title="[bold]Insights[/bold]",
+                    border_style="dim",
+                    box=box.ROUNDED
+                ))
 
     except Exception as e:
         console.print(f"[red]Error generating trends report: {str(e)}[/red]")
@@ -975,53 +923,50 @@ def sync_history(
     Show synchronization history
     """
     try:
-        analytics = AnalyticsService()
+        with get_analytics() as analytics:
+            history = analytics.get_sync_history(limit=limit, institution=institution, status=status)
 
-        history = analytics.get_sync_history(limit=limit, institution=institution, status=status)
+            if not history:
+                console.print("[yellow]No sync history found[/yellow]")
+                return
 
-        if not history:
-            console.print("[yellow]No sync history found[/yellow]")
-            return
+            # Create table
+            table = Table(title="Synchronization History", show_header=True, header_style="bold cyan", box=box.ROUNDED)
+            table.add_column("ID", style="dim", width=6)
+            table.add_column("Type", width=15)
+            table.add_column("Institution", width=15)
+            table.add_column("Status", width=10)
+            table.add_column("Started", width=18)
+            table.add_column("Duration", width=12)
+            table.add_column("Added", justify="right", width=8)
+            table.add_column("Updated", justify="right", width=8)
 
-        # Create table
-        table = Table(title="Synchronization History", show_header=True, header_style="bold cyan", box=box.ROUNDED)
-        table.add_column("ID", style="dim", width=6)
-        table.add_column("Type", width=15)
-        table.add_column("Institution", width=15)
-        table.add_column("Status", width=10)
-        table.add_column("Started", width=18)
-        table.add_column("Duration", width=12)
-        table.add_column("Added", justify="right", width=8)
-        table.add_column("Updated", justify="right", width=8)
+            for sync in history:
+                # Status color
+                status_color = "green" if sync.status == "success" else "red" if sync.status == "failed" else "yellow"
+                status_str = f"[{status_color}]{sync.status}[/{status_color}]"
 
-        for sync in history:
-            # Status color
-            status_color = "green" if sync.status == "success" else "red" if sync.status == "failed" else "yellow"
-            status_str = f"[{status_color}]{sync.status}[/{status_color}]"
+                # Calculate duration
+                duration = "-"
+                if sync.completed_at and sync.started_at:
+                    duration_seconds = (sync.completed_at - sync.started_at).total_seconds()
+                    if duration_seconds < 60:
+                        duration = f"{duration_seconds:.0f}s"
+                    else:
+                        duration = f"{duration_seconds / 60:.1f}m"
 
-            # Calculate duration
-            duration = "-"
-            if sync.completed_at and sync.started_at:
-                duration_seconds = (sync.completed_at - sync.started_at).total_seconds()
-                if duration_seconds < 60:
-                    duration = f"{duration_seconds:.0f}s"
-                else:
-                    duration = f"{duration_seconds / 60:.1f}m"
+                table.add_row(
+                    str(sync.id),
+                    sync.sync_type,
+                    sync.institution or "-",
+                    status_str,
+                    sync.started_at.strftime("%Y-%m-%d %H:%M"),
+                    duration,
+                    str(sync.records_added),
+                    str(sync.records_updated)
+                )
 
-            table.add_row(
-                str(sync.id),
-                sync.sync_type,
-                sync.institution or "-",
-                status_str,
-                sync.started_at.strftime("%Y-%m-%d %H:%M"),
-                duration,
-                str(sync.records_added),
-                str(sync.records_updated)
-            )
-
-        console.print(table)
-
-        analytics.close()
+            console.print(table)
 
     except Exception as e:
         console.print(f"[red]Error showing sync history: {str(e)}[/red]")

@@ -3,15 +3,103 @@ CLI utility functions for improved user experience
 """
 
 import re
-from typing import Optional, Any
+from contextlib import contextmanager
+from datetime import date, datetime
+from typing import Optional, Any, Tuple, Generator
 from rich.console import Console
 from bidi.algorithm import get_display
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich.panel import Panel
 from rich import print as rprint
+import typer
 
 console = Console()
+
+
+# ==================== Date Parsing Utilities ====================
+
+def parse_date(date_str: str, param_name: str = "date") -> date:
+    """
+    Parse a YYYY-MM-DD date string.
+
+    Args:
+        date_str: Date string in YYYY-MM-DD format
+        param_name: Name of the parameter for error messages
+
+    Returns:
+        Parsed date object
+
+    Raises:
+        typer.Exit: If date format is invalid
+    """
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        console.print(f"[red]Invalid {param_name} format. Use YYYY-MM-DD[/red]")
+        raise typer.Exit(code=1)
+
+
+def parse_date_range(
+    from_date: Optional[str],
+    to_date: Optional[str]
+) -> Tuple[Optional[date], Optional[date]]:
+    """
+    Parse optional from/to date strings.
+
+    Args:
+        from_date: Optional start date string (YYYY-MM-DD)
+        to_date: Optional end date string (YYYY-MM-DD)
+
+    Returns:
+        Tuple of (from_date, to_date) as date objects or None
+
+    Raises:
+        typer.Exit: If any date format is invalid
+    """
+    from_date_obj = parse_date(from_date, "from date") if from_date else None
+    to_date_obj = parse_date(to_date, "to date") if to_date else None
+    return from_date_obj, to_date_obj
+
+
+# ==================== Service Context Managers ====================
+
+@contextmanager
+def get_analytics() -> Generator["AnalyticsService", None, None]:
+    """
+    Context manager for AnalyticsService.
+
+    Ensures proper cleanup of database session on exit.
+
+    Usage:
+        with get_analytics() as analytics:
+            stats = analytics.get_overall_stats()
+    """
+    from services.analytics_service import AnalyticsService
+    service = AnalyticsService()
+    try:
+        yield service
+    finally:
+        service.close()
+
+
+@contextmanager
+def get_db_session() -> Generator["Session", None, None]:
+    """
+    Context manager for database session.
+
+    Ensures proper cleanup on exit.
+
+    Usage:
+        with get_db_session() as session:
+            accounts = session.query(Account).all()
+    """
+    from db.database import SessionLocal
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 def print_success(message: str):

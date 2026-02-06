@@ -44,7 +44,7 @@ def test_sync_cal_success_output(cli_runner, mock_db_session):
     """
     CAL sync with valid credentials should show success message.
     """
-    with patch("cli.commands.sync.SessionLocal", return_value=mock_db_session):
+    with patch("db.database.SessionLocal", return_value=mock_db_session):
         with patch("db.database.check_database_exists", return_value=True):
             with patch("config.settings.select_accounts_to_sync") as mock_select:
                 account = MagicMock()
@@ -76,7 +76,7 @@ def test_sync_cal_shows_card_count(cli_runner, mock_db_session):
     """
     Sync output should show number of cards synced.
     """
-    with patch("cli.commands.sync.SessionLocal", return_value=mock_db_session):
+    with patch("db.database.SessionLocal", return_value=mock_db_session):
         with patch("db.database.check_database_exists", return_value=True):
             with patch("config.settings.select_accounts_to_sync") as mock_select:
                 account = MagicMock()
@@ -104,7 +104,7 @@ def test_sync_max_success_output(cli_runner, mock_db_session):
     """
     Max sync with valid credentials should show success message.
     """
-    with patch("cli.commands.sync.SessionLocal", return_value=mock_db_session):
+    with patch("db.database.SessionLocal", return_value=mock_db_session):
         with patch("db.database.check_database_exists", return_value=True):
             with patch("config.settings.select_accounts_to_sync") as mock_select:
                 account = MagicMock()
@@ -134,7 +134,7 @@ def test_sync_isracard_success_output(cli_runner, mock_db_session):
     """
     Isracard sync with valid credentials should show success message.
     """
-    with patch("cli.commands.sync.SessionLocal", return_value=mock_db_session):
+    with patch("db.database.SessionLocal", return_value=mock_db_session):
         with patch("db.database.check_database_exists", return_value=True):
             with patch("config.settings.select_accounts_to_sync") as mock_select:
                 account = MagicMock()
@@ -181,7 +181,7 @@ def test_sync_cal_scraper_error_shows_message(cli_runner, mock_db_session):
     """
     Sync should show error message when scraper fails.
     """
-    with patch("cli.commands.sync.SessionLocal", return_value=mock_db_session):
+    with patch("db.database.SessionLocal", return_value=mock_db_session):
         with patch("db.database.check_database_exists", return_value=True):
             with patch("config.settings.select_accounts_to_sync") as mock_select:
                 account = MagicMock()
@@ -206,7 +206,7 @@ def test_sync_cal_empty_cards_shows_error(cli_runner, mock_db_session):
     """
     Sync with no cards found should show error.
     """
-    with patch("cli.commands.sync.SessionLocal", return_value=mock_db_session):
+    with patch("db.database.SessionLocal", return_value=mock_db_session):
         with patch("db.database.check_database_exists", return_value=True):
             with patch("config.settings.select_accounts_to_sync") as mock_select:
                 account = MagicMock()
@@ -252,7 +252,7 @@ def test_sync_shows_transaction_counts(cli_runner, mock_db_session):
     """
     Sync output should show transaction add/update counts.
     """
-    with patch("cli.commands.sync.SessionLocal", return_value=mock_db_session):
+    with patch("db.database.SessionLocal", return_value=mock_db_session):
         with patch("db.database.check_database_exists", return_value=True):
             with patch("config.settings.select_accounts_to_sync") as mock_select:
                 account = MagicMock()
@@ -285,7 +285,7 @@ def test_sync_shows_unmapped_warning(cli_runner, mock_db_session):
     """
     Sync with unmapped categories should show warning.
     """
-    with patch("cli.commands.sync.SessionLocal", return_value=mock_db_session):
+    with patch("db.database.SessionLocal", return_value=mock_db_session):
         with patch("db.database.check_database_exists", return_value=True):
             with patch("config.settings.select_accounts_to_sync") as mock_select:
                 account = MagicMock()
@@ -319,7 +319,7 @@ def test_sync_multi_account_shows_progress(cli_runner, mock_db_session):
     """
     Sync with multiple accounts should show progress for each.
     """
-    with patch("cli.commands.sync.SessionLocal", return_value=mock_db_session):
+    with patch("db.database.SessionLocal", return_value=mock_db_session):
         with patch("db.database.check_database_exists", return_value=True):
             with patch("config.settings.select_accounts_to_sync") as mock_select:
                 account1 = MagicMock()
@@ -359,7 +359,7 @@ def test_sync_partial_failure_continues(cli_runner, mock_db_session):
             raise Exception("First account failed")
         return [build_card_account()]
 
-    with patch("cli.commands.sync.SessionLocal", return_value=mock_db_session):
+    with patch("db.database.SessionLocal", return_value=mock_db_session):
         with patch("db.database.check_database_exists", return_value=True):
             with patch("config.settings.select_accounts_to_sync") as mock_select:
                 account1 = MagicMock()
@@ -393,7 +393,7 @@ def test_sync_shows_summary(cli_runner, mock_db_session):
     """
     Sync should show summary at the end.
     """
-    with patch("cli.commands.sync.SessionLocal", return_value=mock_db_session):
+    with patch("db.database.SessionLocal", return_value=mock_db_session):
         with patch("db.database.check_database_exists", return_value=True):
             with patch("config.settings.select_accounts_to_sync") as mock_select:
                 account = MagicMock()

@@ -3,14 +3,12 @@ Transaction management CLI commands
 """
 
 import typer
-from datetime import date, datetime
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from typing import Optional, List
 
-from cli.utils import fix_rtl
-from services.analytics_service import AnalyticsService
+from cli.utils import fix_rtl, parse_date_range, get_analytics
 from services.tag_service import TagService
 
 app = typer.Typer(help="Manage transactions")
@@ -33,23 +31,7 @@ def browse_transactions(
     try:
         from cli.tui.browser import run_browser
 
-        # Parse dates
-        from_date_obj = None
-        to_date_obj = None
-
-        if from_date:
-            try:
-                from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
-            except ValueError:
-                console.print("[red]Invalid from date format. Use YYYY-MM-DD[/red]")
-                raise typer.Exit(code=1)
-
-        if to_date:
-            try:
-                to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
-            except ValueError:
-                console.print("[red]Invalid to date format. Use YYYY-MM-DD[/red]")
-                raise typer.Exit(code=1)
+        from_date_obj, to_date_obj = parse_date_range(from_date, to_date)
 
         run_browser(
             from_date=from_date_obj,
@@ -84,108 +66,90 @@ def list_transactions(
     List transactions with filters
     """
     try:
-        analytics = AnalyticsService()
-        tag_service = TagService()
+        from_date_obj, to_date_obj = parse_date_range(from_date, to_date)
 
-        # Parse dates
-        from_date_obj = None
-        to_date_obj = None
+        with get_analytics() as analytics:
+            tag_service = TagService()
 
-        if from_date:
-            try:
-                from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
-            except ValueError:
-                console.print("[red]Invalid from date format. Use YYYY-MM-DD[/red]")
-                raise typer.Exit(code=1)
-
-        if to_date:
-            try:
-                to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
-            except ValueError:
-                console.print("[red]Invalid to date format. Use YYYY-MM-DD[/red]")
-                raise typer.Exit(code=1)
-
-        # Get transactions
-        transactions = analytics.get_transactions(
-            account_id=account_id,
-            from_date=from_date_obj,
-            to_date=to_date_obj,
-            status=status,
-            institution=institution,
-            tags=tag,
-            untagged_only=untagged,
-            limit=limit,
-            offset=offset
-        )
-
-        if not transactions:
-            console.print("[yellow]No transactions found matching the criteria[/yellow]")
-            return
-
-        # Create table
-        table = Table(title="Transactions", show_header=True, header_style="bold cyan")
-        table.add_column("ID", style="dim", width=6)
-        table.add_column("Date", width=12)
-        table.add_column("Description", width=30)
-        table.add_column("Amount", justify="right", width=15)
-        table.add_column("Category", width=15)
-        table.add_column("Card", width=6)
-        table.add_column("Tags", width=18)
-        table.add_column("Account", width=10)
-
-        for txn in transactions:
-            # Format amount with color - use charged_amount (actual payment) if available
-            amount = txn.charged_amount if txn.charged_amount is not None else txn.original_amount
-            currency = txn.charged_currency or txn.original_currency
-            amount_str = f"{amount:,.2f} {currency}"
-            if amount < 0:
-                amount_str = f"[red]{amount_str}[/red]"
-            else:
-                amount_str = f"[green]{amount_str}[/green]"
-
-            # Get tags for transaction
-            txn_tags = tag_service.get_transaction_tags(txn.id)
-            if txn_tags:
-                tags_str = ", ".join([f"[cyan]{fix_rtl(t.name)}[/cyan]" for t in txn_tags[:3]])
-                if len(txn_tags) > 3:
-                    tags_str += f" [dim]+{len(txn_tags) - 3}[/dim]"
-            else:
-                tags_str = "[dim](none)[/dim]"
-
-            # Get account info
-            account = analytics.get_account_by_id(txn.account_id)
-            account_str = f"{account.institution}" if account else "Unknown"
-            card_str = account.account_number if account else ""
-
-            # Get effective category (user_category if set, else source category)
-            category_str = fix_rtl(txn.effective_category[:15]) if txn.effective_category else "[dim](none)[/dim]"
-
-            # Use processed_date for installments (when you actually pay), otherwise transaction_date
-            if txn.installment_number and txn.processed_date:
-                date_str = txn.processed_date.strftime("%Y-%m-%d")
-            else:
-                date_str = txn.transaction_date.strftime("%Y-%m-%d")
-
-            table.add_row(
-                str(txn.id),
-                date_str,
-                fix_rtl(txn.description[:30]),
-                amount_str,
-                category_str,
-                card_str,
-                tags_str,
-                account_str
+            # Get transactions
+            transactions = analytics.get_transactions(
+                account_id=account_id,
+                from_date=from_date_obj,
+                to_date=to_date_obj,
+                status=status,
+                institution=institution,
+                tags=tag,
+                untagged_only=untagged,
+                limit=limit,
+                offset=offset
             )
 
-        console.print(table)
+            if not transactions:
+                console.print("[yellow]No transactions found matching the criteria[/yellow]")
+                return
 
-        # Show summary
-        console.print(f"\n[bold]Showing:[/bold] {len(transactions)} transaction(s)")
+            # Create table
+            table = Table(title="Transactions", show_header=True, header_style="bold cyan")
+            table.add_column("ID", style="dim", width=6)
+            table.add_column("Date", width=12)
+            table.add_column("Description", width=30)
+            table.add_column("Amount", justify="right", width=15)
+            table.add_column("Category", width=15)
+            table.add_column("Card", width=6)
+            table.add_column("Tags", width=18)
+            table.add_column("Account", width=10)
 
-        if len(transactions) == limit:
-            console.print(f"[dim]Use --offset {offset + limit} to see more transactions[/dim]")
+            for txn in transactions:
+                # Format amount with color - use charged_amount (actual payment) if available
+                amount = txn.charged_amount if txn.charged_amount is not None else txn.original_amount
+                currency = txn.charged_currency or txn.original_currency
+                amount_str = f"{amount:,.2f} {currency}"
+                if amount < 0:
+                    amount_str = f"[red]{amount_str}[/red]"
+                else:
+                    amount_str = f"[green]{amount_str}[/green]"
 
-        analytics.close()
+                # Get tags for transaction
+                txn_tags = tag_service.get_transaction_tags(txn.id)
+                if txn_tags:
+                    tags_str = ", ".join([f"[cyan]{fix_rtl(t.name)}[/cyan]" for t in txn_tags[:3]])
+                    if len(txn_tags) > 3:
+                        tags_str += f" [dim]+{len(txn_tags) - 3}[/dim]"
+                else:
+                    tags_str = "[dim](none)[/dim]"
+
+                # Get account info
+                account = analytics.get_account_by_id(txn.account_id)
+                account_str = f"{account.institution}" if account else "Unknown"
+                card_str = account.account_number if account else ""
+
+                # Get effective category (user_category if set, else source category)
+                category_str = fix_rtl(txn.effective_category[:15]) if txn.effective_category else "[dim](none)[/dim]"
+
+                # Use processed_date for installments (when you actually pay), otherwise transaction_date
+                if txn.installment_number and txn.processed_date:
+                    date_str = txn.processed_date.strftime("%Y-%m-%d")
+                else:
+                    date_str = txn.transaction_date.strftime("%Y-%m-%d")
+
+                table.add_row(
+                    str(txn.id),
+                    date_str,
+                    fix_rtl(txn.description[:30]),
+                    amount_str,
+                    category_str,
+                    card_str,
+                    tags_str,
+                    account_str
+                )
+
+            console.print(table)
+
+            # Show summary
+            console.print(f"\n[bold]Showing:[/bold] {len(transactions)} transaction(s)")
+
+            if len(transactions) == limit:
+                console.print(f"[dim]Use --offset {offset + limit} to see more transactions[/dim]")
 
     except Exception as e:
         console.print(f"[red]Error listing transactions: {str(e)}[/red]")
@@ -200,106 +164,103 @@ def show_transaction(
     Show detailed information for a specific transaction
     """
     try:
-        analytics = AnalyticsService()
-        tag_service = TagService()
+        with get_analytics() as analytics:
+            tag_service = TagService()
 
-        transaction = analytics.get_transaction_by_id(transaction_id)
+            transaction = analytics.get_transaction_by_id(transaction_id)
 
-        if not transaction:
-            console.print(f"[red]Transaction with ID {transaction_id} not found[/red]")
-            analytics.close()
-            raise typer.Exit(code=1)
+            if not transaction:
+                console.print(f"[red]Transaction with ID {transaction_id} not found[/red]")
+                raise typer.Exit(code=1)
 
-        # Get account info
-        account = analytics.get_account_by_id(transaction.account_id)
+            # Get account info
+            account = analytics.get_account_by_id(transaction.account_id)
 
-        # Get tags
-        txn_tags = tag_service.get_transaction_tags(transaction_id)
+            # Get tags
+            txn_tags = tag_service.get_transaction_tags(transaction_id)
 
-        # Create info panel
-        info_lines = [
-            f"[bold]Transaction ID:[/bold] {transaction.id}",
-            f"[bold]External ID:[/bold] {transaction.transaction_id or 'N/A'}",
-            "",
-            f"[bold cyan]Account Information:[/bold cyan]",
-            f"[bold]Account ID:[/bold] {transaction.account_id}",
-        ]
+            # Create info panel
+            info_lines = [
+                f"[bold]Transaction ID:[/bold] {transaction.id}",
+                f"[bold]External ID:[/bold] {transaction.transaction_id or 'N/A'}",
+                "",
+                f"[bold cyan]Account Information:[/bold cyan]",
+                f"[bold]Account ID:[/bold] {transaction.account_id}",
+            ]
 
-        if account:
-            info_lines.extend([
-                f"[bold]Institution:[/bold] {account.institution}",
-                f"[bold]Account Type:[/bold] {account.account_type}",
-                f"[bold]Account Number:[/bold] {account.account_number}",
-            ])
+            if account:
+                info_lines.extend([
+                    f"[bold]Institution:[/bold] {account.institution}",
+                    f"[bold]Account Type:[/bold] {account.account_type}",
+                    f"[bold]Account Number:[/bold] {account.account_number}",
+                ])
 
-        info_lines.extend([
-            "",
-            f"[bold cyan]Transaction Details:[/bold cyan]",
-            f"[bold]Date:[/bold] {transaction.transaction_date}",
-        ])
-
-        if transaction.processed_date:
-            info_lines.append(f"[bold]Processed Date:[/bold] {transaction.processed_date}")
-
-        info_lines.append(f"[bold]Description:[/bold] {fix_rtl(transaction.description)}")
-
-        # Amount information
-        amount_color = "green" if transaction.original_amount >= 0 else "red"
-        info_lines.append(
-            f"[bold]Original Amount:[/bold] [{amount_color}]{transaction.original_amount:,.2f} {transaction.original_currency}[/{amount_color}]"
-        )
-
-        if transaction.charged_amount is not None:
-            charged_color = "green" if transaction.charged_amount >= 0 else "red"
-            info_lines.append(
-                f"[bold]Charged Amount:[/bold] [{charged_color}]{transaction.charged_amount:,.2f} {transaction.charged_currency}[/{charged_color}]"
-            )
-
-        # Status and type
-        status_color = "yellow" if transaction.status == "pending" else "green"
-        info_lines.extend([
-            f"[bold]Status:[/bold] [{status_color}]{transaction.status or 'unknown'}[/{status_color}]",
-            f"[bold]Type:[/bold] {transaction.transaction_type or 'N/A'}",
-        ])
-
-        # Category information (raw -> normalized -> user override)
-        info_lines.append("")
-        info_lines.append(f"[bold cyan]Category & Tags:[/bold cyan]")
-        # Show effective category prominently
-        info_lines.append(f"[bold]Category:[/bold] {fix_rtl(transaction.effective_category) if transaction.effective_category else '[dim](none)[/dim]'}")
-        # Show breakdown of category sources
-        if transaction.raw_category:
-            info_lines.append(f"  [dim]Provider category:[/dim] {fix_rtl(transaction.raw_category)}")
-        if transaction.category and transaction.category != transaction.raw_category:
-            info_lines.append(f"  [dim]Normalized:[/dim] {fix_rtl(transaction.category)}")
-        if hasattr(transaction, 'user_category') and transaction.user_category:
-            info_lines.append(f"  [dim]Your override:[/dim] [green]{fix_rtl(transaction.user_category)}[/green]")
-
-        # Tags
-        if txn_tags:
-            tags_str = ", ".join([f"[cyan]{fix_rtl(t.name)}[/cyan]" for t in txn_tags])
-            info_lines.append(f"[bold]Tags:[/bold] {tags_str}")
-        else:
-            info_lines.append(f"[bold]Tags:[/bold] [dim](none)[/dim]")
-
-        if transaction.memo:
-            info_lines.append(f"[bold]Memo:[/bold] {fix_rtl(transaction.memo)}")
-
-        # Installment information
-        if transaction.installment_number is not None and transaction.installment_total is not None:
             info_lines.extend([
                 "",
-                f"[bold cyan]Installment:[/bold cyan]",
-                f"[bold]Payment:[/bold] {transaction.installment_number} of {transaction.installment_total}",
+                f"[bold cyan]Transaction Details:[/bold cyan]",
+                f"[bold]Date:[/bold] {transaction.transaction_date}",
             ])
 
-        info_lines.append(f"\n[bold]Created At:[/bold] {transaction.created_at.strftime('%Y-%m-%d %H:%M')}")
+            if transaction.processed_date:
+                info_lines.append(f"[bold]Processed Date:[/bold] {transaction.processed_date}")
 
-        info_text = "\n".join(info_lines)
-        panel = Panel(info_text, title="Transaction Details", border_style="cyan")
-        console.print(panel)
+            info_lines.append(f"[bold]Description:[/bold] {fix_rtl(transaction.description)}")
 
-        analytics.close()
+            # Amount information
+            amount_color = "green" if transaction.original_amount >= 0 else "red"
+            info_lines.append(
+                f"[bold]Original Amount:[/bold] [{amount_color}]{transaction.original_amount:,.2f} {transaction.original_currency}[/{amount_color}]"
+            )
+
+            if transaction.charged_amount is not None:
+                charged_color = "green" if transaction.charged_amount >= 0 else "red"
+                info_lines.append(
+                    f"[bold]Charged Amount:[/bold] [{charged_color}]{transaction.charged_amount:,.2f} {transaction.charged_currency}[/{charged_color}]"
+                )
+
+            # Status and type
+            status_color = "yellow" if transaction.status == "pending" else "green"
+            info_lines.extend([
+                f"[bold]Status:[/bold] [{status_color}]{transaction.status or 'unknown'}[/{status_color}]",
+                f"[bold]Type:[/bold] {transaction.transaction_type or 'N/A'}",
+            ])
+
+            # Category information (raw -> normalized -> user override)
+            info_lines.append("")
+            info_lines.append(f"[bold cyan]Category & Tags:[/bold cyan]")
+            # Show effective category prominently
+            info_lines.append(f"[bold]Category:[/bold] {fix_rtl(transaction.effective_category) if transaction.effective_category else '[dim](none)[/dim]'}")
+            # Show breakdown of category sources
+            if transaction.raw_category:
+                info_lines.append(f"  [dim]Provider category:[/dim] {fix_rtl(transaction.raw_category)}")
+            if transaction.category and transaction.category != transaction.raw_category:
+                info_lines.append(f"  [dim]Normalized:[/dim] {fix_rtl(transaction.category)}")
+            if hasattr(transaction, 'user_category') and transaction.user_category:
+                info_lines.append(f"  [dim]Your override:[/dim] [green]{fix_rtl(transaction.user_category)}[/green]")
+
+            # Tags
+            if txn_tags:
+                tags_str = ", ".join([f"[cyan]{fix_rtl(t.name)}[/cyan]" for t in txn_tags])
+                info_lines.append(f"[bold]Tags:[/bold] {tags_str}")
+            else:
+                info_lines.append(f"[bold]Tags:[/bold] [dim](none)[/dim]")
+
+            if transaction.memo:
+                info_lines.append(f"[bold]Memo:[/bold] {fix_rtl(transaction.memo)}")
+
+            # Installment information
+            if transaction.installment_number is not None and transaction.installment_total is not None:
+                info_lines.extend([
+                    "",
+                    f"[bold cyan]Installment:[/bold cyan]",
+                    f"[bold]Payment:[/bold] {transaction.installment_number} of {transaction.installment_total}",
+                ])
+
+            info_lines.append(f"\n[bold]Created At:[/bold] {transaction.created_at.strftime('%Y-%m-%d %H:%M')}")
+
+            info_text = "\n".join(info_lines)
+            panel = Panel(info_text, title="Transaction Details", border_style="cyan")
+            console.print(panel)
 
     except Exception as e:
         console.print(f"[red]Error showing transaction: {str(e)}[/red]")

@@ -9,7 +9,8 @@ from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from pathlib import Path
 
-from db.database import SessionLocal, check_database_exists, DEFAULT_DB_PATH
+from db.database import check_database_exists, DEFAULT_DB_PATH
+from cli.utils import get_db_session
 from config.settings import load_credentials, get_settings, select_accounts_to_sync, select_pension_accounts_to_sync
 from services.broker_service import BrokerService
 from services.pension_service import PensionService
@@ -109,10 +110,7 @@ def sync_excellence(
         console.print("Run 'fin-cli config' to set up credentials.")
         raise typer.Exit(1)
 
-    # Create database session
-    db = SessionLocal()
-
-    try:
+    with get_db_session() as db:
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -139,9 +137,6 @@ def sync_excellence(
             console.print(f"[red]✗ Failed: {result.error_message}[/red]")
             raise typer.Exit(1)
 
-    finally:
-        db.close()
-
 
 @app.command("meitav")
 def sync_meitav(
@@ -165,10 +160,7 @@ def sync_meitav(
         console.print("Run 'fin-cli config setup' to set up credentials.")
         raise typer.Exit(1)
 
-    # Create database session
-    db = SessionLocal()
-
-    try:
+    with get_db_session() as db:
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -196,9 +188,6 @@ def sync_meitav(
         else:
             console.print(f"[red]✗ Failed: {result.error_message}[/red]")
             raise typer.Exit(1)
-
-    finally:
-        db.close()
 
 
 def _sync_pension_multi_account(
@@ -231,15 +220,12 @@ def _sync_pension_multi_account(
         console.print(f"[bold red]Error: {e}[/bold red]")
         raise typer.Exit(1)
 
-    # Create database session
-    db = SessionLocal()
-
     # Track results
     total_accounts = len(accounts_to_sync)
     succeeded, failed = 0, 0
     errors = []
 
-    try:
+    with get_db_session() as db:
         # Sync each account sequentially
         for current, (idx, account_creds) in enumerate(accounts_to_sync, 1):
             label = f" ({account_creds.label})" if account_creds.label else ""
@@ -304,9 +290,6 @@ def _sync_pension_multi_account(
 
         if failed == total_accounts:
             raise typer.Exit(1)
-
-    finally:
-        db.close()
 
 
 @app.command("migdal")
@@ -417,9 +400,6 @@ def _sync_credit_card_multi_account(
         console.print(f"[bold red]Error: {e}[/bold red]")
         raise typer.Exit(1)
 
-    # Create database session
-    db = SessionLocal()
-
     # Track results
     total_accounts = len(accounts_to_sync)
     succeeded, failed = 0, 0
@@ -427,7 +407,7 @@ def _sync_credit_card_multi_account(
     total_unmapped_categories = 0
     errors = []
 
-    try:
+    with get_db_session() as db:
         # Sync each account sequentially
         for current, (idx, account_creds) in enumerate(accounts_to_sync, 1):
             label = f" ({account_creds.label})" if account_creds.label else ""
@@ -505,9 +485,6 @@ def _sync_credit_card_multi_account(
 
         if failed == total_accounts:
             raise typer.Exit(1)
-
-    finally:
-        db.close()
 
 
 @app.command("cal")
