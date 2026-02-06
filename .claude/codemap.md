@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-02-06 17:04
+# Auto-generated: 2026-02-06 18:21
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -28,7 +28,7 @@ scrapers → services → db → cli/streamlit_app
 - cli/commands/transactions.py: fn:browse_transactions,list_transactions,show_transaction,tag_transaction,untag_transaction
 - cli/main.py: fn:setup_logging,version,callback,main
 - cli/tui/browser.py: class:EditScreen,TagScreen,TransactionBrowser | fn:run_browser
-- cli/utils.py: fn:print_success,print_error,print_warning,print_info,create_table
+- cli/utils.py: fn:parse_date,parse_date_range,get_analytics,get_db_session,print_success
 
 ## config/ - Configuration management for financial data aggreg
 - config/constants.py: class:AccountType,Institution,SyncType,SyncStatus,TransactionStatus
@@ -109,6 +109,7 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/views/transactions.py: fn:render_mobile_transactions,render_desktop_transactions
 
 ## tests/
+- tests/cli/test_utils.py: class:TestParseDate,TestParseDateRange,TestGetAnalytics,TestGetDbSession
 - tests/conftest.py: fn:db_engine,db_session,sample_account,sample_accounts,create_account
 - tests/integration/conftest.py: fn:cli_runner,integration_db_engine,integration_db_session,patched_session_local,patched_db_exists
 - tests/integration/test_category_commands.py: fn:test_categories_list_empty,test_categories_list_shows_mappings,test_categories_list_filters_by_provider,test_categories_map_creates_mapping,test_categories_map_updates_existing
