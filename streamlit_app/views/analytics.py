@@ -39,6 +39,13 @@ from streamlit_app.components.cards import render_metric_row
 from streamlit_app.utils.mobile import is_mobile
 from streamlit_app.components.mobile_ui import apply_mobile_css, summary_card, bottom_navigation
 
+from streamlit_app.utils.analytics_helpers import (
+    get_period_options,
+    transactions_to_dataframe,
+    calculate_spending_metrics,
+    get_spending_by_day_of_week,
+)
+
 
 def render_mobile_analytics():
     """Render simplified mobile analytics view."""
@@ -47,17 +54,15 @@ def render_mobile_analytics():
 
     render_page_header("Analytics")
 
-    # Period selector
+    # Period selector - use shared helper
     today = date.today()
-    period_options = {
-        "This Month": (today.replace(day=1), today),
-        "Last Month": ((today.replace(day=1) - timedelta(days=1)).replace(day=1), today.replace(day=1) - timedelta(days=1)),
-        "Last 3 Months": (today - timedelta(days=90), today),
-    }
+    period_options = get_period_options(today)
+    # Mobile only shows subset of options
+    mobile_options = ["This Month", "Last Month", "Last 3 Months"]
 
     selected_period = st.selectbox(
         "Period",
-        options=list(period_options.keys()),
+        options=mobile_options,
         index=0,
         key="mobile_analytics_period",
         label_visibility="collapsed"
@@ -249,23 +254,8 @@ def render_desktop_analytics():
             end_date=end_date
         )
 
-        # Convert to DataFrame
-        transactions_data = []
-        for txn in transactions_list:
-            txn_date = txn['transaction_date']
-            transactions_data.append({
-                'id': txn['id'],
-                'date': txn_date,
-                'amount': txn['original_amount'],
-                'category': txn['effective_category'] or 'Uncategorized',
-                'description': txn['description'],
-                'status': txn['status'],
-                'account_id': txn['account_id'],
-                'is_expense': txn['original_amount'] < 0,
-                'day_of_week': txn_date.strftime('%A') if txn_date else 'Unknown'
-            })
-
-        df_all = pd.DataFrame(transactions_data)
+        # Convert to DataFrame using shared helper
+        df_all = transactions_to_dataframe(transactions_list)
 
         if df_all.empty:
             st.warning("No transactions found in the selected date range.")
@@ -279,17 +269,14 @@ def render_desktop_analytics():
         # Ensure date column is datetime in df_expenses as well
         df_expenses['date'] = pd.to_datetime(df_expenses['date'])
 
-        # Summary metrics row
-        total_spending = abs(df_expenses['amount'].sum()) if not df_expenses.empty else 0
-        transaction_count_display = len(df_all)
-        top_category = df_expenses.groupby('category')['amount'].sum().abs().idxmax() if not df_expenses.empty else "—"
-        avg_transaction = abs(df_expenses['amount'].mean()) if not df_expenses.empty else 0
+        # Summary metrics row - use shared helper
+        metrics = calculate_spending_metrics(df_expenses)
 
         render_metric_row([
-            {"value": format_amount_private(total_spending), "label": "Total Spending"},
-            {"value": f"{transaction_count_display:,}", "label": "Transactions"},
-            {"value": top_category, "label": "Top Category"},
-            {"value": format_amount_private(avg_transaction), "label": "Avg Transaction"},
+            {"value": format_amount_private(metrics['total_spending']), "label": "Total Spending"},
+            {"value": f"{len(df_all):,}", "label": "Transactions"},
+            {"value": metrics['top_category'], "label": "Top Category"},
+            {"value": format_amount_private(metrics['avg_transaction']), "label": "Avg Transaction"},
         ])
 
         st.markdown("")  # Spacing
@@ -358,9 +345,8 @@ def render_desktop_analytics():
 
                 with col1:
                     st.subheader("Spending by Day of Week")
-                    day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-                    day_spending = df_expenses.groupby('day_of_week')['amount'].sum().abs()
-                    day_spending = day_spending.reindex(day_order, fill_value=0)
+                    # Use shared helper for day of week spending
+                    day_spending = get_spending_by_day_of_week(df_expenses)
 
                     fig_dow = go.Figure(data=[go.Bar(
                         x=day_spending.index,

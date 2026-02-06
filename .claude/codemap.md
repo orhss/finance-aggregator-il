@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-02-06 22:05
+# Auto-generated: 2026-02-06 22:31
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -95,6 +95,7 @@ scrapers → services → db → cli/streamlit_app
 - streamlit_app/main.py: Financial Data Aggregator - Central Entrypoint
 - streamlit_app/mobile_dashboard.py: fn:render_budget_progress,render_alerts,render_recent_transactions,render_mobile_dashboard
 - streamlit_app/styles/design_tokens.py: fn:get_css_variables,get_token,get_hero_styles,get_card_styles,get_metric_card_styles
+- streamlit_app/utils/analytics_helpers.py: fn:get_period_options,transactions_to_dataframe,calculate_spending_metrics,get_spending_by_day_of_week
 - streamlit_app/utils/cache.py: fn:get_transactions_cached,get_dashboard_stats,get_category_spending_cached,get_monthly_trend_cached,get_accounts_cached
 - streamlit_app/utils/errors.py: class:ErrorBoundary | fn:safe_service_call,get_user_friendly_error,safe_call_with_spinner,handle_error_with_retry,safe_decorator
 - streamlit_app/utils/formatters.py: fn:format_currency,format_date,format_datetime,format_number,format_percentage
@@ -123,3 +124,4 @@ scrapers → services → db → cli/streamlit_app
 - tests/services/test_category_service.py: fn:category_service,sample_account,sample_mapping,sample_merchant_mapping,test_normalize_category_happy_flow
 - tests/services/test_rules_service.py: fn:temp_rules_file,rules_service,sample_account,test_rule_matches_match_types,test_rule_matches_regex
 - tests/smoke/test_imports.py: fn:test_cli_main_imports,test_cli_commands_import,test_cli_tui_imports,test_services_import,test_models_import
+- tests/streamlit_app/test_analytics_helpers.py: class:TestGetPeriodOptions,TestTransactionsToDataframe,TestCalculateSpendingMetrics,TestGetSpendingByDayOfWeek

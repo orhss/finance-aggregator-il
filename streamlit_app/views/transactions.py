@@ -26,6 +26,7 @@ from streamlit_app.components.mobile_ui import (
     bottom_navigation,
 )
 from streamlit_app.utils.formatters import get_category_icon
+from streamlit_app.utils.analytics_helpers import get_period_options
 
 
 def render_mobile_transactions():
@@ -57,18 +58,15 @@ def render_mobile_transactions():
         label_visibility="collapsed"
     )
 
-    # Date filter presets
+    # Date filter presets - use shared helper + mobile-specific "All Time"
     today = date.today()
-    date_presets = {
-        "This Month": (today.replace(day=1), today),
-        "Last Month": ((today.replace(day=1) - timedelta(days=1)).replace(day=1), today.replace(day=1) - timedelta(days=1)),
-        "Last 3 Months": (today - timedelta(days=90), today),
-        "All Time": (today - timedelta(days=365*5), today),
-    }
+    date_presets = get_period_options(today)
+    date_presets["All Time"] = (today - timedelta(days=365*5), today)
+    mobile_date_options = ["This Month", "Last Month", "Last 3 Months", "All Time"]
 
     selected_preset = st.selectbox(
         "Date Range",
-        options=list(date_presets.keys()),
+        options=mobile_date_options,
         index=0,
         key="mobile_date_preset",
         label_visibility="collapsed"
