@@ -278,7 +278,7 @@ def render_account_card(
     )
 
     if on_click_key:
-        return st.button("View Details", key=on_click_key, use_container_width=True)
+        return st.button("View Details", key=on_click_key, width="stretch")
     return False
 
 
@@ -544,7 +544,7 @@ def render_alert_card(
         )
     with col2:
         if action_label and action_key:
-            return st.button(action_label, key=action_key, use_container_width=True)
+            return st.button(action_label, key=action_key, width="stretch")
     return False
 
 

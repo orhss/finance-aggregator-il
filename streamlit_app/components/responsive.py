@@ -200,7 +200,7 @@ def compact_form(
             elif field_type == "checkbox":
                 values[key] = st.checkbox(label, **kwargs)
 
-        submitted = st.form_submit_button(submit_text, use_container_width=True)
+        submitted = st.form_submit_button(submit_text, width="stretch")
 
         if submitted:
             return values

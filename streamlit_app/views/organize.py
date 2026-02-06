@@ -111,7 +111,7 @@ try:
                     })
 
                 df_unmapped = pd.DataFrame(unmapped_data)
-                st.dataframe(df_unmapped, use_container_width=True, hide_index=True)
+                st.dataframe(df_unmapped, width="stretch", hide_index=True)
 
                 # Quick mapping
                 st.markdown("**Quick Map**")
@@ -126,7 +126,7 @@ try:
 
                 with col3:
                     st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("Map", type="primary", use_container_width=True, key="cat_quick_map_btn"):
+                    if st.button("Map", type="primary", width="stretch", key="cat_quick_map_btn"):
                         if quick_map_select and quick_map_unified:
                             idx = unmapped_options.index(quick_map_select)
                             item = unmapped[idx]
@@ -166,7 +166,7 @@ try:
                         })
 
                     df_merchants = pd.DataFrame(merchant_data)
-                    st.dataframe(df_merchants, use_container_width=True, hide_index=True)
+                    st.dataframe(df_merchants, width="stretch", hide_index=True)
 
                     # Quick categorize
                     st.markdown("**Quick Categorize**")
@@ -181,7 +181,7 @@ try:
 
                     with col3:
                         st.markdown("<br>", unsafe_allow_html=True)
-                        if st.button("Apply", type="primary", use_container_width=True, key="merchant_apply"):
+                        if st.button("Apply", type="primary", width="stretch", key="merchant_apply"):
                             if selected_merchant and assign_category:
                                 idx = merchant_options.index(selected_merchant)
                                 group = filtered_groups[idx]
@@ -221,7 +221,7 @@ try:
                     })
 
                 df_mappings = pd.DataFrame(table_data)
-                st.dataframe(df_mappings, use_container_width=True, hide_index=True)
+                st.dataframe(df_mappings, width="stretch", hide_index=True)
                 st.caption(f"{len(mappings)} mappings total")
 
                 # Apply mappings button
@@ -279,7 +279,7 @@ try:
                 new_tags_input = st.text_input("New tags (comma-separated)", key="new_rule_tags_new")
                 rule_description = st.text_input("Description (optional)", key="new_rule_description")
 
-            if st.button("Add Rule", type="primary", use_container_width=True, key="add_rule_btn"):
+            if st.button("Add Rule", type="primary", width="stretch", key="add_rule_btn"):
                 if rule_pattern and rule_pattern.strip():
                     final_category = None
                     if selected_category == "(Enter new...)":
@@ -325,7 +325,7 @@ try:
                 })
 
             df_rules = pd.DataFrame(table_data)
-            st.dataframe(df_rules, use_container_width=True, hide_index=True)
+            st.dataframe(df_rules, width="stretch", hide_index=True)
 
             # Apply Rules
             st.markdown("")  # Spacing
@@ -337,7 +337,7 @@ try:
             with col2:
                 apply_mode = st.radio("Mode", ["Dry Run", "Apply Changes"], horizontal=True, key="rules_apply_mode")
 
-            if st.button("Run Rules", type="primary", use_container_width=True, key="run_rules_btn"):
+            if st.button("Run Rules", type="primary", width="stretch", key="run_rules_btn"):
                 only_uncategorized = (apply_scope == "Uncategorized Only")
                 dry_run = (apply_mode == "Dry Run")
 
@@ -393,7 +393,7 @@ try:
 
             with col2:
                 st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("Create Tag", type="primary", use_container_width=True, key="create_tag_btn"):
+                if st.button("Create Tag", type="primary", width="stretch", key="create_tag_btn"):
                     if new_tag_name and new_tag_name.strip():
                         try:
                             tag = tag_service.get_or_create_tag(new_tag_name.strip())
@@ -424,7 +424,7 @@ try:
             df_tags = pd.DataFrame(table_data)
             df_tags = df_tags.sort_values('_count', ascending=False)
 
-            st.dataframe(df_tags[['Tag', 'Transactions', 'Total Amount', '% of Total']], use_container_width=True, hide_index=True)
+            st.dataframe(df_tags[['Tag', 'Transactions', 'Total Amount', '% of Total']], width="stretch", hide_index=True)
 
             # Tag cloud
             st.markdown("**Quick Tag View**")
@@ -442,7 +442,7 @@ try:
                 old_tag_name = st.selectbox("Select tag to rename", tag_names, key="rename_old_tag")
                 new_tag_name_rename = st.text_input("New name", key="rename_new_tag", placeholder="Enter new name...")
 
-                if st.button("Rename Tag", type="primary", use_container_width=True, key="rename_tag_btn"):
+                if st.button("Rename Tag", type="primary", width="stretch", key="rename_tag_btn"):
                     if new_tag_name_rename and new_tag_name_rename.strip():
                         success = tag_service.rename_tag(old_tag_name, new_tag_name_rename.strip())
                         if success:
@@ -459,7 +459,7 @@ try:
                 if selected_tag_stat:
                     st.caption(f"This will remove the tag from {selected_tag_stat['count']} transactions")
 
-                if st.button("Delete Tag", type="secondary", use_container_width=True, key="delete_tag_btn"):
+                if st.button("Delete Tag", type="secondary", width="stretch", key="delete_tag_btn"):
                     success = tag_service.delete_tag(delete_tag_name)
                     if success:
                         st.toast(f"Deleted tag: {delete_tag_name}", icon="trash")
@@ -482,7 +482,7 @@ try:
             with col2:
                 merchant_tags_input = st.text_input("Tags to Add (comma-separated)", key="bulk_merchant_tags", placeholder="e.g., delivery, food")
 
-            if st.button("Preview Matches", key="preview_merchant", use_container_width=True):
+            if st.button("Preview Matches", key="preview_merchant", width="stretch"):
                 if merchant_pattern and merchant_pattern.strip():
                     total_count = session.query(func.count(Transaction.id)).filter(
                         Transaction.description.ilike(f"%{merchant_pattern}%")
@@ -497,7 +497,7 @@ try:
                         st.session_state['merchant_preview_ready'] = False
 
             if st.session_state.get('merchant_preview_ready', False):
-                if st.button("Apply Tags", type="primary", key="apply_merchant", use_container_width=True):
+                if st.button("Apply Tags", type="primary", key="apply_merchant", width="stretch"):
                     if merchant_pattern and merchant_tags_input:
                         tags_list = [tag.strip() for tag in merchant_tags_input.split(',') if tag.strip()]
                         if tags_list:
@@ -526,7 +526,7 @@ try:
                 with col2:
                     category_tags_input = st.text_input("Tags to Add (comma-separated)", key="bulk_category_tags", placeholder="e.g., food, groceries")
 
-                if st.button("Preview Category Matches", key="preview_category", use_container_width=True):
+                if st.button("Preview Category Matches", key="preview_category", width="stretch"):
                     match_count = session.query(func.count(Transaction.id)).filter(
                         or_(
                             Transaction.user_category == selected_category,
@@ -543,7 +543,7 @@ try:
                         st.session_state['category_preview_ready'] = False
 
                 if st.session_state.get('category_preview_ready', False):
-                    if st.button("Apply Tags to Category", type="primary", key="apply_category", use_container_width=True):
+                    if st.button("Apply Tags to Category", type="primary", key="apply_category", width="stretch"):
                         if category_tags_input:
                             tags_list = [tag.strip() for tag in category_tags_input.split(',') if tag.strip()]
                             if tags_list:

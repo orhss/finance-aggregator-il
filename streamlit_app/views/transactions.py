@@ -80,19 +80,19 @@ def render_mobile_transactions():
 
     type_filter = st.session_state.get('mobile_type_filter', 'All')
     with filter_cols[0]:
-        if st.button("All", type="primary" if type_filter == "All" else "secondary", use_container_width=True):
+        if st.button("All", type="primary" if type_filter == "All" else "secondary", width="stretch"):
             st.session_state.mobile_type_filter = "All"
             st.rerun()
     with filter_cols[1]:
-        if st.button("Expenses", type="primary" if type_filter == "Expenses" else "secondary", use_container_width=True):
+        if st.button("Expenses", type="primary" if type_filter == "Expenses" else "secondary", width="stretch"):
             st.session_state.mobile_type_filter = "Expenses"
             st.rerun()
     with filter_cols[2]:
-        if st.button("Income", type="primary" if type_filter == "Income" else "secondary", use_container_width=True):
+        if st.button("Income", type="primary" if type_filter == "Income" else "secondary", width="stretch"):
             st.session_state.mobile_type_filter = "Income"
             st.rerun()
     with filter_cols[3]:
-        if st.button("Pending", type="primary" if type_filter == "Pending" else "secondary", use_container_width=True):
+        if st.button("Pending", type="primary" if type_filter == "Pending" else "secondary", width="stretch"):
             st.session_state.mobile_type_filter = "Pending"
             st.rerun()
 
@@ -535,7 +535,7 @@ def render_desktop_transactions():
             col1, col2, col3, col4 = st.columns(4)
 
             with col1:
-                if st.button("Export Current Page to CSV", use_container_width=True):
+                if st.button("Export Current Page to CSV", width="stretch"):
                     # Export current page
                     export_data = []
                     for txn in transactions:
@@ -555,11 +555,11 @@ def render_desktop_transactions():
                         data=csv,
                         file_name=f"transactions_{start_date}_{end_date}_page{current_page}.csv",
                         mime="text/csv",
-                        use_container_width=True
+                        width="stretch"
                     )
 
             with col2:
-                if st.button("Export All to CSV", use_container_width=True):
+                if st.button("Export All to CSV", width="stretch"):
                     # Export all filtered transactions
                     all_transactions = query.all()
                     export_data = []
@@ -580,7 +580,7 @@ def render_desktop_transactions():
                         data=csv,
                         file_name=f"transactions_{start_date}_{end_date}_all.csv",
                         mime="text/csv",
-                        use_container_width=True
+                        width="stretch"
                     )
 
         # ============================================================================
@@ -753,7 +753,7 @@ def render_desktop_transactions():
             # Display table with styling
             st.dataframe(
                 df_styled[display_cols],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
                 height=table_height,
                 column_config={
@@ -904,10 +904,10 @@ def render_desktop_transactions():
                     btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 3])
 
                     with btn_col1:
-                        save_clicked = st.button("Save Changes", type="primary", use_container_width=True)
+                        save_clicked = st.button("Save Changes", type="primary", width="stretch")
 
                     with btn_col2:
-                        reset_clicked = st.button("Reset", use_container_width=True)
+                        reset_clicked = st.button("Reset", width="stretch")
 
                     if reset_clicked:
                         # Clear the edit form by removing session state keys

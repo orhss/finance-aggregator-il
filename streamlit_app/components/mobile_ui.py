@@ -480,7 +480,7 @@ def filter_chips(options: List[str], selected: str, key: str = "filter") -> str:
     for idx, option in enumerate(options):
         with cols[idx]:
             btn_type = "primary" if option == selected else "secondary"
-            if st.button(option, key=f"{key}_{idx}", use_container_width=True, type=btn_type):
+            if st.button(option, key=f"{key}_{idx}", width="stretch", type=btn_type):
                 return option
     return selected
 
@@ -526,17 +526,17 @@ def quick_categorize_card(
             if cat_idx < len(grid_categories):
                 cat = grid_categories[cat_idx]
                 with cols[col_idx]:
-                    if st.button(f"{cat['icon']}\n{cat['name']}", key=f"cat_{cat_idx}", use_container_width=True):
+                    if st.button(f"{cat['icon']}\n{cat['name']}", key=f"cat_{cat_idx}", width="stretch"):
                         on_categorize(cat['name'])
 
     # More and Skip buttons
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("More...", use_container_width=True, type="secondary"):
+        if st.button("More...", width="stretch", type="secondary"):
             # Could expand to show all categories
             pass
     with col2:
-        if st.button("Skip", use_container_width=True, type="secondary"):
+        if st.button("Skip", width="stretch", type="secondary"):
             on_skip()
 
 

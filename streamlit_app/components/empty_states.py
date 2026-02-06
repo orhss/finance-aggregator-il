@@ -28,7 +28,7 @@ def empty_transactions_state():
         3. Come back here to see your transactions
         """)
 
-        if st.button("🔄 Start Syncing", type="primary", use_container_width=True, key="empty_txn_sync"):
+        if st.button("🔄 Start Syncing", type="primary", width="stretch", key="empty_txn_sync"):
             st.switch_page("views/accounts.py")
 
         st.caption("⏱️ First sync usually takes 2-3 minutes")
@@ -83,7 +83,7 @@ def empty_accounts_state():
         3. **Or use the UI** - click below to go to the Sync page
         """)
 
-        if st.button("🔄 Go to Sync", type="primary", use_container_width=True, key="empty_acct_sync"):
+        if st.button("🔄 Go to Sync", type="primary", width="stretch", key="empty_acct_sync"):
             st.switch_page("views/accounts.py")
 
         st.caption("💡 Tip: Start with one institution to test the setup")
@@ -114,7 +114,7 @@ def empty_analytics_state():
         2. Return here to see your analytics
         """)
 
-        if st.button("🔄 Sync Now", type="primary", use_container_width=True, key="empty_analytics_sync"):
+        if st.button("🔄 Sync Now", type="primary", width="stretch", key="empty_analytics_sync"):
             st.switch_page("views/accounts.py")
 
 
@@ -145,11 +145,11 @@ def empty_dashboard_state():
 
         col_a, col_b = st.columns(2)
         with col_a:
-            if st.button("⚙️ Configure", use_container_width=True, key="empty_dash_config"):
+            if st.button("⚙️ Configure", width="stretch", key="empty_dash_config"):
                 st.info("💻 Run `fin-cli config setup` in your terminal to configure credentials")
 
         with col_b:
-            if st.button("🔄 Sync", type="primary", use_container_width=True, key="empty_dash_sync"):
+            if st.button("🔄 Sync", type="primary", width="stretch", key="empty_dash_sync"):
                 st.switch_page("views/accounts.py")
 
         st.caption("🔒 Your data is encrypted and stored locally - we never send it to the cloud")

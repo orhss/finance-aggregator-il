@@ -107,7 +107,7 @@ def render_budget_settings(session):
             key="budget_input"
         )
 
-        if st.button("Save Budget", use_container_width=True):
+        if st.button("Save Budget", width="stretch"):
             budget_service.set_current_budget(new_budget)
             st.success(f"Budget set to {new_budget:,.0f}")
             st.rerun()
@@ -283,7 +283,7 @@ def render_desktop_settings():
                     txn_count = session.query(func.count(Transaction.id)).scalar()
                     st.markdown(f"- {account_count} accounts, {txn_count:,} transactions")
 
-                    if st.button("Create Backup", use_container_width=True):
+                    if st.button("Create Backup", width="stretch"):
                         backup_name = f"financial_data_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
                         backup_path = CONFIG_DIR / backup_name
                         shutil.copy(db_path, backup_path)
@@ -354,7 +354,7 @@ def render_desktop_settings():
                         new_password = st.text_input("Password", type="password")
                         confirm_password = st.text_input("Confirm Password", type="password")
 
-                        if st.form_submit_button("Add User", use_container_width=True):
+                        if st.form_submit_button("Add User", width="stretch"):
                             if not new_username:
                                 st.error("Username required")
                             elif not new_password:

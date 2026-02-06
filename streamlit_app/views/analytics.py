@@ -10,8 +10,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta, date
-from dateutil.relativedelta import relativedelta
-from typing import Tuple, Optional
+from typing import Optional
 
 from streamlit_app.utils.session import format_amount_private, get_accounts_display
 from streamlit_app.utils.formatters import format_number, format_datetime
@@ -36,6 +35,7 @@ from streamlit_app.components.charts import (
 from streamlit_app.components.heatmap import calendar_heatmap
 from streamlit_app.components.theme import render_page_header
 from streamlit_app.components.cards import render_metric_row
+from streamlit_app.components.filters import date_range_picker
 from streamlit_app.utils.mobile import is_mobile
 from streamlit_app.components.mobile_ui import apply_mobile_css, summary_card, bottom_navigation
 
@@ -108,7 +108,7 @@ def render_mobile_analytics():
                 texttemplate='%{x:,.0f}',
                 textposition='outside'
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         else:
             st.info("No spending data for this period")
@@ -142,7 +142,7 @@ def render_mobile_analytics():
                 line_color='#667eea',
                 marker_color='#667eea',
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.info("No trend data available")
 
@@ -151,73 +151,6 @@ def render_mobile_analytics():
 
     # Bottom navigation
     bottom_navigation(current="analytics")
-
-
-def time_range_selector() -> Tuple[date, date]:
-    """
-    Render time range selector with single dropdown and custom date picker
-
-    Returns:
-        Tuple of (start_date, end_date)
-    """
-    today = date.today()
-    first_of_month = today.replace(day=1)
-    last_month = first_of_month - timedelta(days=1)
-    first_of_last_month = last_month.replace(day=1)
-    three_months_ago = today - relativedelta(months=3)
-    six_months_ago = today - relativedelta(months=6)
-    first_of_year = today.replace(month=1, day=1)
-
-    # Time range presets
-    time_range_options = {
-        "Last 3 Months": ('3_months', three_months_ago, today),
-        "This Month": ('this_month', first_of_month, today),
-        "Last Month": ('last_month', first_of_last_month, last_month),
-        "Last 6 Months": ('6_months', six_months_ago, today),
-        "This Year": ('this_year', first_of_year, today),
-        "Custom Range": ('custom', None, None),
-    }
-
-    col1, col2, col3 = st.columns([1, 1, 2])
-
-    with col1:
-        # Get current selection from session state
-        current_key = st.session_state.get('date_range', ('3_months', three_months_ago, today))[0]
-        current_label = next(
-            (k for k, v in time_range_options.items() if v[0] == current_key),
-            "Last 3 Months"
-        )
-
-        selected_range = st.selectbox(
-            "Time Range",
-            options=list(time_range_options.keys()),
-            index=list(time_range_options.keys()).index(current_label),
-            key="time_range_select"
-        )
-
-        # Update session state when selection changes
-        st.session_state.date_range = time_range_options[selected_range]
-
-    # Custom date picker if custom is selected
-    if st.session_state.date_range[0] == 'custom':
-        with col2:
-            start_date = st.date_input(
-                "Start",
-                value=today - relativedelta(months=3),
-                max_value=today,
-                key="custom_start_date"
-            )
-        with col3:
-            end_date = st.date_input(
-                "End",
-                value=today,
-                max_value=today,
-                min_value=start_date if 'custom_start_date' in st.session_state else None,
-                key="custom_end_date"
-            )
-        return start_date, end_date
-    else:
-        return st.session_state.date_range[1], st.session_state.date_range[2]
 
 
 def render_desktop_analytics():
@@ -240,8 +173,13 @@ def render_desktop_analytics():
             empty_analytics_state()
             st.stop()
 
-        # Time range selector
-        start_date, end_date = time_range_selector()
+        # Time range selector - use unified component
+        start_date, end_date = date_range_picker(
+            key_prefix="analytics",
+            mode="dropdown",
+            show_custom=True,
+            default_option="Last 3 Months"
+        )
         st.info(f"Showing data from **{start_date}** to **{end_date}**")
 
         # Fetch transactions for selected period (cached for 5 minutes)
@@ -311,7 +249,7 @@ def render_desktop_analytics():
                         label_col="category",
                         top_n=10
                     )
-                    st.plotly_chart(fig_category, use_container_width=True)
+                    st.plotly_chart(fig_category, width="stretch")
 
                     # Show category details table
                     if st.checkbox("Show category details", key="cat_details"):
@@ -322,7 +260,7 @@ def render_desktop_analytics():
                         cat_summary['Total'] = cat_summary['Total'].abs()
                         cat_summary['Avg'] = cat_summary['Avg'].abs()
                         cat_summary = cat_summary.sort_values('Total', ascending=False)
-                        st.dataframe(cat_summary, use_container_width=True)
+                        st.dataframe(cat_summary, width="stretch")
 
                 with col2:
                     st.subheader("Top Merchants")
@@ -338,7 +276,7 @@ def render_desktop_analytics():
                         top_n=15,
                         horizontal=True
                     )
-                    st.plotly_chart(fig_merchants, use_container_width=True)
+                    st.plotly_chart(fig_merchants, width="stretch")
 
                 # Row 2: Spending by Day of Week + Summary Stats
                 col1, col2 = st.columns(2)
@@ -361,7 +299,7 @@ def render_desktop_analytics():
                         yaxis_title="Total Spending",
                         height=400
                     )
-                    st.plotly_chart(fig_dow, use_container_width=True)
+                    st.plotly_chart(fig_dow, width="stretch")
 
                 with col2:
                     st.markdown('<div class="section-title">Summary Statistics</div>', unsafe_allow_html=True)
@@ -433,7 +371,7 @@ def render_desktop_analytics():
                         title=f"Daily Spending Heatmap - {selected_year}",
                         colorscale='Reds'
                     )
-                    st.plotly_chart(fig_heatmap, use_container_width=True)
+                    st.plotly_chart(fig_heatmap, width="stretch")
 
                     # Quick stats for the year
                     year_total = df_year['amount'].sum()
@@ -468,7 +406,7 @@ def render_desktop_analytics():
                     amount_col="amount",
                     months=12
                 )
-                st.plotly_chart(fig_monthly, use_container_width=True)
+                st.plotly_chart(fig_monthly, width="stretch")
 
                 # Category Trends (Stacked Area)
                 st.subheader("Category Trends Over Time")
@@ -494,7 +432,7 @@ def render_desktop_analytics():
                     labels={'amount': 'Spending', 'month': 'Month'}
                 )
                 fig_cat_trend.update_layout(height=400)
-                st.plotly_chart(fig_cat_trend, use_container_width=True)
+                st.plotly_chart(fig_cat_trend, width="stretch")
 
                 # Month-over-Month Comparison
                 st.subheader("Month-over-Month Comparison")
@@ -535,7 +473,7 @@ def render_desktop_analytics():
                         height=400,
                         hovermode='x unified'
                     )
-                    st.plotly_chart(fig_mom, use_container_width=True)
+                    st.plotly_chart(fig_mom, width="stretch")
                 else:
                     st.info("Need at least 2 months of data for MoM comparison")
 
@@ -560,7 +498,7 @@ def render_desktop_analytics():
                         markers=True
                     )
                     fig_yoy.update_layout(height=400)
-                    st.plotly_chart(fig_yoy, use_container_width=True)
+                    st.plotly_chart(fig_yoy, width="stretch")
 
         # ============================================================================
         # TAB 3: BALANCE & PORTFOLIO
@@ -602,7 +540,7 @@ def render_desktop_analytics():
                         value_col="balance",
                         label_col="account_type"
                     )
-                    st.plotly_chart(fig_portfolio, use_container_width=True)
+                    st.plotly_chart(fig_portfolio, width="stretch")
                 else:
                     st.info("No balance data available")
 
@@ -616,7 +554,7 @@ def render_desktop_analytics():
                         value_col="balance",
                         label_col="institution"
                     )
-                    st.plotly_chart(fig_inst, use_container_width=True)
+                    st.plotly_chart(fig_inst, width="stretch")
                 else:
                     st.info("No balance data available")
 
@@ -660,7 +598,7 @@ def render_desktop_analytics():
                     y_col="balance",
                     group_col="institution"
                 )
-                st.plotly_chart(fig_balance_hist, use_container_width=True)
+                st.plotly_chart(fig_balance_hist, width="stretch")
             else:
                 st.info("No balance history available for selected period")
 
@@ -687,7 +625,7 @@ def render_desktop_analytics():
                         session.close()
 
                     df_summary = pd.DataFrame(summary_data)
-                    st.dataframe(df_summary, use_container_width=True, hide_index=True)
+                    st.dataframe(df_summary, width="stretch", hide_index=True)
 
         # ============================================================================
         # TAB 4: TAGS ANALYSIS
@@ -744,7 +682,7 @@ def render_desktop_analytics():
                         top_n=15,
                         horizontal=True
                     )
-                    st.plotly_chart(fig_tags, use_container_width=True)
+                    st.plotly_chart(fig_tags, width="stretch")
 
                 with col2:
                     st.subheader("Tag Distribution")
@@ -759,7 +697,7 @@ def render_desktop_analytics():
                         color_continuous_scale='Blues'
                     )
                     fig_treemap.update_layout(height=400)
-                    st.plotly_chart(fig_treemap, use_container_width=True)
+                    st.plotly_chart(fig_treemap, width="stretch")
 
                 # Tag Trends Over Time
                 st.subheader("Tag Trends Over Time")
@@ -816,7 +754,7 @@ def render_desktop_analytics():
                         markers=True
                     )
                     fig_tag_trend.update_layout(height=400)
-                    st.plotly_chart(fig_tag_trend, use_container_width=True)
+                    st.plotly_chart(fig_tag_trend, width="stretch")
 
                 # Tag summary table
                 st.subheader("Tag Summary")
@@ -826,7 +764,7 @@ def render_desktop_analytics():
                 df_tags_display['Avg per Transaction'] = (df_tags_display['amount'] / df_tags_display['count']).apply(format_amount_private)
                 st.dataframe(
                     df_tags_display[['tag', 'Count', 'Amount', 'Avg per Transaction']].rename(columns={'tag': 'Tag'}),
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True
                 )
             else:
@@ -965,7 +903,7 @@ def render_desktop_analytics():
                         barmode='group',
                         height=400
                     )
-                    st.plotly_chart(fig_comparison, use_container_width=True)
+                    st.plotly_chart(fig_comparison, width="stretch")
             else:
                 st.info("Need at least 2 months of data for comparison")
 
@@ -1009,7 +947,7 @@ def render_desktop_analytics():
                         yaxis_title='Spending',
                         height=350
                     )
-                    st.plotly_chart(fig_cat_trend, use_container_width=True)
+                    st.plotly_chart(fig_cat_trend, width="stretch")
 
                     # Top transactions in this category
                     st.markdown("**Top 10 Transactions**")
@@ -1018,7 +956,7 @@ def render_desktop_analytics():
                     df_cat_top['date'] = df_cat_top['date'].apply(lambda d: d.strftime('%Y-%m-%d'))
                     st.dataframe(
                         df_cat_top.rename(columns={'date': 'Date', 'description': 'Description', 'amount': 'Amount'}),
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True
                     )
 
@@ -1056,7 +994,7 @@ def render_desktop_analytics():
                     yaxis_title='Total Spending',
                     height=400
                 )
-                st.plotly_chart(fig_acc_comp, use_container_width=True)
+                st.plotly_chart(fig_acc_comp, width="stretch")
 
         st.markdown("")  # Spacing
 
@@ -1067,19 +1005,19 @@ def render_desktop_analytics():
 
         with col1:
             # Export to CSV
-            if st.button("Export Transactions to CSV", use_container_width=True):
+            if st.button("Export Transactions to CSV", width="stretch"):
                 csv = df_all.to_csv(index=False)
                 st.download_button(
                     label="Download CSV",
                     data=csv,
                     file_name=f"transactions_{start_date}_{end_date}.csv",
                     mime="text/csv",
-                    use_container_width=True
+                    width="stretch"
                 )
 
         with col2:
             # Export summary
-            if st.button("Export Summary to CSV", use_container_width=True):
+            if st.button("Export Summary to CSV", width="stretch"):
                 summary = df_expenses.groupby('category').agg({
                     'amount': ['sum', 'count', 'mean']
                 }).round(2)
@@ -1090,7 +1028,7 @@ def render_desktop_analytics():
                     data=csv_summary,
                     file_name=f"summary_{start_date}_{end_date}.csv",
                     mime="text/csv",
-                    use_container_width=True
+                    width="stretch"
                 )
 
 

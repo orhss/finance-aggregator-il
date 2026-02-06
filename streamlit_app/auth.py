@@ -130,7 +130,7 @@ def get_logout_button():
     name = st.session_state.get("name", "User")
     st.sidebar.markdown(f"Logged in as **{name}**")
 
-    if st.sidebar.button("Logout", use_container_width=True):
+    if st.sidebar.button("Logout", width="stretch"):
         st.session_state.authenticated = False
         st.session_state.username = None
         st.session_state.name = None

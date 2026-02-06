@@ -50,7 +50,7 @@ def render_budget_progress():
                     secondary="No budget set",
                 )
             with col2:
-                if st.button("Set", key="mobile_set_budget", use_container_width=True):
+                if st.button("Set", key="mobile_set_budget", width="stretch"):
                     st.switch_page("views/settings.py")
             return
 
@@ -94,7 +94,7 @@ def render_alerts():
             with col1:
                 st.markdown(f"{alert['icon']} {alert['message']}")
             with col2:
-                if st.button(alert['action_label'], key=alert['key'], use_container_width=True):
+                if st.button(alert['action_label'], key=alert['key'], width="stretch"):
                     st.switch_page(alert['page'])
 
 
@@ -129,7 +129,7 @@ def render_recent_transactions():
 
     transaction_list(transactions, date_formatter=format_date_relative)
 
-    if st.button("View All Transactions", use_container_width=True, type="secondary"):
+    if st.button("View All Transactions", width="stretch", type="secondary"):
         st.switch_page("views/transactions.py")
 
 
@@ -153,7 +153,7 @@ def render_mobile_dashboard():
         st.markdown("---")
         st.info("No accounts configured yet. Set up your accounts to get started.")
 
-        if st.button("Go to Accounts", use_container_width=True, type="primary"):
+        if st.button("Go to Accounts", width="stretch", type="primary"):
             st.switch_page("views/accounts.py")
         return
 

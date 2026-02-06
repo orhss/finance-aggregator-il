@@ -210,7 +210,7 @@ def test_streamlit_components_import():
         from streamlit_app.components.theme import apply_theme
         from streamlit_app.components.sidebar import render_minimal_sidebar
         from streamlit_app.components.cards import render_card
-        from streamlit_app.components.filters import date_range_filter
+        from streamlit_app.components.filters import date_range_picker
         from streamlit_app.components.charts import spending_donut
 
         assert apply_theme is not None

@@ -66,7 +66,7 @@ def render_empty_state():
         2. **Sync your data**
         """)
 
-        if st.button("Go to Accounts", use_container_width=True, type="primary"):
+        if st.button("Go to Accounts", width="stretch", type="primary"):
             st.switch_page("views/accounts.py")
 
         st.markdown("---")
@@ -80,7 +80,7 @@ def render_header():
         greeting = get_time_greeting()
         render_page_header(greeting)
     with col2:
-        if st.button("Sync Now", use_container_width=True, type="secondary"):
+        if st.button("Sync Now", width="stretch", type="secondary"):
             st.switch_page("views/accounts.py")
 
 
@@ -171,7 +171,7 @@ def render_budget_progress():
                     unsafe_allow_html=True
                 )
             with col2:
-                if st.button("Set Budget", use_container_width=True, type="secondary"):
+                if st.button("Set Budget", width="stretch", type="secondary"):
                     st.switch_page("views/settings.py")
             return
 
@@ -268,7 +268,7 @@ def render_alerts():
                 unsafe_allow_html=True
             )
         with col2:
-            if st.button(alert['action_label'], key=alert['key'], use_container_width=True, type="secondary"):
+            if st.button(alert['action_label'], key=alert['key'], width="stretch", type="secondary"):
                 st.switch_page(alert['page'])
 
 
@@ -316,7 +316,7 @@ def render_recent_activity(min_height: int = None) -> int:
         min_height=min_height
     )
 
-    if st.button("View all transactions", use_container_width=True, type="secondary"):
+    if st.button("View all transactions", width="stretch", type="secondary"):
         st.switch_page("views/transactions.py")
 
     return height
@@ -364,7 +364,7 @@ def render_accounts_overview(min_height: int = None) -> int:
     # Use reusable card component
     height = render_summary_card(title="🏦 Accounts", items=items, min_height=min_height)
 
-    if st.button("View all accounts", use_container_width=True, type="secondary"):
+    if st.button("View all accounts", width="stretch", type="secondary"):
         st.switch_page("views/accounts.py")
 
     return height

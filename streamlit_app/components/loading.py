@@ -101,7 +101,7 @@ def skeleton_table(rows: int = 5, columns: int = 5) -> None:
     data = {f"Column {i+1}": ["..." for _ in range(rows)] for i in range(columns)}
     df = pd.DataFrame(data)
 
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
     st.caption("⏳ Loading data...")
 
 

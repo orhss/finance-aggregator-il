@@ -41,7 +41,7 @@ def show_bulk_preview(
 
     # Show preview table
     df = pd.DataFrame(items[:max_preview])
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
     if count > max_preview:
         st.caption(f"Showing first {max_preview} of {count} items")
@@ -173,7 +173,7 @@ def bulk_action_workflow(
 
         col1, col2 = st.columns([1, 3])
         with col1:
-            if st.button(f"✅ {apply_button_text}", type="primary", key=apply_key, use_container_width=True):
+            if st.button(f"✅ {apply_button_text}", type="primary", key=apply_key, width="stretch"):
                 # Execute the operation
                 try:
                     actual_count = apply_callback()
@@ -195,7 +195,7 @@ def bulk_action_workflow(
                     st.toast(f"Error: {str(e)}", icon="❌")
 
         with col2:
-            if st.button("❌ Cancel", key=f"{apply_key}_cancel", use_container_width=True):
+            if st.button("❌ Cancel", key=f"{apply_key}_cancel", width="stretch"):
                 st.session_state[f'{apply_key}_ready'] = False
                 st.rerun()
 
@@ -235,7 +235,7 @@ def quick_bulk_preview(
 
     # Create DataFrame and display
     df = pd.DataFrame(preview_data[:20])
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
     if len(matches) > 20:
         st.caption(f"Showing first 20 of {len(matches)} items")

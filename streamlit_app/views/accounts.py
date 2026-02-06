@@ -165,7 +165,7 @@ def render_mobile_accounts():
         st.markdown("")
 
         # Quick sync button
-        if st.button("Sync All Accounts", type="primary", use_container_width=True):
+        if st.button("Sync All Accounts", type="primary", width="stretch"):
             init_sync_state()
             start_sync("all")
             st.rerun()
@@ -223,7 +223,7 @@ def render_desktop_accounts():
 
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("Sync All Accounts", type="primary", use_container_width=True):
+                if st.button("Sync All Accounts", type="primary", width="stretch"):
                     start_sync("all")
                     st.rerun()
             with col2:
@@ -323,7 +323,7 @@ def render_desktop_accounts():
                             st.markdown(f"**Account:** {format_account_number(account.account_number, masked=masked)}")
 
                     with col2:
-                        if st.button("Close Details", use_container_width=True):
+                        if st.button("Close Details", width="stretch"):
                             del st.session_state.selected_account_id
                             st.rerun()
 
@@ -355,7 +355,7 @@ def render_desktop_accounts():
                             {'date': bd, 'balance': ta} for bd, ta in balance_history_query
                         ])
                         fig = balance_history(df_balance_history, title=f"Balance History - {account.institution}")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width="stretch")
                     else:
                         st.info("No balance history available")
 
@@ -401,7 +401,7 @@ def render_desktop_accounts():
                             unsafe_allow_html=True
                         )
 
-                        if st.button("View Details", key=f"view_{account.id}", use_container_width=True):
+                        if st.button("View Details", key=f"view_{account.id}", width="stretch"):
                             st.session_state.selected_account_id = account.id
                             st.rerun()
 
@@ -536,7 +536,7 @@ def render_desktop_accounts():
                     f"Sync",
                     key=f"sync_{institution}",
                     disabled=st.session_state.sync_running,
-                    use_container_width=True
+                    width="stretch"
                 ):
                     sync_target = INSTITUTION_MAP.get(institution, institution.lower())
                     st.toast(f"Starting sync for {institution}...", icon="🔄")
@@ -579,7 +579,7 @@ def render_desktop_accounts():
             col1, col2 = st.columns(2)
 
             with col1:
-                if st.button("Sync All", type="primary", disabled=st.session_state.sync_running, use_container_width=True):
+                if st.button("Sync All", type="primary", disabled=st.session_state.sync_running, width="stretch"):
                     st.toast("Starting sync for all institutions...", icon="🔄")
                     start_sync("all", headless_mode, months_back, months_forward)
                     st.rerun()
