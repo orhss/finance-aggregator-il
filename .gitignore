@@ -145,3 +145,6 @@ web/*.local
 # API Python cache
 api/__pycache__/
 api/**/__pycache__/
+
+# Side project
+tribunal-checker/

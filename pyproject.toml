@@ -24,41 +24,34 @@ dependencies = [
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
     "selenium>=4.15.0",
-
     # CLI framework and UI
     "typer>=0.9.0",
     "rich>=13.7.0",
     "textual>=0.45.0",
-
     # Database ORM
     "sqlalchemy>=2.0.0",
-
     # Configuration and validation
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
     "PyYAML>=6.0",
-
     # Date/time utilities
     "python-dateutil>=2.8.2",
-
     # RTL/Hebrew text support
     "python-bidi>=0.4.2",
-
     # Secure credential storage
     "cryptography>=41.0.0",
     "bcrypt>=4.0.0",
-
     # Streamlit UI
     "streamlit>=1.35.0",
     "streamlit-authenticator>=0.4.0",
     "plotly>=5.17.0",
     "pandas>=2.0.0",
-
     # FastAPI REST API
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "python-jose[cryptography]>=3.3.0",
     "python-multipart>=0.0.9",
+    "beautifulsoup4>=4.14.3",
 ]
 
 [project.optional-dependencies]
