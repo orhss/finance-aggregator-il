@@ -4,6 +4,11 @@ import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Chip from '@mui/material/Chip'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogContentText from '@mui/material/DialogContentText'
+import DialogTitle from '@mui/material/DialogTitle'
 import Divider from '@mui/material/Divider'
 import FormControl from '@mui/material/FormControl'
 import InputLabel from '@mui/material/InputLabel'
@@ -14,6 +19,7 @@ import Tabs from '@mui/material/Tabs'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useTags, useTagStats, useDeleteTag } from '@/api/tags'
+import type { TagStats } from '@/types/tag'
 import { useCategoryMappings, useUnmappedCategories, useAddCategoryMapping, useMerchantSuggestions, useBulkAssignCategory } from '@/api/categories'
 import { useRules, useCreateRule, useDeleteRule, useApplyRules } from '@/api/rules'
 import { UnifiedCategory } from '@/utils/constants'
@@ -230,6 +236,7 @@ function RulesTab() {
 function TagsTab() {
   const { data: tagStats } = useTagStats()
   const { mutate: deleteTag } = useDeleteTag()
+  const [pendingDeleteTag, setPendingDeleteTag] = useState<TagStats | null>(null)
 
   return (
     <Box>
@@ -248,13 +255,34 @@ function TagsTab() {
               <Chip
                 key={t.name}
                 label={`${t.name} (${t.count})`}
-                onDelete={() => deleteTag(t.name)}
+                onDelete={() => setPendingDeleteTag(t)}
                 size="small"
               />
             ))}
           </Box>
         </CardContent>
       </Card>
+
+      <Dialog open={!!pendingDeleteTag} onClose={() => setPendingDeleteTag(null)}>
+        <DialogTitle>Delete tag "{pendingDeleteTag?.name}"?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This will remove the tag from {pendingDeleteTag?.count} transaction{pendingDeleteTag?.count === 1 ? '' : 's'}. This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingDeleteTag(null)}>Cancel</Button>
+          <Button
+            color="error"
+            onClick={() => {
+              if (pendingDeleteTag) deleteTag(pendingDeleteTag.name)
+              setPendingDeleteTag(null)
+            }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

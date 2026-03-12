@@ -62,7 +62,7 @@ def category_breakdown(
     analytics: AnalyticsService = Depends(get_analytics),
 ):
     raw = analytics.get_category_breakdown(from_date=from_date, to_date=to_date)
-    return [
+    items = [
         CategoryBreakdownItem(
             category=cat,
             count=v["count"],
@@ -71,6 +71,8 @@ def category_breakdown(
         )
         for cat, v in raw.items()
     ]
+    items.sort(key=lambda x: abs(x.total_amount), reverse=True)
+    return items
 
 
 @router.get("/category-trends", response_model=CategoryTrendsResponse)
@@ -92,7 +94,7 @@ def tag_breakdown(
     analytics: AnalyticsService = Depends(get_analytics),
 ):
     raw = analytics.get_tag_breakdown(from_date=from_date, to_date=to_date)
-    return [
+    items = [
         TagBreakdownItem(
             tag=tag,
             count=v["count"],
@@ -101,6 +103,8 @@ def tag_breakdown(
         )
         for tag, v in raw.items()
     ]
+    items.sort(key=lambda x: abs(x.total_amount), reverse=True)
+    return items
 
 
 @router.get("/cards", response_model=List[CardSpendingItem])

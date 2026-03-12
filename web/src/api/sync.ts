@@ -13,8 +13,10 @@ export function useSyncHistory(params?: { limit?: number; institution?: string; 
   })
 }
 
-export async function startSync(institution: string): Promise<{ job_id: string }> {
-  const { data } = await apiClient.post<{ job_id: string }>(`/sync/${institution}`)
+export async function startSync(institution: string, monthsBack?: number): Promise<{ job_id: string }> {
+  const { data } = await apiClient.post<{ job_id: string }>(`/sync/${institution}`, {
+    months_back: monthsBack ?? null,
+  })
   return data
 }
 

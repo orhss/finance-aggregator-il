@@ -63,9 +63,11 @@ export function CategoryBars({ data, height = 300, limit = 8 }: CategoryBarsProp
           }}
         />
         <Bar dataKey="total_amount" radius={[0, 4, 4, 0]} label={{ position: 'right', fontSize: 10, formatter: (v: number) => formatCurrency(v) }}>
-          {chartData.map((_, i) => (
-            <Cell key={i} fill={theme.palette.primary.main} fillOpacity={1 - i * 0.07} />
-          ))}
+          {chartData.map((_, i) => {
+            const minOpacity = 0.25
+            const step = chartData.length > 1 ? (1 - minOpacity) / (chartData.length - 1) : 0
+            return <Cell key={i} fill={theme.palette.primary.main} fillOpacity={1 - i * step} />
+          })}
         </Bar>
       </BarChart>
     </ResponsiveContainer>

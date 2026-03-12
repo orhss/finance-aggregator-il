@@ -5,8 +5,17 @@ import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogContentText from '@mui/material/DialogContentText'
+import DialogTitle from '@mui/material/DialogTitle'
 import Divider from '@mui/material/Divider'
+import FormControl from '@mui/material/FormControl'
 import Grid from '@mui/material/Grid2'
+import InputLabel from '@mui/material/InputLabel'
+import MenuItem from '@mui/material/MenuItem'
+import Select from '@mui/material/Select'
 import LinearProgress from '@mui/material/LinearProgress'
 import Typography from '@mui/material/Typography'
 import SyncIcon from '@mui/icons-material/Sync'
@@ -31,12 +40,14 @@ export default function Accounts() {
 
   const [syncing, setSyncing] = useState<string | null>(null)
   const [progress, setProgress] = useState<SyncProgress | null>(null)
+  const [pendingSync, setPendingSync] = useState<string | null>(null)
+  const [monthsBack, setMonthsBack] = useState(3)
 
   async function handleSync(institution: string) {
     setSyncing(institution)
     setProgress(null)
     try {
-      const { job_id } = await startSync(institution)
+      const { job_id } = await startSync(institution, monthsBack)
       createSyncStream(
         job_id,
         (data) => setProgress(data),
@@ -48,6 +59,11 @@ export default function Accounts() {
     } catch {
       setSyncing(null)
     }
+  }
+
+  function confirmSync() {
+    if (pendingSync) handleSync(pendingSync)
+    setPendingSync(null)
   }
 
   const byInstitution = accounts?.reduce<Record<string, Account[]>>((acc, a) => {
@@ -78,7 +94,7 @@ export default function Accounts() {
               variant="contained"
               startIcon={syncing === 'all' ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
               disabled={!!syncing}
-              onClick={() => handleSync('all')}
+              onClick={() => setPendingSync('all')}
             >
               Sync All
             </Button>
@@ -88,7 +104,7 @@ export default function Accounts() {
                 variant="outlined"
                 size="small"
                 disabled={!!syncing}
-                onClick={() => handleSync(inst)}
+                onClick={() => setPendingSync(inst)}
               >
                 {INSTITUTION_LABELS[inst]}
               </Button>
@@ -105,7 +121,7 @@ export default function Accounts() {
           icon="🏦"
           title="No accounts yet"
           description="Sync your financial institutions to see accounts here."
-          action={{ label: 'Sync All', onClick: () => handleSync('all') }}
+          action={{ label: 'Sync All', onClick: () => setPendingSync('all') }}
         />
       ) : (
         Object.entries(byInstitution ?? {}).map(([inst, accts]) => (
@@ -162,6 +178,32 @@ export default function Accounts() {
           </Card>
         </Box>
       )}
+      <Dialog open={!!pendingSync} onClose={() => setPendingSync(null)}>
+        <DialogTitle>
+          Sync {pendingSync === 'all' ? 'all institutions' : INSTITUTION_LABELS[pendingSync ?? ''] ?? pendingSync}?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            This will connect to {pendingSync === 'all' ? 'all configured institutions' : INSTITUTION_LABELS[pendingSync ?? ''] ?? pendingSync} and fetch the latest transactions.
+          </DialogContentText>
+          <FormControl size="small" sx={{ minWidth: 160 }}>
+            <InputLabel>Months back</InputLabel>
+            <Select
+              label="Months back"
+              value={monthsBack}
+              onChange={(e) => setMonthsBack(e.target.value as number)}
+            >
+              {[1, 2, 3, 6, 12].map((m) => (
+                <MenuItem key={m} value={m}>{m} month{m > 1 ? 's' : ''}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingSync(null)}>Cancel</Button>
+          <Button variant="contained" onClick={confirmSync}>Sync</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

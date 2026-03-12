@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Grid from '@mui/material/Grid2'
@@ -67,9 +68,13 @@ function recordToBreakdown(rec: Record<string, number>): CategoryBreakdownItem[]
     .sort((a, b) => b.total_amount - a.total_amount)
 }
 
+const TAG_CHART_DEFAULT_LIMIT = 15
+
 export default function Analytics() {
   const [tab, setTab] = useState(0)
   const [portfolioPeriod, setPortfolioPeriod] = useState<PeriodKey>('1y')
+  const [showAllTags, setShowAllTags] = useState(false)
+  const [showAllCats, setShowAllCats] = useState(false)
   const theme = useTheme()
 
   const now = new Date()
@@ -275,7 +280,20 @@ export default function Analytics() {
                 <Typography variant="subtitle2" fontWeight={600} gutterBottom>
                   Top Categories
                 </Typography>
-                {catLoading ? <ChartSkeleton height={260} /> : <CategoryBars data={categories ?? []} />}
+                {catLoading ? <ChartSkeleton height={260} /> : (
+                  <>
+                    <CategoryBars
+                      data={categories ?? []}
+                      limit={showAllCats ? (categories ?? []).length : TAG_CHART_DEFAULT_LIMIT}
+                      height={Math.max(260, Math.min((categories ?? []).length, showAllCats ? (categories ?? []).length : TAG_CHART_DEFAULT_LIMIT) * 36)}
+                    />
+                    {(categories ?? []).length > TAG_CHART_DEFAULT_LIMIT && (
+                      <Button size="small" onClick={() => setShowAllCats((v) => !v)} sx={{ mt: 1 }}>
+                        {showAllCats ? 'Show top 15' : `Show all (${(categories ?? []).length})`}
+                      </Button>
+                    )}
+                  </>
+                )}
               </CardContent>
             </Card>
           </Grid>
@@ -296,7 +314,18 @@ export default function Analytics() {
                 No tags applied yet. Go to Organize → Tags to start tagging transactions.
               </Typography>
             ) : (
-              <CategoryBars data={tagsAsBars} height={Math.max(260, tagsAsBars.length * 36)} />
+              <>
+                <CategoryBars
+                  data={tagsAsBars}
+                  limit={showAllTags ? tagsAsBars.length : TAG_CHART_DEFAULT_LIMIT}
+                  height={Math.max(260, Math.min(tagsAsBars.length, showAllTags ? tagsAsBars.length : TAG_CHART_DEFAULT_LIMIT) * 36)}
+                />
+                {tagsAsBars.length > TAG_CHART_DEFAULT_LIMIT && (
+                  <Button size="small" onClick={() => setShowAllTags((v) => !v)} sx={{ mt: 1 }}>
+                    {showAllTags ? 'Show top 15' : `Show all (${tagsAsBars.length})`}
+                  </Button>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

@@ -22,6 +22,7 @@ class SyncHistoryResponse(BaseModel):
 
 class SyncRequest(BaseModel):
     account_index: Optional[int] = None
+    months_back: Optional[int] = None
 
 
 class SyncProgress(BaseModel):

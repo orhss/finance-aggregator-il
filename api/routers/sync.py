@@ -55,6 +55,7 @@ def start_sync(
         "started_at": datetime.utcnow().isoformat(),
         "status": "pending",
         "lines": [],
+        "months_back": body.months_back,
     }
     return {"job_id": job_id, "institution": institution}
 
@@ -79,6 +80,8 @@ async def sync_stream(job_id: str, _: str = CurrentUser):
 
         # Build the fin-cli command
         cmd = [sys.executable, "-m", "cli.main", "sync", institution]
+        if job.get("months_back") is not None:
+            cmd.extend(["--months-back", str(job["months_back"])])
 
         try:
             proc = await asyncio.create_subprocess_exec(
