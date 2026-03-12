@@ -13,6 +13,7 @@ from db.query_utils import (
     effective_category_expr,
     get_effective_amount,
 )
+from config.constants import AccountType, Currency
 
 
 class AnalyticsService:
@@ -655,6 +656,139 @@ class AnalyticsService:
             'by_category': by_category,
             'transactions': txn_list
         }
+
+    # ==================== Portfolio Methods ====================
+
+    # Account types that represent investments (excludes credit cards)
+    INVESTMENT_TYPES = [AccountType.BROKER, AccountType.PENSION, AccountType.SAVINGS]
+
+    @staticmethod
+    def _series_sorted_by_latest(points: List[Dict[str, Any]]) -> List[str]:
+        """Sort series names by their last known value (descending)."""
+        latest: Dict[str, float] = {}
+        for p in points:
+            latest[p['series']] = p['total_amount']  # keeps overwriting → last value wins
+        return sorted(latest, key=lambda s: latest[s], reverse=True)
+
+    def get_portfolio_by_type(
+        self,
+        from_date: Optional[date] = None,
+        to_date: Optional[date] = None
+    ) -> Tuple[List[Dict[str, Any]], List[str]]:
+        """
+        Get portfolio progression grouped by account type for stacked area chart.
+
+        Joins Balance + Account, filters to investment accounts, ILS currency,
+        active accounts. Groups by (balance_date, account_type).
+
+        Returns:
+            Tuple of (points, series_names) where:
+            - points: list of dicts with date, series, total_amount, profit_loss
+            - series_names: sorted by latest value descending
+        """
+        query = (
+            self.session.query(
+                Balance.balance_date,
+                Account.account_type,
+                func.sum(Balance.total_amount).label('total_amount'),
+                func.sum(Balance.profit_loss).label('profit_loss'),
+            )
+            .join(Account, Balance.account_id == Account.id)
+            .filter(
+                Account.account_type.in_(self.INVESTMENT_TYPES),
+                Account.is_active == True,
+                Balance.currency == Currency.ILS,
+            )
+        )
+
+        if from_date:
+            query = query.filter(Balance.balance_date >= from_date)
+        if to_date:
+            query = query.filter(Balance.balance_date <= to_date)
+
+        query = query.group_by(
+            Balance.balance_date, Account.account_type
+        ).order_by(Balance.balance_date)
+
+        results = query.all()
+
+        points = [
+            {
+                'date': r.balance_date,
+                'series': r.account_type,
+                'total_amount': float(r.total_amount or 0),
+                'profit_loss': float(r.profit_loss) if r.profit_loss is not None else None,
+            }
+            for r in results
+        ]
+
+        return points, self._series_sorted_by_latest(points)
+
+    def get_portfolio_by_account(
+        self,
+        from_date: Optional[date] = None,
+        to_date: Optional[date] = None
+    ) -> Tuple[List[Dict[str, Any]], List[str]]:
+        """
+        Get portfolio progression per individual account for multi-line chart.
+
+        Same filters as get_portfolio_by_type but groups by (balance_date, account_id).
+
+        Returns:
+            Tuple of (points, series_names) where:
+            - points: list of dicts with date, series, total_amount, profit_loss
+            - series_names: sorted by latest value descending
+        """
+        query = (
+            self.session.query(
+                Balance.balance_date,
+                Account.id.label('account_id'),
+                Account.account_name,
+                Account.institution,
+                Account.account_type,
+                Balance.total_amount,
+                Balance.profit_loss,
+            )
+            .join(Account, Balance.account_id == Account.id)
+            .filter(
+                Account.account_type.in_(self.INVESTMENT_TYPES),
+                Account.is_active == True,
+                Balance.currency == Currency.ILS,
+            )
+        )
+
+        if from_date:
+            query = query.filter(Balance.balance_date >= from_date)
+        if to_date:
+            query = query.filter(Balance.balance_date <= to_date)
+
+        query = query.order_by(Balance.balance_date)
+
+        results = query.all()
+
+        # Build account labels, disambiguating collisions
+        account_labels: Dict[int, str] = {}
+        seen_labels: Dict[str, int] = {}  # label → first account_id that used it
+        for r in results:
+            if r.account_id in account_labels:
+                continue
+            label = r.account_name or f"{r.institution} ({r.account_type})"
+            if label in seen_labels and seen_labels[label] != r.account_id:
+                label = f"{label} #{r.account_id}"
+            seen_labels[label] = r.account_id
+            account_labels[r.account_id] = label
+
+        points = [
+            {
+                'date': r.balance_date,
+                'series': account_labels[r.account_id],
+                'total_amount': float(r.total_amount or 0),
+                'profit_loss': float(r.profit_loss) if r.profit_loss is not None else None,
+            }
+            for r in results
+        ]
+
+        return points, self._series_sorted_by_latest(points)
 
     # ==================== Sync History Methods ====================
 
