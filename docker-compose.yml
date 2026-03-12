@@ -1,13 +1,12 @@
 services:
-  fin:
+  # Legacy Streamlit UI (kept during migration)
+  streamlit:
     build: .
     image: fin-cli:latest
-    container_name: fin-cli
+    container_name: fin-streamlit
     ports:
       - "8501:8501"
     volumes:
-      # Mount host's .fin directory to container for data persistence
-      # Modify the path before the colon to use a different location on your host
       - ~/.fin:/root/.fin
     environment:
       - STREAMLIT_SERVER_PORT=8501
@@ -18,4 +17,42 @@ services:
       interval: 30s
       timeout: 10s
       start_period: 5s
+      retries: 3
+
+  # FastAPI REST API
+  api:
+    build: .
+    image: fin-cli:latest
+    container_name: fin-api
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ~/.fin:/root/.fin
+    environment:
+      - FIN_DATA_DIR=/root/.fin
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+
+  # React SPA (nginx static serve)
+  web:
+    build:
+      context: web
+      dockerfile: Dockerfile
+    container_name: fin-web
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
       retries: 3

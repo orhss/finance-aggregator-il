@@ -13,7 +13,9 @@ Python automation framework for extracting and managing financial data from Isra
 - **Category normalization**: Unified categories across all providers with custom mappings
 - **Budget tracking**: Monthly budget goals with progress tracking
 - **Rules engine**: Auto-categorize and tag transactions based on patterns
-- **Streamlit Web UI**: Modern, mobile-friendly dashboard for viewing and managing data
+- **React SPA**: Mobile-first React + MUI dashboard with offline PWA support (replaces Streamlit)
+- **REST API**: FastAPI backend with JWT auth, SSE sync streaming, and OpenAPI docs
+- **Streamlit Web UI**: Legacy dashboard (kept during migration)
 - **CLI & TUI**: Full command-line interface with interactive transaction browser
 - **Data export**: Export to CSV/JSON with filtering options
 
@@ -23,9 +25,8 @@ Python automation framework for extracting and managing financial data from Isra
 # 1. Install uv (if not already installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 2. Install dependencies and CLI
-uv sync
-source .venv/bin/activate  # Or: uv run fin-cli ...
+# 2. Install all dependencies (Python + Node)
+make install
 
 # 3. Initialize database
 fin-cli init
@@ -33,25 +34,16 @@ fin-cli init
 # 4. Configure credentials
 fin-cli config setup
 
-# 5. Sync your data
+# 5. Start the React app + API (two terminals, or make dev)
+make api    # FastAPI on :8000
+make web    # React on :3000
+
+# — or with Docker (all three services) —
+make up     # streamlit :8501, API :8000, React :3000
+
+# 6. Sync your data
 fin-cli sync all
-
-# 6. View your accounts
-fin-cli accounts list
-
-# 7. Check your transactions
-fin-cli transactions list
-
-# 8. View statistics
-fin-cli reports stats
-
-# 9. Set up category mappings (optional)
-fin-cli categories analyze
-fin-cli categories setup
-
-# 10. Set a monthly budget (optional)
-fin-cli budget set 5000
-fin-cli budget show
+# (or click "Sync" in the React UI at http://localhost:3000)
 ```
 
 ## Supported Institutions
@@ -73,60 +65,40 @@ fin-cli budget show
 
 ```
 Fin/
-├── cli/                   # Command-line interface
-│   ├── commands/          # CLI command modules
-│   │   ├── accounts.py    # Account listing and details
-│   │   ├── budget.py      # Budget management
-│   │   ├── categories.py  # Category mapping and normalization
-│   │   ├── config.py      # Credential configuration
-│   │   ├── export.py      # CSV/JSON export
-│   │   ├── maintenance.py # Backup, cleanup, migrations
-│   │   ├── reports.py     # Analytics and reports
-│   │   ├── rules.py       # Auto-categorization rules
-│   │   ├── sync.py        # Data synchronization
-│   │   ├── tags.py        # Tag management
-│   │   └── transactions.py # Transaction queries
-│   ├── tui/               # Terminal UI (transaction browser)
-│   └── main.py            # CLI entry point
-├── config/                # Configuration management
-│   ├── constants.py       # Application constants
-│   └── settings.py        # Credentials and settings
-├── db/                    # Database layer
-│   ├── models.py          # SQLAlchemy models
-│   ├── database.py        # Database initialization
-│   └── migrations/        # Schema migrations
-├── services/              # Business logic layer
-│   ├── analytics_service.py   # Queries and reporting
-│   ├── budget_service.py      # Budget tracking
-│   ├── category_service.py    # Category normalization
-│   ├── credit_card_service.py # Credit card sync
-│   ├── broker_service.py      # Broker sync
-│   ├── pension_service.py     # Pension sync
-│   ├── rules_service.py       # Auto-categorization
-│   └── tag_service.py         # Tag management
-├── scrapers/              # Financial institution scrapers
-│   ├── base/              # Modular base components
-│   │   ├── broker_base.py     # REST API client base
-│   │   ├── email_retriever.py # IMAP MFA code retrieval
-│   │   ├── mfa_handler.py     # MFA code entry
-│   │   ├── pension_automator.py # Pension login flows
-│   │   ├── selenium_driver.py # WebDriver management
-│   │   └── web_actions.py     # Form filling, clicking
+├── api/                   # FastAPI REST backend
+│   ├── main.py            # App factory, CORS, health endpoint
+│   ├── auth.py            # JWT create/verify
+│   ├── deps.py            # Dependency injection (DB, services)
+│   ├── routers/           # Route handlers (one file per domain)
+│   └── schemas/           # Pydantic request/response models
+├── web/                   # React SPA (TypeScript + MUI)
+│   ├── src/
+│   │   ├── api/           # TanStack Query hooks
+│   │   ├── components/    # cards/, charts/, common/, layout/
+│   │   ├── contexts/      # Auth, Privacy, Theme
+│   │   ├── hooks/         # useDebounce, useDateRange, useLocalStorage
+│   │   ├── pages/         # Dashboard, Transactions, Analytics, …
+│   │   ├── theme/         # MUI theme (ported from Streamlit palette)
+│   │   ├── types/         # TypeScript interfaces mirroring API schemas
+│   │   └── utils/         # format.ts, rtl.ts, constants.ts
+│   ├── Dockerfile         # Multi-stage: node build → nginx
+│   ├── nginx.conf         # SPA fallback + /api proxy + SSE config
+│   └── package.json
+├── cli/                   # Typer CLI (entry: main.py)
+│   ├── commands/          # accounts, budget, categories, sync, …
+│   └── tui/               # Interactive transaction browser
+├── config/                # Settings, credentials, encryption
+├── db/                    # SQLAlchemy models, SQLite, migrations
+├── services/              # Business logic (analytics, category, rules, …)
+├── scrapers/              # Selenium + API data extraction
+│   ├── base/              # SeleniumDriver, MFAHandler, EmailRetriever
 │   ├── brokers/           # Excellence, Meitav
 │   ├── pensions/          # Migdal, Phoenix
-│   ├── credit_cards/      # CAL, Max, Isracard
-│   └── utils/             # Retry, smart waits
-├── streamlit_app/         # Web UI
-│   ├── views/             # Page views
-│   ├── components/        # Reusable UI components
-│   ├── utils/             # Formatting, caching
-│   └── app.py             # Main dashboard
-├── tests/                 # Test suite
-│   ├── services/          # Unit tests
-│   ├── integration/       # CLI integration tests
-│   └── smoke/             # Import smoke tests
-├── plans/                 # Implementation documentation
-├── requirements.txt       # Python dependencies
+│   └── credit_cards/      # CAL, Max, Isracard
+├── streamlit_app/         # Legacy web UI (kept during migration)
+├── tests/                 # pytest suite (services/, integration/, smoke/)
+├── plans/                 # Architecture documentation
+├── Makefile               # Developer shortcuts
 └── CLAUDE.md              # Development guide
 ```
 
@@ -184,65 +156,67 @@ Fin/
    fin-cli config set email.password "app_password"
    ```
 
-### Option 2: Docker Installation (Easy Deployment)
+### Option 2: Docker Deployment (All Services)
 
-1. **Prerequisites**:
-   - Docker and Docker Compose installed
+Three services run together: React SPA, FastAPI, and legacy Streamlit.
 
-2. **Create data directory** (if using existing database):
-   ```bash
-   mkdir -p ~/.fin
-   # Copy your existing financial_data.db, credentials.enc, etc. to ~/.fin/
-   ```
-
-3. **Start the application**:
-   ```bash
-   docker-compose up -d
-   ```
-
-4. **Initialize database** (for new installations):
-   ```bash
-   docker-compose exec fin fin-cli init
-   docker-compose exec fin fin-cli config setup
-   ```
-
-5. **Access the application**:
-   - Streamlit UI: http://localhost:8501
-   - CLI commands: `docker-compose exec fin fin-cli <command>`
-
-6. **Stop the application**:
-   ```bash
-   docker-compose down
-   ```
-
-**Key Features**:
-- **Data Persistence**: Your `~/.fin/` directory is mounted to the container, so all data (database, credentials) persists between restarts
-- **Auto-restart**: Container restarts automatically unless explicitly stopped
-- **Customization**: Edit `docker-compose.yml` to change the data directory path
-
-**View Logs**:
 ```bash
-docker-compose logs -f
+# Start all services
+make up
+# or: docker compose up -d
+
+# Initialize on first run
+docker compose exec api fin-cli init
+docker compose exec api fin-cli config setup
 ```
 
-**Run CLI Commands**:
+| Service | URL | Description |
+|---|---|---|
+| React SPA | http://localhost:3000 | Primary UI |
+| FastAPI | http://localhost:8000 | REST API + Swagger at `/docs` |
+| Streamlit | http://localhost:8501 | Legacy UI |
+
 ```bash
-# Sync all sources
-docker-compose exec fin fin-cli sync all
-
-# View accounts
-docker-compose exec fin fin-cli accounts list
-
-# View transactions
-docker-compose exec fin fin-cli transactions list
+make logs    # Tail all logs
+make down    # Stop everything
 ```
 
-**Custom Data Path**:
-Edit `docker-compose.yml` and modify the volume path:
-```yaml
-volumes:
-  - /custom/path:/root/.fin  # Change left side to your preferred path
+**Data persistence**: `~/.fin/` is mounted into containers — database and credentials survive restarts.
+
+## React App & REST API
+
+### Running locally
+
+```bash
+make install   # Install Python + Node deps (once)
+make api       # FastAPI on http://localhost:8000
+make web       # React dev server on http://localhost:3000
+# or both at once:
+make dev
 ```
+
+The React dev server proxies `/api/*` → `localhost:8000`, so no CORS config needed during development.
+
+### API docs
+
+FastAPI auto-generates Swagger UI at **http://localhost:8000/docs** — useful for exploring endpoints and testing without the UI.
+
+### Authentication
+
+```bash
+fin-cli auth add-user admin   # Add a user
+fin-cli auth enable            # Require login
+```
+
+When auth is disabled the API issues tokens automatically (useful for local-only use). JWT tokens are stored in `localStorage` — compatible with Capacitor for future native mobile packaging.
+
+### Build for production
+
+```bash
+make build-web   # Outputs to web/dist/
+```
+
+The production build is served by nginx (see `web/nginx.conf`) which proxies `/api/` to the FastAPI container.
 
 ## Self-Hosting Guide
 
@@ -772,36 +746,37 @@ Three-tier category hierarchy with `effective_category` property:
 
 ### Setup
 ```bash
-# Install with dev dependencies
-uv sync
+make install       # uv sync + npm install in web/
 
-# Or with pip
-pip install -e ".[dev]"
+# Or manually:
+uv sync            # Python deps
+cd web && npm install  # Node deps
+```
+
+### Common commands
+```bash
+make api           # FastAPI :8000 (auto-reload)
+make web           # React :3000 (HMR)
+make dev           # Both in parallel
+make test          # All Python tests
+make lint          # ruff check
+make build-web     # Production React build
+make help          # Full command list
 ```
 
 ### Running Tests
 ```bash
-# All tests
-uv run pytest
-
-# Unit tests only
-uv run pytest tests/services -v
-
-# Integration tests
-uv run pytest tests/integration -v
-
-# With coverage
-uv run pytest --cov=services --cov=cli
-
-# Or if venv is activated, just use pytest directly
-pytest
+uv run pytest                       # All tests
+uv run pytest tests/services -v     # Unit tests only
+uv run pytest tests/integration -v  # Integration tests
+uv run pytest --cov=services --cov=cli  # With coverage
 ```
 
 ### Code Quality
 ```bash
-# Lint and format
 uv run ruff check .
 uv run ruff format .
+cd web && npm run lint    # ESLint
 ```
 
 ### Documentation

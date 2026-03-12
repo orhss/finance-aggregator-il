@@ -8,9 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Python automation framework for financial institutions (brokers, pension funds, and credit cards) using web scraping with Selenium and API clients. Implements MFA (Multi-Factor Authentication) automation via email retrieval.
 
-**Project Structure**: Reorganized into modular packages with fully implemented CLI, services layer, and SQLite database. See `README.md` for usage examples.
+**Stack**: Python services + SQLite + FastAPI REST API + React SPA (MUI, TanStack Query). Streamlit UI is legacy and kept during migration.
 
-**CLI Implementation**: Fully implemented command-line interface with database storage, analytics, and reporting. See `plans/CLI_PLAN.md` for architecture details.
+**Project Structure**: Reorganized into modular packages with fully implemented CLI, services layer, SQLite database, FastAPI backend, and React frontend.
 
 **Multi-Account Support**: Credit card scrapers support multiple accounts per institution (CAL, Max, Isracard). See `plans/MULTI_ACCOUNT_PLAN.md` for details.
 
@@ -23,17 +23,22 @@ Python automation framework for financial institutions (brokers, pension funds, 
 
 ### Environment Setup
 ```bash
-# Install dependencies with uv (recommended)
-uv sync
+make install          # Install everything (uv sync + npm install in web/)
 
-# Activate virtual environment
-source .venv/bin/activate
+# Or manually:
+uv sync               # Python deps
+cd web && npm install # Node deps
 
-# Or run commands directly without activating
-uv run fin-cli <command>
+# Run services
+make api              # FastAPI on :8000 (--reload)
+make web              # React dev server on :3000
+make dev              # Both in parallel (make -j2)
+make streamlit        # Legacy Streamlit on :8501
 
-# Alternative: Install with pip
-pip install -e ".[dev]"
+# Docker (all three services)
+make up               # Start  (streamlit :8501, api :8000, web :3000)
+make down             # Stop
+make logs             # Tail logs
 ```
 
 ### CLI Quick Start
@@ -64,44 +69,20 @@ fin-cli auth list-users          # List configured users
 fin-cli auth status              # Show auth status
 ```
 
-### Docker Deployment
-```bash
-# Build and start services
-docker-compose up -d
-
-# Initialize database (first time only)
-docker-compose exec fin fin-cli init
-docker-compose exec fin fin-cli config setup
-
-# Run CLI commands inside container
-docker-compose exec fin fin-cli sync all
-docker-compose exec fin fin-cli accounts list
-docker-compose exec fin fin-cli transactions list
-
-# View Streamlit UI
-# Open browser to http://localhost:8501
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
 ### Configuration
 - **Encrypted credentials**: Stored in `~/.fin/credentials.enc` (managed via `fin-cli config`)
 - **Environment variables**: Fallback option in `.env` (for development)
 - **Configuration directory**: `~/.fin/` (config.json, credentials.enc, .key, financial_data.db)
 - Chrome WebDriver is located in `chrome-linux64/` directory
 
-### Docker Configuration
-- **Base image**: Python 3.12-slim
-- **Exposed ports**: 8501 (Streamlit UI)
-- **Data persistence**: Host `~/.fin/` directory mounted to `/root/.fin` in container
-- **Services**: Combined Streamlit UI + CLI tool in single container
-- **Health check**: Streamlit health endpoint monitored every 30s
-- **Auto-restart**: Container restarts automatically unless explicitly stopped
-- **Customization**: Edit `docker-compose.yml` to change data directory path
+### Docker Services
+| Container | Port | Description |
+|---|---|---|
+| `fin-api` | 8000 | FastAPI (`uvicorn api.main:app`) |
+| `fin-web` | 3000 | React nginx (proxies `/api/` → api:8000) |
+| `fin-streamlit` | 8501 | Legacy Streamlit |
+
+All three share `~/.fin/` volume for the SQLite database.
 
 ## Codebase Navigation
 
@@ -136,16 +117,61 @@ To refresh the codemap: `python scripts/generate_codemap.py`
 
 ### Project Structure Overview
 
+- `api/` - FastAPI REST backend (routers/, schemas/, auth.py, deps.py)
+- `web/` - React SPA (src/api/, components/, pages/, contexts/, types/)
 - `cli/` - Typer CLI (entry: main.py)
 - `config/` - Settings, credentials, encryption
 - `db/` - SQLAlchemy models, SQLite
 - `services/` - Business logic layer
 - `scrapers/` - Selenium + API data extraction
-- `streamlit_app/` - Web UI
+- `streamlit_app/` - Legacy Web UI
 - `plans/` - Implementation plans and documentation
 
-For detailed file/function navigation, see `.claude/codemap.md`
+For detailed Python file/function navigation, see `.claude/codemap.md`
 
+
+## FastAPI (`api/`)
+
+### Key files
+- `api/main.py` — app factory, CORS, mounts all routers, `/health`
+- `api/auth.py` — `create_access_token()`, `decode_token()`, secret auto-created at `~/.fin/jwt_secret.key`
+- `api/deps.py` — `get_db()`, `get_current_user()`, service factory functions (`get_analytics`, `get_budget_service`, …)
+- `api/routers/` — one file per domain: accounts, transactions, analytics, budget, tags, categories, rules, sync, auth_router
+- `api/schemas/` — Pydantic v2 models mirroring db models; `common.py` has `PaginatedResponse[T]`
+
+### Patterns
+- **Sync handlers only** — all route functions are `def` (not `async def`) because SQLite doesn't support concurrent async access
+- **SSE streaming** — `api/routers/sync.py` uses `asyncio.create_subprocess_exec` to run `fin-cli sync` and stream stdout as Server-Sent Events; auth token passed as URL query param (EventSource doesn't support headers)
+- **DI via `deps.py`** — services are injected, never instantiated inside route handlers
+- **Auth bypass** — when `is_auth_enabled()` returns False, `get_current_user` returns `"anonymous"` so routes still work without login
+
+### Adding a new endpoint
+1. Add Pydantic schema to `api/schemas/<domain>.py`
+2. Add route function to `api/routers/<domain>.py` using existing service via `Depends(get_<service>)`
+3. Router is already registered in `api/main.py`; no changes needed there
+
+## React App (`web/src/`)
+
+### Key patterns
+- **API hooks** — all data fetching via TanStack Query in `web/src/api/`. Each file exports `useXxx()` query hooks and `useMutateXxx()` mutation hooks. Invalidate related query keys on mutation success.
+- **`@/` alias** — maps to `src/`; use `@/components/...` not relative paths
+- **Grid** — import from `@mui/material/Grid2` (not `Grid`) to get the `size={{ xs, md }}` API
+- **Privacy masking** — use `<AmountDisplay amount={n} />` (never format currency inline); reads `maskBalances` from `PrivacyContext`
+- **Hebrew/RTL** — wrap user-generated text in `<RtlText text={str} />`; it auto-detects Hebrew and sets `dir="rtl"`
+- **Auth** — JWT stored in `localStorage`. `AuthContext` exposes `isAuthenticated`, `setTokens(access, refresh)`, `logout()`. `ProtectedRoute` in `App.tsx` redirects to `/login` if not authenticated.
+- **Theme** — `createAppTheme(mode)` in `web/src/theme/index.ts`; primary indigo `#6366f1`, secondary violet `#8b5cf6`
+
+### Key files
+- `web/src/main.tsx` — provider tree: QueryClient → AppTheme → Privacy → Router → Auth
+- `web/src/App.tsx` — lazy-loaded routes, `ProtectedRoute` wrapper
+- `web/src/api/client.ts` — Axios instance with JWT interceptor + auto-refresh on 401
+- `web/src/utils/format.ts` — `formatCurrency`, `formatDate`, `formatRelativeDate`, `amountColor`
+- `web/src/utils/constants.ts` — `UnifiedCategory` enum, `getCategoryIcon(category)`
+
+### Component conventions
+- Files stay under ~150 lines; split complex pages into sub-components
+- Cards in `components/cards/`, charts in `components/charts/`, layout in `components/layout/`
+- `<EmptyState>`, `<LoadingSkeleton>`, `<AlertCard>` for consistent states
 
 ## Important Implementation Notes
 
@@ -196,6 +222,20 @@ with spinner("Fetching data..."):
 # Spinner automatically clears when done
 ```
 
+**Output Utilities**: Use standardized output functions from `cli/utils.py`:
+```python
+from cli.utils import print_success, print_error, print_warning, print_info
+
+print_success("Operation completed")  # ✓ green
+print_error("Something failed")       # ✗ red
+print_warning("Check this")           # ⚠ yellow
+print_info("FYI")                     # ℹ blue
+```
+
+**When to use what:**
+- `print_success/error/warning/info` - Simple status messages
+- `console.print()` - Complex formatting (tables, panels, custom markup)
+
 ### Testing
 
 **When to Write Tests**:
@@ -229,6 +269,15 @@ pytest --cov=services           # With coverage
 pytest -k "test_sync"           # By name pattern
 ```
 
+### Package Exports
+
+**Keep `__all__` updated**: When adding new modules to a package, update the `__init__.py`:
+- `cli/commands/__init__.py` - All command modules
+- `services/__init__.py` - All service classes
+- `scrapers/*/` - All scraper classes
+
+This ensures IDE autocomplete works and documents the public API.
+
 ### Database and Services
 - **SQLite database**: `~/.fin/financial_data.db` (initialized via `fin-cli init`)
 - **Services layer**: Use services (not scrapers directly) for business logic
@@ -239,6 +288,21 @@ pytest -k "test_sync"           # By name pattern
 - **Shared CSS**: Call `apply_theme()` from `components/theme.py` at the top of each page - it loads shared styles from `styles/main.css` automatically.
 - **Privacy-aware formatting**: Always use `format_amount_private()` from `session.py` for financial amounts (balances, totals, transactions). Never use `format_currency()` directly - it ignores the `mask_balances` privacy setting.
 - **Display wrappers**: Use `get_accounts_display()` from `session.py` for accounts with pre-formatted balance fields (respects privacy settings).
+- **Exception handling**: For database queries, catch `SQLAlchemyError` first, then `Exception` as fallback. Always log exceptions for debugging:
+  ```python
+  from sqlalchemy.exc import SQLAlchemyError
+  import logging
+  logger = logging.getLogger(__name__)
+
+  try:
+      result = session.query(...).all()
+  except SQLAlchemyError as e:
+      logger.error(f"Database error: {e}")
+      st.error("Database operation failed")
+  except Exception as e:
+      logger.exception(f"Unexpected error: {e}")
+      st.error(f"Error: {e}")
+  ```
 - **Shared sidebar**: Use `render_minimal_sidebar()` from `components/sidebar.py` - ensures consistent privacy toggle and stats across all pages.
 - **Complex HTML rendering**: Don't use `st.markdown(unsafe_allow_html=True)` for nested HTML - Streamlit's sanitizer corrupts it. Use `streamlit.components.v1.html()` instead. See `components/cards.py` for reusable card components.
 - **Mobile support**: Use `detect_mobile()` and `is_mobile()` from `utils/mobile.py` at page top. Render mobile view with early `st.stop()` when mobile detected. Mobile components in `components/mobile_ui.py`.
