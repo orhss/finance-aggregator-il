@@ -42,6 +42,7 @@ export const UnifiedCategory = {
   EDUCATION: 'education',
   DONATIONS: 'donations',
   GIFTS: 'gifts',
+  PETS: 'pets',
   SERVICES: 'services',
   OTHER: 'other',
 } as const
@@ -70,6 +71,7 @@ export const CATEGORY_ICONS: Record<string, string> = {
   children: '👶',
   events: '🎪',
   donations: '❤️',
+  pets: '🐾',
   services: '🔧',
 }
 
@@ -77,3 +79,10 @@ export function getCategoryIcon(category: string | null | undefined): string {
   if (!category) return '📋'
   return CATEGORY_ICONS[category.toLowerCase()] ?? '📋'
 }
+
+/** Shared color palette for stacked/multi-series charts */
+export const CHART_COLORS = [
+  '#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b',
+  '#ef4444', '#ec4899', '#14b8a6', '#f97316', '#84cc16',
+  '#a855f7', '#0ea5e9',
+]

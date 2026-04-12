@@ -83,5 +83,6 @@ def apply_rules(
         transaction_ids=body.transaction_ids,
         only_uncategorized=body.only_uncategorized,
         dry_run=body.dry_run,
+        rule_indices=body.rule_indices,
     )
     return ApplyRulesResult(**result)

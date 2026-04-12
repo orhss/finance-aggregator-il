@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-02-06 23:05
+# Auto-generated: 2026-03-15 21:36
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -11,6 +11,34 @@ scrapers → services → db → cli/streamlit_app
 - Credit cards: Selenium login → token extract → API calls
 - Pensions: Email MFA via IMAP (Migdal, Phoenix)
 - Brokers: Pure REST API clients
+
+## api/
+- api/auth.py: fn:create_access_token,create_refresh_token,decode_token
+- api/deps.py: fn:get_db,get_current_user,get_analytics,get_budget_service,get_tag_service
+- api/main.py: fn:health,root
+- api/routers/accounts.py: fn:list_accounts,account_summary,get_account
+- api/routers/analytics.py: fn:overall_stats,monthly_summary,monthly_trends,category_breakdown,category_trends
+- api/routers/auth_router.py: fn:login,refresh,auth_status
+- api/routers/balances.py: fn:latest_balances,portfolio_by_type,portfolio_by_account,pnl_summary,balance_history
+- api/routers/budget.py: fn:budget_progress,get_budget,set_budget,delete_budget
+- api/routers/categories.py: fn:list_mappings,create_mapping,delete_mapping,apply_mappings,unmapped_categories
+- api/routers/retirement.py: fn:simulate
+- api/routers/rules.py: fn:list_rules,create_rule,delete_rule,apply_rules
+- api/routers/sync.py: fn:sync_history,start_sync
+- api/routers/tags.py: fn:list_tags,tag_stats,untagged_count,tag_transaction,untag_transaction
+- api/routers/transactions.py: fn:list_transactions,transaction_count,get_transaction,update_transaction
+- api/schemas/accounts.py: class:BalanceSummary,AccountResponse,AccountSummary
+- api/schemas/analytics.py: class:StatsResponse,MonthlySummary,TrendPoint,CategoryBreakdownItem,TagBreakdownItem
+- api/schemas/auth.py: class:LoginRequest,TokenResponse,RefreshRequest
+- api/schemas/balances.py: class:BalanceResponse,LatestBalanceResponse,PortfolioProgressionPoint,PortfolioProgressionResponse,PnLSummaryItem
+- api/schemas/budget.py: class:BudgetResponse,BudgetSet,BudgetProgress
+- api/schemas/categories.py: class:MappingResponse,MappingCreate,MerchantMappingResponse,MerchantMappingCreate,UnmappedCategory
+- api/schemas/common.py: class:PaginatedResponse,ErrorResponse,MessageResponse,CountResponse
+- api/schemas/retirement.py: class:SimulationSummary,MonthlyRow,Milestone,SimulationResponse
+- api/schemas/rules.py: class:RuleResponse,RuleCreate,ApplyRulesRequest,ApplyRulesResult
+- api/schemas/sync.py: class:SyncHistoryResponse,SyncRequest,SyncProgress
+- api/schemas/tags.py: class:TagResponse,TagStatsResponse,TagTransactionRequest,BulkTagRequest,RenameTagRequest
+- api/schemas/transactions.py: class:TransactionResponse,TransactionUpdate,TransactionFilters
 
 ## cli/ - CLI interface for financial data aggregator
 - cli/commands/accounts.py: fn:list_accounts,show_account,account_summary
@@ -126,3 +154,7 @@ scrapers → services → db → cli/streamlit_app
 - tests/smoke/test_imports.py: fn:test_cli_main_imports,test_cli_commands_import,test_cli_tui_imports,test_services_import,test_models_import
 - tests/streamlit_app/test_analytics_helpers.py: class:TestGetPeriodOptions,TestTransactionsToDataframe,TestCalculateSpendingMetrics,TestGetSpendingByDayOfWeek
 - tests/streamlit_app/test_filters.py: class:TestDateRangePickerLogic
+- tests/test_retirement_calculator.py: class:TestFIFOTracker,TestPensionConverter,TestTaxCalculator,TestGrowthEngine,TestCashFlowResolution
+
+## web/
+- web/node_modules/flatted/python/flatted.py: class:_Known,_String | fn:parse,stringify

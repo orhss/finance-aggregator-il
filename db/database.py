@@ -447,3 +447,47 @@ def migrate_budget_schema(db_path: Path = DEFAULT_DB_PATH) -> dict:
         logger.info("Budget schema already up to date")
 
     return results
+
+
+def migrate_retirement_scenario_schema(db_path: Path = DEFAULT_DB_PATH) -> dict:
+    """
+    Migrate database schema to add retirement scenario persistence.
+    Safe to run multiple times (idempotent).
+
+    Adds:
+    - retirement_scenarios table
+
+    Args:
+        db_path: Path to SQLite database file
+
+    Returns:
+        Dict with migration results: {created_tables: []}
+    """
+    engine = get_engine(db_path)
+    results = {"created_tables": []}
+
+    with engine.connect() as conn:
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+
+        if 'retirement_scenarios' not in existing_tables:
+            conn.execute(text("""
+                CREATE TABLE retirement_scenarios (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name VARCHAR(255) NOT NULL,
+                    config TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP
+                )
+            """))
+            results["created_tables"].append("retirement_scenarios")
+            logger.info("Created retirement_scenarios table")
+
+        conn.commit()
+
+    if results["created_tables"]:
+        logger.info(f"Retirement scenario migration completed: {results}")
+    else:
+        logger.info("Retirement scenario schema already up to date")
+
+    return results

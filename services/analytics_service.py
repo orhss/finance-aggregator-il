@@ -135,6 +135,8 @@ class AnalyticsService:
         to_date: Optional[date] = None,
         status: Optional[str] = None,
         institution: Optional[str] = None,
+        search: Optional[str] = None,
+        category: Optional[str] = None,
         tags: Optional[List[str]] = None,
         untagged_only: bool = False,
         limit: Optional[int] = None,
@@ -149,6 +151,8 @@ class AnalyticsService:
             to_date: End date
             status: Transaction status ('pending', 'completed')
             institution: Filter by institution
+            search: Search description (case-insensitive substring)
+            category: Filter by effective category
             tags: Filter by tags (AND logic - must have all specified tags)
             untagged_only: If True, only return transactions without any tags
             limit: Maximum number of results
@@ -173,6 +177,18 @@ class AnalyticsService:
 
         if institution:
             query = query.filter(Account.institution == institution)
+
+        if search:
+            query = query.filter(Transaction.description.ilike(f"%{search}%"))
+
+        if category:
+            query = query.filter(
+                func.coalesce(
+                    Transaction.user_category,
+                    Transaction.category,
+                    Transaction.raw_category,
+                ) == category
+            )
 
         # Tag filtering
         if untagged_only:
@@ -216,7 +232,9 @@ class AnalyticsService:
         account_id: Optional[int] = None,
         from_date: Optional[date] = None,
         to_date: Optional[date] = None,
-        status: Optional[str] = None
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        category: Optional[str] = None,
     ) -> int:
         """
         Get count of transactions matching filters
@@ -226,6 +244,8 @@ class AnalyticsService:
             from_date: Start date
             to_date: End date
             status: Transaction status
+            search: Search description (case-insensitive substring)
+            category: Filter by effective category
 
         Returns:
             Count of transactions
@@ -243,6 +263,18 @@ class AnalyticsService:
 
         if status:
             query = query.filter(Transaction.status == status)
+
+        if search:
+            query = query.filter(Transaction.description.ilike(f"%{search}%"))
+
+        if category:
+            query = query.filter(
+                func.coalesce(
+                    Transaction.user_category,
+                    Transaction.category,
+                    Transaction.raw_category,
+                ) == category
+            )
 
         return query.scalar()
 
@@ -670,6 +702,16 @@ class AnalyticsService:
             latest[p['series']] = p['total_amount']  # keeps overwriting → last value wins
         return sorted(latest, key=lambda s: latest[s], reverse=True)
 
+    @staticmethod
+    def _collapse_to_monthly(dates: list) -> Dict[Tuple[int, int], date]:
+        """Keep only the last date per (year, month) for monthly aggregation."""
+        last_per_month: Dict[Tuple[int, int], date] = {}
+        for d in dates:
+            key = (d.year, d.month)
+            if key not in last_per_month or d > last_per_month[key]:
+                last_per_month[key] = d
+        return last_per_month
+
     def get_portfolio_by_type(
         self,
         from_date: Optional[date] = None,
@@ -678,8 +720,9 @@ class AnalyticsService:
         """
         Get portfolio progression grouped by account type for stacked area chart.
 
-        Joins Balance + Account, filters to investment accounts, ILS currency,
-        active accounts. Groups by (balance_date, account_type).
+        Queries per-account balances, forward-fills missing dates per account
+        (so accounts without a balance on a given date carry their last known
+        value), then aggregates by (date, account_type).
 
         Returns:
             Tuple of (points, series_names) where:
@@ -689,9 +732,10 @@ class AnalyticsService:
         query = (
             self.session.query(
                 Balance.balance_date,
+                Account.id.label('account_id'),
                 Account.account_type,
-                func.sum(Balance.total_amount).label('total_amount'),
-                func.sum(Balance.profit_loss).label('profit_loss'),
+                Balance.total_amount,
+                Balance.profit_loss,
             )
             .join(Account, Balance.account_id == Account.id)
             .filter(
@@ -706,20 +750,61 @@ class AnalyticsService:
         if to_date:
             query = query.filter(Balance.balance_date <= to_date)
 
-        query = query.group_by(
-            Balance.balance_date, Account.account_type
-        ).order_by(Balance.balance_date)
-
+        query = query.order_by(Balance.balance_date, Balance.id)
         results = query.all()
+
+        # Collect all dates and per-account data
+        all_dates_raw: list[date] = sorted({r.balance_date for r in results})
+
+        # When data spans multiple months, keep only last date per month
+        # to avoid cluttered charts from intra-month live sync records
+        last_per_month = self._collapse_to_monthly(all_dates_raw)
+        if len(all_dates_raw) > 1:
+            all_dates = sorted(last_per_month.values())
+        else:
+            all_dates = all_dates_raw
+
+        # account_id -> {date -> (amount, profit_loss, account_type)}
+        # Map each record to the last day of its month so intra-month
+        # records collapse (latest value per month wins due to date ordering)
+        by_account: Dict[int, Dict[date, Tuple[float, Optional[float], str]]] = {}
+        for r in results:
+            key = (r.balance_date.year, r.balance_date.month)
+            month_end = last_per_month.get(key, r.balance_date) if len(all_dates_raw) > 1 else r.balance_date
+            by_account.setdefault(r.account_id, {})[month_end] = (
+                float(r.total_amount or 0),
+                float(r.profit_loss) if r.profit_loss is not None else None,
+                r.account_type,
+            )
+
+        # Forward-fill per account, then aggregate by (date, type)
+        # {(date, account_type) -> (sum_amount, sum_pnl)}
+        aggregated: Dict[Tuple[date, str], Tuple[float, Optional[float]]] = {}
+        for account_id, date_map in by_account.items():
+            last_amount = 0.0
+            last_pnl: Optional[float] = None
+            account_type: Optional[str] = None
+            for d in all_dates:
+                if d in date_map:
+                    last_amount, last_pnl, account_type = date_map[d]
+                elif account_type is None:
+                    # No data yet for this account at this date
+                    continue
+                key = (d, account_type)
+                prev_amount, prev_pnl = aggregated.get(key, (0.0, None))
+                new_pnl = None
+                if last_pnl is not None or prev_pnl is not None:
+                    new_pnl = (prev_pnl or 0.0) + (last_pnl or 0.0)
+                aggregated[key] = (prev_amount + last_amount, new_pnl)
 
         points = [
             {
-                'date': r.balance_date,
-                'series': r.account_type,
-                'total_amount': float(r.total_amount or 0),
-                'profit_loss': float(r.profit_loss) if r.profit_loss is not None else None,
+                'date': d,
+                'series': acct_type,
+                'total_amount': amount,
+                'profit_loss': pnl,
             }
-            for r in results
+            for (d, acct_type), (amount, pnl) in sorted(aggregated.items())
         ]
 
         return points, self._series_sorted_by_latest(points)
@@ -762,7 +847,7 @@ class AnalyticsService:
         if to_date:
             query = query.filter(Balance.balance_date <= to_date)
 
-        query = query.order_by(Balance.balance_date)
+        query = query.order_by(Balance.balance_date, Balance.id)
 
         results = query.all()
 
@@ -778,14 +863,25 @@ class AnalyticsService:
             seen_labels[label] = r.account_id
             account_labels[r.account_id] = label
 
+        # Collapse to last value per (account, month) to avoid
+        # cluttered charts from intra-month live sync records
+        all_dates_raw = sorted({r.balance_date for r in results})
+        last_per_month = self._collapse_to_monthly(all_dates_raw)
+
+        # Keep latest record per (account, month)
+        monthly: Dict[Tuple[int, Tuple[int, int]], Any] = {}
+        for r in results:
+            key = (r.account_id, (r.balance_date.year, r.balance_date.month))
+            monthly[key] = r  # last one wins (query ordered by date)
+
         points = [
             {
-                'date': r.balance_date,
+                'date': last_per_month[(r.balance_date.year, r.balance_date.month)],
                 'series': account_labels[r.account_id],
                 'total_amount': float(r.total_amount or 0),
                 'profit_loss': float(r.profit_loss) if r.profit_loss is not None else None,
             }
-            for r in results
+            for r in monthly.values()
         ]
 
         return points, self._series_sorted_by_latest(points)

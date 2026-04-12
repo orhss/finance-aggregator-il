@@ -47,14 +47,15 @@ def list_transactions(
     to_date: Optional[date] = None,
     status: Optional[str] = None,
     institution: Optional[str] = None,
+    search: Optional[str] = None,
+    category: Optional[str] = None,
     untagged_only: bool = False,
-    page: int = 1,
-    page_size: int = 50,
+    limit: int = 50,
+    offset: int = 0,
     _: str = CurrentUser,
     analytics: AnalyticsService = Depends(get_analytics),
 ):
-    page_size = min(page_size, 200)
-    offset = (page - 1) * page_size
+    limit = min(limit, 200)
 
     # Get total count
     total = analytics.get_transaction_count(
@@ -62,6 +63,8 @@ def list_transactions(
         from_date=from_date,
         to_date=to_date,
         status=status,
+        search=search,
+        category=category,
     )
 
     txns = analytics.get_transactions(
@@ -70,16 +73,20 @@ def list_transactions(
         to_date=to_date,
         status=status,
         institution=institution,
+        search=search,
+        category=category,
         untagged_only=untagged_only,
-        limit=page_size,
+        limit=limit,
         offset=offset,
     )
+
+    page = (offset // limit) + 1 if limit else 1
 
     return PaginatedResponse(
         items=[_txn_schema(t) for t in txns],
         total=total,
         page=page,
-        page_size=page_size,
+        page_size=limit,
         has_next=(offset + len(txns)) < total,
     )
 

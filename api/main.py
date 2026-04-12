@@ -17,6 +17,8 @@ from api.routers import (
     balances,
     budget,
     categories,
+    dividends,
+    retirement,
     rules,
     sync,
     tags,
@@ -65,6 +67,8 @@ app.include_router(tags.router)
 app.include_router(categories.router)
 app.include_router(rules.router)
 app.include_router(sync.router)
+app.include_router(retirement.router)
+app.include_router(dividends.router)
 
 # ==================== Health ====================
 

@@ -65,9 +65,9 @@ async def sync_stream(job_id: str, _: str = CurrentUser):
     """
     SSE stream for sync progress.
     Starts the subprocess and streams stdout as server-sent events.
+    If the client reconnects, replays cached lines instead of starting a new subprocess.
     """
     async def event_generator():
-        # Send a ping so the client knows the connection is alive
         yield _sse_event("ping", {"message": "connected"})
 
         job = _jobs.get(job_id)
@@ -76,9 +76,45 @@ async def sync_stream(job_id: str, _: str = CurrentUser):
             return
 
         institution = job["institution"]
+
+        # Guard: if subprocess already started (reconnect), replay lines + wait
+        if job["status"] in ("running", "success", "error"):
+            # Replay cached output
+            for line in job["lines"]:
+                yield _sse_event("progress", {"message": line, "institution": institution})
+
+            # If already finished, send final status
+            if job["status"] in ("success", "error"):
+                success = job["status"] == "success"
+                yield _sse_event(
+                    "success" if success else "error",
+                    {"message": "Sync completed" if success else "Sync failed", "institution": institution},
+                )
+                return
+
+            # Still running — tail new lines until done
+            seen = len(job["lines"])
+            while job["status"] == "running":
+                await asyncio.sleep(1)
+                # Send keepalive ping
+                yield _sse_event("ping", {"message": "waiting"})
+                # Send any new lines
+                new_lines = job["lines"][seen:]
+                for line in new_lines:
+                    yield _sse_event("progress", {"message": line, "institution": institution})
+                seen += len(new_lines)
+
+            # Process finished while we were tailing
+            success = job["status"] == "success"
+            yield _sse_event(
+                "success" if success else "error",
+                {"message": "Sync completed" if success else "Sync failed", "institution": institution},
+            )
+            return
+
+        # First connection — start the subprocess
         _jobs[job_id]["status"] = "running"
 
-        # Build the fin-cli command
         cmd = [sys.executable, "-m", "cli.main", "sync", institution]
         if job.get("months_back") is not None:
             cmd.extend(["--months-back", str(job["months_back"])])

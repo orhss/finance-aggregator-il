@@ -12,6 +12,8 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
 import TuneIcon from '@mui/icons-material/Tune'
+import CalculateIcon from '@mui/icons-material/Calculate'
+import PaidIcon from '@mui/icons-material/Paid'
 import SettingsIcon from '@mui/icons-material/Settings'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -21,6 +23,8 @@ const NAV_ITEMS = [
   { label: 'Analytics', icon: <BarChartIcon />, path: '/analytics' },
   { label: 'Accounts', icon: <AccountBalanceIcon />, path: '/accounts' },
   { label: 'Organize', icon: <TuneIcon />, path: '/organize' },
+  { label: 'Retirement', icon: <CalculateIcon />, path: '/retirement' },
+  { label: 'Dividends', icon: <PaidIcon />, path: '/dividends' },
   { label: 'Settings', icon: <SettingsIcon />, path: '/settings' },
 ]
 

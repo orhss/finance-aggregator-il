@@ -85,3 +85,8 @@ def get_category_service(db: Session = Depends(get_db)):
 def get_rules_service(db: Session = Depends(get_db)):
     from services.rules_service import RulesService
     return RulesService(session=db)
+
+
+def get_retirement_scenario_service(db: Session = Depends(get_db)):
+    from services.retirement_scenario_service import RetirementScenarioService
+    return RetirementScenarioService(session=db)

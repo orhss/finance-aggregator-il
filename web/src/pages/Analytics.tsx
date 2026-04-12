@@ -35,11 +35,13 @@ import { AccountGrowthLines } from '@/components/charts/AccountGrowthLines'
 import { CategoryBars } from '@/components/charts/CategoryBars'
 import { MonthlyTrend } from '@/components/charts/MonthlyTrend'
 import { PnLBars } from '@/components/charts/PnLBars'
+import { FIProgressChart } from '@/components/charts/FIProgressChart'
 import { PortfolioProgression } from '@/components/charts/PortfolioProgression'
 import { SpendingDonut } from '@/components/charts/SpendingDonut'
 import { MetricCard } from '@/components/cards/MetricCard'
 import { AmountDisplay } from '@/components/common/AmountDisplay'
 import { ChartSkeleton } from '@/components/common/LoadingSkeleton'
+import { CHART_COLORS } from '@/utils/constants'
 import type { CategoryBreakdownItem } from '@/types/analytics'
 
 type PeriodKey = '3m' | '6m' | '1y' | 'all'
@@ -55,7 +57,6 @@ function periodToDateRange(period: PeriodKey): { from_date?: string; to_date?: s
 }
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-const STACK_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b']
 
 function TabPanel({ value, index, children }: { value: number; index: number; children: React.ReactNode }) {
   return value === index ? <Box sx={{ pt: 2 }}>{children}</Box> : null
@@ -83,7 +84,7 @@ export default function Analytics() {
   const prevYear = month === 1 ? year - 1 : year
   const prevMonth = month === 1 ? 12 : month - 1
 
-  const { data: trends, isLoading: trendsLoading } = useMonthlyTrends({ months: 12 })
+  const { data: trends, isLoading: trendsLoading } = useMonthlyTrends({ months: 12, include_current: true })
   const { data: categories, isLoading: catLoading } = useCategoryBreakdown()
   const { data: tags, isLoading: tagsLoading } = useTagBreakdown()
   const { data: catTrends, isLoading: catTrendsLoading } = useCategoryTrends({ months: 6, top_n: 5 })
@@ -146,6 +147,7 @@ export default function Analytics() {
         <Tab label="Categories" />
         <Tab label="Tags" />
         <Tab label="Portfolio" />
+        <Tab label="FI" />
       </Tabs>
 
       {/* ── Trends ── */}
@@ -215,8 +217,8 @@ export default function Analytics() {
                     <defs>
                       {catTrendsKeys.map((cat, i) => (
                         <linearGradient key={cat} id={`catGrad-${i}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={STACK_COLORS[i % STACK_COLORS.length]} stopOpacity={0.4} />
-                          <stop offset="95%" stopColor={STACK_COLORS[i % STACK_COLORS.length]} stopOpacity={0.05} />
+                          <stop offset="5%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.4} />
+                          <stop offset="95%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.05} />
                         </linearGradient>
                       ))}
                     </defs>
@@ -248,7 +250,7 @@ export default function Analytics() {
                         type="monotone"
                         dataKey={cat}
                         stackId="1"
-                        stroke={STACK_COLORS[i % STACK_COLORS.length]}
+                        stroke={CHART_COLORS[i % CHART_COLORS.length]}
                         fill={`url(#catGrad-${i})`}
                         strokeWidth={2}
                       />
@@ -369,7 +371,8 @@ function PortfolioPanel({
   }, [pnl])
 
   return (
-    <TabPanel value={tab} index={3}>
+    <>
+      <TabPanel value={tab} index={3}>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {/* Metrics row */}
         <Grid container spacing={2}>
@@ -489,6 +492,26 @@ function PortfolioPanel({
           </Grid>
         </Grid>
       </Box>
+      </TabPanel>
+
+      {/* ── Financial Independence ── */}
+      <FIPanel tab={tab} />
+    </>
+  )
+}
+
+/* ── FI Panel (separate so it always fetches full-range data) ── */
+
+function FIPanel({ tab }: { tab: number }) {
+  const { data: byType, isLoading } = usePortfolioByType({})
+
+  return (
+    <TabPanel value={tab} index={4}>
+      {isLoading ? (
+        <ChartSkeleton height={400} />
+      ) : (
+        <FIProgressChart data={byType ?? { points: [], series_names: [] }} height={320} />
+      )}
     </TabPanel>
   )
 }

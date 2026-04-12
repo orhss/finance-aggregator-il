@@ -10,6 +10,8 @@ const Transactions = lazy(() => import('@/pages/Transactions'))
 const Analytics = lazy(() => import('@/pages/Analytics'))
 const Accounts = lazy(() => import('@/pages/Accounts'))
 const Organize = lazy(() => import('@/pages/Organize'))
+const Retirement = lazy(() => import('@/pages/Retirement'))
+const Dividends = lazy(() => import('@/pages/Dividends'))
 const Settings = lazy(() => import('@/pages/Settings'))
 const Login = lazy(() => import('@/pages/Login'))
 const NotFound = lazy(() => import('@/pages/NotFound'))
@@ -48,6 +50,8 @@ export default function App() {
           <Route path="analytics" element={<Analytics />} />
           <Route path="accounts" element={<Accounts />} />
           <Route path="organize" element={<Organize />} />
+          <Route path="retirement" element={<Retirement />} />
+          <Route path="dividends" element={<Dividends />} />
           <Route path="settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Route>

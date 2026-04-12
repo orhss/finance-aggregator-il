@@ -31,7 +31,6 @@ export function createSyncStream(
 ): EventSource {
   const token = localStorage.getItem('access_token')
   const base = import.meta.env.VITE_API_URL || ''
-  // SSE with auth header via URL param (EventSource doesn't support custom headers)
   const url = `${base}/sync/stream/${jobId}${token ? `?token=${token}` : ''}`
   const es = new EventSource(url)
 
@@ -46,8 +45,20 @@ export function createSyncStream(
 
   es.addEventListener('progress', handle('progress'))
   es.addEventListener('success', handle('success'))
-  es.addEventListener('error', handle('error'))
   es.addEventListener('ping', handle('ping'))
+
+  // Handle both server-sent "error" events and native connection errors.
+  // Native errors (connection drop) have no .data — let EventSource reconnect
+  // to the same endpoint; the server will replay cached lines instead of
+  // starting a duplicate subprocess.
+  es.addEventListener('error', (e) => {
+    const me = e as MessageEvent
+    if (me.data) {
+      // Server-sent error event with payload
+      handle('error')(me)
+    }
+    // Native connection error — EventSource auto-reconnects, server handles it
+  })
 
   return es
 }

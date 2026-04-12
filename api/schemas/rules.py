@@ -27,6 +27,7 @@ class ApplyRulesRequest(BaseModel):
     transaction_ids: Optional[List[int]] = None
     only_uncategorized: bool = False
     dry_run: bool = False
+    rule_indices: Optional[List[int]] = None
 
 
 class ApplyRulesResult(BaseModel):

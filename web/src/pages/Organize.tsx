@@ -17,6 +17,8 @@ import Select from '@mui/material/Select'
 import Tab from '@mui/material/Tab'
 import Tabs from '@mui/material/Tabs'
 import TextField from '@mui/material/TextField'
+import Checkbox from '@mui/material/Checkbox'
+import Alert from '@mui/material/Alert'
 import Typography from '@mui/material/Typography'
 import { useTags, useTagStats, useDeleteTag } from '@/api/tags'
 import type { TagStats } from '@/types/tag'
@@ -151,17 +153,39 @@ function RulesTab() {
   const [pattern, setPattern] = useState('')
   const [ruleCategory, setRuleCategory] = useState('')
   const [tags, setTags] = useState('')
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+
+  function toggleSelected(index: number) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
+      return next
+    })
+  }
 
   function handleCreate() {
     if (!pattern || !ruleCategory) return
-    createRule({
-      pattern,
-      category: ruleCategory,
-      tags: tags ? tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
-    })
-    setPattern('')
-    setRuleCategory('')
-    setTags('')
+    setFeedback(null)
+    createRule(
+      {
+        pattern,
+        category: ruleCategory,
+        tags: tags ? tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
+      },
+      {
+        onSuccess: () => {
+          setPattern('')
+          setRuleCategory('')
+          setTags('')
+          setFeedback({ type: 'success', message: `Rule "${pattern}" added` })
+        },
+        onError: (err) => {
+          setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Failed to create rule' })
+        },
+      },
+    )
   }
 
   return (
@@ -194,19 +218,30 @@ function RulesTab() {
               onChange={(e) => setTags(e.target.value)}
               sx={{ flex: 1, minWidth: 120 }}
             />
-            <Button variant="contained" onClick={handleCreate}>Add</Button>
+            <Button variant="contained" onClick={handleCreate} disabled={!pattern || !ruleCategory}>Add</Button>
           </Box>
         </CardContent>
       </Card>
 
-      <Box sx={{ display: 'flex', gap: 1 }}>
-        <Button variant="outlined" onClick={() => applyRules({ dry_run: true })}>Dry Run</Button>
-        <Button variant="contained" onClick={() => applyRules({})}>Apply All Rules</Button>
+      {feedback && (
+        <Alert severity={feedback.type} onClose={() => setFeedback(null)}>{feedback.message}</Alert>
+      )}
+
+      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+        <Button variant="outlined" onClick={() => applyRules({ dry_run: true, rule_indices: selected.size ? [...selected] : undefined })}>
+          {selected.size ? `Dry Run (${selected.size})` : 'Dry Run All'}
+        </Button>
+        <Button variant="contained" onClick={() => applyRules({ rule_indices: selected.size ? [...selected] : undefined })}>
+          {selected.size ? `Apply Selected (${selected.size})` : 'Apply All Rules'}
+        </Button>
+        {selected.size > 0 && (
+          <Button variant="text" size="small" onClick={() => setSelected(new Set())}>Clear Selection</Button>
+        )}
       </Box>
       {applyResult && (
-        <Typography variant="body2" color="success.main">
-          Applied to {applyResult.modified} transactions
-        </Typography>
+        <Alert severity={applyResult.modified > 0 ? 'success' : 'info'} onClose={() => {}}>
+          {applyResult.message || `Applied to ${applyResult.modified} of ${applyResult.processed} transactions`}
+        </Alert>
       )}
 
       <Card>
@@ -217,9 +252,12 @@ function RulesTab() {
             <React.Fragment key={r.pattern}>
               {i > 0 && <Divider />}
               <Box sx={{ py: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                  <Typography variant="body2" fontWeight={500}>{r.pattern}</Typography>
-                  <Typography variant="caption" color="text.secondary">→ {r.category}{r.tags?.length ? ` · ${r.tags.join(', ')}` : ''}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Checkbox size="small" checked={selected.has(i)} onChange={() => toggleSelected(i)} />
+                  <Box>
+                    <Typography variant="body2" fontWeight={500}>{r.pattern}</Typography>
+                    <Typography variant="caption" color="text.secondary">→ {r.category}{r.tags?.length ? ` · ${r.tags.join(', ')}` : ''}</Typography>
+                  </Box>
                 </Box>
                 <Button size="small" color="error" onClick={() => deleteRule(r.pattern)}>Remove</Button>
               </Box>

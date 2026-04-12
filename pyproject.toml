@@ -52,6 +52,8 @@ dependencies = [
     "python-jose[cryptography]>=3.3.0",
     "python-multipart>=0.0.9",
     "beautifulsoup4>=4.14.3",
+    # Financial data
+    "yfinance>=0.2.36",
 ]
 
 [project.optional-dependencies]

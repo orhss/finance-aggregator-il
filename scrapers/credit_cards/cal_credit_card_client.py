@@ -555,7 +555,7 @@ class CALCreditCardScraper(BaseCreditCardScraper['CALCredentials', 'CardAccount'
             charged_amount=charged_amount,
             charged_currency=txn.get('debCrdCurrencySymbol', 'ILS'),
             description=txn.get('merchantName', ''),
-            memo=str(txn.get('transTypeCommentDetails', '')),
+            memo=', '.join(txn['transTypeCommentDetails']) if isinstance(txn.get('transTypeCommentDetails'), list) else str(txn.get('transTypeCommentDetails', '') or ''),
             category=txn.get('branchCodeDesc', ''),
         )
 

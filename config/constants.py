@@ -100,6 +100,7 @@ class UnifiedCategory:
     EDUCATION = "education"
     DONATIONS = "donations"
     GIFTS = "gifts"
+    PETS = "pets"
     SERVICES = "services"
     OTHER = "other"
 

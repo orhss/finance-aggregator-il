@@ -86,6 +86,7 @@ export default function Transactions() {
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(0) }}
           InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+          inputProps={{ dir: 'auto' }}
           sx={{ flex: 1, minWidth: 200 }}
         />
         <FormControl size="small" sx={{ minWidth: 140 }}>
@@ -179,6 +180,7 @@ export default function Transactions() {
                 rows={2}
                 value={editMemo}
                 onChange={(e) => setEditMemo(e.target.value)}
+                inputProps={{ dir: 'auto' }}
               />
 
               <Box sx={{ display: 'flex', gap: 1 }}>

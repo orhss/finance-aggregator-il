@@ -86,6 +86,14 @@ export function amountColor(amount: number, mode: 'light' | 'dark' = 'light'): s
   return mode === 'light' ? '#6b7280' : '#64748b'
 }
 
+/** Format large ILS values for chart axes (e.g. ₪1.2M, ₪500K) */
+export function formatAxisValue(v: number): string {
+  const abs = Math.abs(v)
+  if (abs >= 1_000_000) return `₪${(v / 1_000_000).toFixed(1)}M`
+  if (abs >= 1_000) return `₪${(v / 1_000).toFixed(0)}K`
+  return `₪${v.toFixed(0)}`
+}
+
 /** Format month number (1-12) to abbreviated name */
 export function monthName(month: number): string {
   return new Date(2000, month - 1, 1).toLocaleString('en-US', { month: 'short' })

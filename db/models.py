@@ -300,3 +300,20 @@ class Budget(Base):
 
     def __repr__(self):
         return f"<Budget(year={self.year}, month={self.month}, amount={self.amount})>"
+
+
+class RetirementScenario(Base):
+    """
+    Persisted retirement calculator scenario.
+    Config is stored as a JSON blob; results are not persisted (cheap to re-compute).
+    """
+    __tablename__ = "retirement_scenarios"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    config = Column(Text, nullable=False)  # JSON blob
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<RetirementScenario(id={self.id}, name={self.name})>"

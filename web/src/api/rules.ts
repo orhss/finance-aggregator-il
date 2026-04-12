@@ -29,7 +29,7 @@ export function useDeleteRule() {
 export function useApplyRules() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: { dry_run?: boolean; account_id?: number }) =>
+    mutationFn: (body: { dry_run?: boolean; account_id?: number; rule_indices?: number[] }) =>
       apiClient.post<ApplyRulesResult>('/rules/apply', body).then((r) => r.data),
     onSuccess: (_, vars) => {
       if (!vars.dry_run) {
