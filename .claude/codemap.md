@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-03-15 21:36
+# Auto-generated: 2026-04-12 19:45
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -22,7 +22,8 @@ scrapers → services → db → cli/streamlit_app
 - api/routers/balances.py: fn:latest_balances,portfolio_by_type,portfolio_by_account,pnl_summary,balance_history
 - api/routers/budget.py: fn:budget_progress,get_budget,set_budget,delete_budget
 - api/routers/categories.py: fn:list_mappings,create_mapping,delete_mapping,apply_mappings,unmapped_categories
-- api/routers/retirement.py: fn:simulate
+- api/routers/dividends.py: fn:ticker_search,dividend_summary,drip_projection,drip_compare,portfolio_income
+- api/routers/retirement.py: fn:simulate,list_scenarios,create_scenario,update_scenario,delete_scenario
 - api/routers/rules.py: fn:list_rules,create_rule,delete_rule,apply_rules
 - api/routers/sync.py: fn:sync_history,start_sync
 - api/routers/tags.py: fn:list_tags,tag_stats,untagged_count,tag_transaction,untag_transaction
@@ -34,7 +35,8 @@ scrapers → services → db → cli/streamlit_app
 - api/schemas/budget.py: class:BudgetResponse,BudgetSet,BudgetProgress
 - api/schemas/categories.py: class:MappingResponse,MappingCreate,MerchantMappingResponse,MerchantMappingCreate,UnmappedCategory
 - api/schemas/common.py: class:PaginatedResponse,ErrorResponse,MessageResponse,CountResponse
-- api/schemas/retirement.py: class:SimulationSummary,MonthlyRow,Milestone,SimulationResponse
+- api/schemas/dividends.py: class:DividendPaymentResponse,DividendSummaryResponse,DripRequest,DripPointResponse,DripProjectionResponse
+- api/schemas/retirement.py: class:SimulationSummary,MonthlyRow,Milestone,SimulationResponse,ScenarioCreate
 - api/schemas/rules.py: class:RuleResponse,RuleCreate,ApplyRulesRequest,ApplyRulesResult
 - api/schemas/sync.py: class:SyncHistoryResponse,SyncRequest,SyncProgress
 - api/schemas/tags.py: class:TagResponse,TagStatsResponse,TagTransactionRequest,BulkTagRequest,RenameTagRequest
@@ -100,7 +102,9 @@ scrapers → services → db → cli/streamlit_app
 - services/budget_service.py: class:BudgetService
 - services/category_service.py: class:CategoryService
 - services/credit_card_service.py: class:CreditCardService
+- services/dividend_service.py: class:DividendPayment,DividendSummary,DripProjectionPoint,DripProjection,PortfolioIncomeProjection | fn:fetch_dividend_summary,project_drip,project_portfolio_income,search_tickers
 - services/pension_service.py: class:PensionService
+- services/retirement_scenario_service.py: class:RetirementScenarioService
 - services/rules_service.py: class:MatchType,Rule,RulesService
 - services/tag_service.py: class:TagService
 
@@ -155,6 +159,3 @@ scrapers → services → db → cli/streamlit_app
 - tests/streamlit_app/test_analytics_helpers.py: class:TestGetPeriodOptions,TestTransactionsToDataframe,TestCalculateSpendingMetrics,TestGetSpendingByDayOfWeek
 - tests/streamlit_app/test_filters.py: class:TestDateRangePickerLogic
 - tests/test_retirement_calculator.py: class:TestFIFOTracker,TestPensionConverter,TestTaxCalculator,TestGrowthEngine,TestCashFlowResolution
-
-## web/
-- web/node_modules/flatted/python/flatted.py: class:_Known,_String | fn:parse,stringify
