@@ -252,7 +252,7 @@ def simulate(
     _: str = CurrentUser,
 ):
     """Run the retirement simulation with the given config."""
-    from retirement_calculator import find_fire_month, parse_config, simulate as run_sim
+    from services.retirement_calculator import find_fire_month, parse_config, simulate as run_sim
 
     config_obj = parse_config(config)
 

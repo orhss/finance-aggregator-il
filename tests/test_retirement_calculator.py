@@ -9,7 +9,7 @@ cash flow resolution, and withdrawal engine.
 import pytest
 from datetime import date
 
-from retirement_calculator import (
+from services.retirement_calculator import (
     # Tax module
     calc_annual_income_tax,
     calc_monthly_income_tax,
