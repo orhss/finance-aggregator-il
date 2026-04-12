@@ -1,7 +1,7 @@
 # Fin Codemap
 # USE THIS FILE to check if files/directories exist
 # Do NOT use Glob/Grep for file existence checks
-# Auto-generated: 2026-04-12 19:45
+# Auto-generated: 2026-04-12 19:52
 # Refresh: python scripts/generate_codemap.py
 
 ## Flow
@@ -104,6 +104,7 @@ scrapers → services → db → cli/streamlit_app
 - services/credit_card_service.py: class:CreditCardService
 - services/dividend_service.py: class:DividendPayment,DividendSummary,DripProjectionPoint,DripProjection,PortfolioIncomeProjection | fn:fetch_dividend_summary,project_drip,project_portfolio_income,search_tickers
 - services/pension_service.py: class:PensionService
+- services/retirement_calculator.py: class:Person,CashFlow,PortfolioConfig,PensionConfig,KerenConfig | fn:parse_date_str,parse_cashflow,parse_config,load_config,calc_annual_income_tax
 - services/retirement_scenario_service.py: class:RetirementScenarioService
 - services/rules_service.py: class:MatchType,Rule,RulesService
 - services/tag_service.py: class:TagService
